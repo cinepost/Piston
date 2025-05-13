@@ -1,0 +1,1 @@
+HOUDINI_PATH = "/opt/piston/houdini_${HOUDINI_VERSION};&"

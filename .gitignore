@@ -1,0 +1,58 @@
+# Some trash
+core
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# python
+*.pyc
+
+# version
+src/version.cpp
+
+# folders
+deps
+deps/
+tmp
+tmp/
+build
+build/
+venv
+venv/
+env
+env/
+
+third_party/external
+third_party/external/
+
+install/
+.vs/
+.vscode/
+
+*.sublime-workspace

@@ -1,0 +1,18 @@
+import importlib
+import _piston
+
+#####################################################
+# This is a simple module wrapper for hot reloading #
+#####################################################
+
+
+def reload(func):
+	def wrapper_reload(*args, **kwargs):
+		importlib.reload(_piston)
+		return func(*args, **kwargs)
+
+	return wrapper_reload
+
+@reload
+def __getattr__(name):
+	return getattr(_piston, name)
