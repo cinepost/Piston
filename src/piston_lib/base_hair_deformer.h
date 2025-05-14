@@ -19,7 +19,11 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		};
 		
 	public:
-		void setRestGeoPrim(pxr::UsdPrim* pRestGeoPrim);
+		void setRestGeoPrim(pxr::UsdPrim* pGeoPrim);
+		void setDeformedGeoPrim(pxr::UsdPrim* pGeoPrim);
+
+		virtual bool deform() = 0;
+
 		virtual const std::string& greet() const;
 
 	protected:

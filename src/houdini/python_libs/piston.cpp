@@ -25,12 +25,13 @@ BOOST_PYTHON_MODULE(_piston) {
   	.def("getFastDeformer", &HairDeformerFactory::getFastDeformer)
   ;
 
-	class_<BaseHairDeformer, BaseHairDeformer::SharedPtr>("BaseHairDeformer",  no_init)
+	class_<BaseHairDeformer, BaseHairDeformer::SharedPtr, boost::noncopyable>("BaseHairDeformer",  no_init)
 		.def("setRestGeoPrim", &BaseHairDeformer::setRestGeoPrim)
+		.def("deform", &BaseHairDeformer::deform)
 		.def("greet", &BaseHairDeformer::greet, return_value_policy<copy_const_reference>())
 	;
 
-	class_<FastHairDeformer, FastHairDeformer::SharedPtr>("FastHairDeformer",  no_init)
+	class_<FastHairDeformer, FastHairDeformer::SharedPtr, bases<BaseHairDeformer>>("FastHairDeformer",  no_init)
 		.def("create", &FastHairDeformer::create)
 		.staticmethod("create")
 		.def("greet", &FastHairDeformer::greet, return_value_policy<copy_const_reference>())

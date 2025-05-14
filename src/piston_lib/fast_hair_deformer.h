@@ -15,6 +15,7 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 	public:
 		static SharedPtr create();
 
+		virtual bool deform();
 		virtual const std::string& greet() const override;
 
 	protected:
