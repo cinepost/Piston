@@ -7,6 +7,29 @@
 #include <string>
 #include <pxr/usd/usd/prim.h>
 
+class UsdPrimHandle {
+	public:
+		UsdPrimHandle();
+		UsdPrimHandle(pxr::UsdStageWeakPtr pStage, const pxr::SdfPath& path);
+		UsdPrimHandle(const pxr::UsdPrim* pPrim);
+
+		pxr::UsdPrim getPrim() const;
+
+		const std::string&  	getName() const { return mPath.GetName(); }
+		const pxr::SdfPath& 	getPath() const { return mPath; }
+		pxr::UsdStageWeakPtr 	getStage() { return mpStage; }
+		
+		/* Invalidate handle */
+		void                    clear();
+
+		bool operator==(const pxr::UsdPrim* pPrim) const;
+
+	private:
+		pxr::UsdStageWeakPtr 	mpStage;
+		pxr::SdfPath 			mPath;
+
+};
+
 class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<BaseHairDeformer>;
@@ -19,21 +42,20 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		};
 		
 	public:
-		void setRestGeoPrim(pxr::UsdPrim* pGeoPrim);
-		void setDeformedGeoPrim(pxr::UsdPrim* pGeoPrim);
-
+		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
+		void setHairGeoPrim(pxr::UsdPrim* pGeoPrim);
+		
 		virtual bool deform() = 0;
 
-		virtual const std::string& greet() const;
+		virtual const std::string& toString() const;
 
 	protected:
 		BaseHairDeformer();
+		virtual bool buildDeformerData() = 0;
 
 	private:
-		Type mType = Type::UNKNOWN;
-		pxr::UsdPrim *mpRestGeoPrim;
-		pxr::UsdPrim *mpDeformedGeoPrim;
-		pxr::UsdPrim *mpHairPrim;
+		UsdPrimHandle mMeshGeoPrimHandle;
+		UsdPrimHandle mHairGeoPrimHandle;
 };
 
 inline std::string to_string(BaseHairDeformer::Type mt) {
