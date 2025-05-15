@@ -8,6 +8,10 @@
 #include <string>
 #include <pxr/usd/usd/prim.h>
 
+#include <glm/vec3.hpp> // glm::vec3
+
+namespace Piston {
+
 class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_this<BaseHairDeformer, FastHairDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<FastHairDeformer>;
@@ -15,13 +19,18 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 	public:
 		static SharedPtr create();
 
-		virtual bool deform();
 		virtual const std::string& toString() const override;
 
 	protected:
 		FastHairDeformer();
+		virtual bool deformImpl();
 
+	private:
 		virtual bool buildDeformerData() override;
+
+		std::vector<glm::vec3> mRestFaceNormals;
 };
+
+} // namespace Piston
 
 #endif // PISTON_LIB_FAST_HAIR_DEFORMER_H_

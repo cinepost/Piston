@@ -9,6 +9,8 @@
 #include <map>
 #include <mutex>
 
+namespace Piston {
+
 /*
  * Factory singleton class
  */
@@ -47,5 +49,7 @@ class HairDeformerFactory {
 
     	HairDeformerFactory() {}
 };
+
+} // namespace Piston
 
 #endif // PISTON_LIB_HAIR_DEFORMER_FACTORY_H_

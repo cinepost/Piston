@@ -5,6 +5,7 @@ include_directories(
 )
 
 file( GLOB SOURCES
+    ./geometry_tools.cpp
     ./base_hair_deformer.cpp
     ./fast_hair_deformer.cpp
     ./hair_deformer_factory.cpp

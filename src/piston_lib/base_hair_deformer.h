@@ -6,6 +6,9 @@
 #include <memory>
 #include <string>
 #include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usdGeom/mesh.h>
+
+namespace Piston {
 
 class UsdPrimHandle {
 	public:
@@ -18,7 +21,7 @@ class UsdPrimHandle {
 		const std::string&  	getName() const { return mPath.GetName(); }
 		const pxr::SdfPath& 	getPath() const { return mPath; }
 		pxr::UsdStageWeakPtr 	getStage() { return mpStage; }
-		
+
 		/* Invalidate handle */
 		void                    clear();
 
@@ -45,21 +48,29 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
 		void setHairGeoPrim(pxr::UsdPrim* pGeoPrim);
 		
-		virtual bool deform() = 0;
+		bool deform();
 
 		virtual const std::string& toString() const;
 
 	protected:
 		BaseHairDeformer();
-		virtual bool buildDeformerData() = 0;
 
-	private:
+		virtual bool deformImpl() = 0;
+
+	protected:
 		UsdPrimHandle mMeshGeoPrimHandle;
 		UsdPrimHandle mHairGeoPrimHandle;
+
+	private:
+		virtual bool buildDeformerData() = 0;
+		bool mDirty = false;
+
 };
 
-inline std::string to_string(BaseHairDeformer::Type mt) {
-#define t2s(t_) case BaseHairDeformer::Type::t_: return #t_;
+} // namespace Piston
+
+inline std::string to_string(Piston::BaseHairDeformer::Type mt) {
+#define t2s(t_) case Piston::BaseHairDeformer::Type::t_: return #t_;
     switch (mt) {
         t2s(FAST);
         t2s(INTERPOLATED);

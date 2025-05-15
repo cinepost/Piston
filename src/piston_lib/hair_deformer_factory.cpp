@@ -1,5 +1,7 @@
 #include "hair_deformer_factory.h"
 
+namespace Piston {
+
 HairDeformerFactory& HairDeformerFactory::getInstance() {
     if (mInstancePtr == nullptr) {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -30,6 +32,8 @@ BaseHairDeformer::SharedPtr HairDeformerFactory::getDeformer(BaseHairDeformer::T
 	}
 }
 
+} // namespace Piston
+
 // Initialize static members
-HairDeformerFactory* HairDeformerFactory::mInstancePtr = nullptr;
-std::mutex HairDeformerFactory::mMutex;
+Piston::HairDeformerFactory* Piston::HairDeformerFactory::mInstancePtr = nullptr;
+std::mutex Piston::HairDeformerFactory::mMutex;

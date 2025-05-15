@@ -19,6 +19,7 @@ char const* greet() {
 
 BOOST_PYTHON_MODULE(_piston) {
   using namespace boost::python;
+  using namespace Piston;
 
   class_<HairDeformerFactory, boost::noncopyable>("HairDeformerFactory",  no_init)
   	.def("getInstance", &HairDeformerFactory::getInstance, return_value_policy<reference_existing_object>())

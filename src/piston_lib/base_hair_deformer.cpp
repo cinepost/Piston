@@ -1,5 +1,7 @@
 #include "base_hair_deformer.h"
 
+namespace Piston {
+
 inline static bool isMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	if(pGeoPrim->GetTypeName() != "Mesh") return false;
 	return true;
@@ -50,6 +52,7 @@ void BaseHairDeformer::setMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	}
 
 	mMeshGeoPrimHandle = {pGeoPrim};
+	mDirty = true;
 
 	printf("Mesh geometry prim is set to: %s\n", mMeshGeoPrimHandle.getPath().GetText());
 	//printf("Address of mesh geometry prim is %p\n", (void *)pGeoPrim);  
@@ -64,11 +67,27 @@ void BaseHairDeformer::setHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	}
 
 	mHairGeoPrimHandle = {pGeoPrim};
+	mDirty = true;
+
 	printf("Hair geometry prim is set to: %s\n", mHairGeoPrimHandle.getPath().GetText());
 	//printf("Address of hair geometry prim is %p\n", (void *)pGeoPrim); 
+}
+
+bool BaseHairDeformer::deform() {
+	if(mDirty) {
+		if(!buildDeformerData()) {
+			printf("Error building deform data !\n");
+			return false;
+		}
+		mDirty = false;
+	}
+
+	return deformImpl();
 }
 
 const std::string& BaseHairDeformer::toString() const {
 	static const std::string kBaseDeformerString = "BaseHairDeformer";
 	return kBaseDeformerString;
 }
+
+} // namespace Piston

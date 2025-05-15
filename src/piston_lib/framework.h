@@ -3,7 +3,11 @@
 
 #include <memory>
 
-#define should_not_get_here() assert(false);
+#ifndef should_not_get_here
+#define should_not_get_here() assert(false)
+#endif
+
+namespace Piston {
 
 // This is a helper class which should be used in case a class derives from a base class which derives from enable_shared_from_this
 // If Derived will also inherit enable_shared_from_this, it will cause multiple inheritance from enable_shared_from_this, which results in a runtime errors because we have 2 copies of the WeakPtr inside shared_ptr
@@ -22,5 +26,7 @@ public:
         return std::static_pointer_cast<const Derived>(pShared);
     }
 };
+
+} // namespace Piston
 
 #endif // PISTON_LIB_FRAMEWORK_H_

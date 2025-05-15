@@ -1,5 +1,7 @@
 #include "fast_hair_deformer.h"
 
+namespace Piston {
+
 FastHairDeformer::FastHairDeformer(): BaseHairDeformer() {
 	printf("FastHairDeformer::FastHairDeformer()\n");
 }
@@ -13,12 +15,19 @@ const std::string& FastHairDeformer::toString() const {
 	return kFastDeformerString;
 }
 
-bool FastHairDeformer::deform() {
-	printf("FastHairDeformer::deform()\n");
+bool FastHairDeformer::deformImpl() {
+	printf("FastHairDeformer::deformImpl()\n");
 	return true;
 }
 
 bool FastHairDeformer::buildDeformerData() {
 	printf("FastHairDeformer::buildDeformerData()\n");
+
+	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
+
+	printf("Mesh face count: %zu\n", mesh.GetFaceCount());
+
 	return true;
 }
+
+} // namespace Piston
