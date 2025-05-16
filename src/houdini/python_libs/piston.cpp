@@ -29,6 +29,8 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<BaseHairDeformer, BaseHairDeformer::SharedPtr, boost::noncopyable>("BaseHairDeformer",  no_init)
 		.def("setMeshGeoPrim", &BaseHairDeformer::setMeshGeoPrim)
 		.def("setHairGeoPrim", &BaseHairDeformer::setHairGeoPrim)
+		.def("setMeshRestPositionAttrName", &BaseHairDeformer::setMeshRestPositionAttrName)
+		.def("getMeshRestPositionAttrName", &BaseHairDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
 		.def("deform", &BaseHairDeformer::deform)
 		.def("toString", &BaseHairDeformer::toString, return_value_policy<copy_const_reference>())
 	;

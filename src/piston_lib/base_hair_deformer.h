@@ -7,6 +7,7 @@
 #include <string>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/usd/usdGeom/primvarsAPI.h>
 
 namespace Piston {
 
@@ -22,10 +23,13 @@ class UsdPrimHandle {
 		const pxr::SdfPath& 	getPath() const { return mPath; }
 		pxr::UsdStageWeakPtr 	getStage() { return mpStage; }
 
+		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(mpStage, mPath); }
+
 		/* Invalidate handle */
 		void                    clear();
 
 		bool operator==(const pxr::UsdPrim* pPrim) const;
+		explicit operator bool() const { return mpStage && mpStage->GetPrimAtPath(mPath).IsValid(); };
 
 	private:
 		pxr::UsdStageWeakPtr 	mpStage;
@@ -47,7 +51,10 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 	public:
 		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
 		void setHairGeoPrim(pxr::UsdPrim* pGeoPrim);
-		
+
+		void setMeshRestPositionAttrName(const std::string& name);
+		const std::string& getMeshRestPositionAttrName() const { return mRestPositionAttrName; }
+
 		bool deform();
 
 		virtual const std::string& toString() const;
@@ -61,9 +68,11 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		UsdPrimHandle mMeshGeoPrimHandle;
 		UsdPrimHandle mHairGeoPrimHandle;
 
+		std::string   mRestPositionAttrName = "rest_p";
+		
 	private:
 		virtual bool buildDeformerData() = 0;
-		bool mDirty = false;
+		bool mDirty = true;
 
 };
 

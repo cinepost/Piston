@@ -8,7 +8,7 @@ inline static bool isMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
 }
 
 inline static bool isHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
-	if(pGeoPrim->GetTypeName() != "BasisCurve") return false;
+	if(pGeoPrim->GetTypeName() != "BasisCurves") return false;
 	return true;
 }
 
@@ -38,7 +38,7 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim* pPrim) const {
 	return mpStage == pPrim->GetStage() && mPath == pPrim->GetPath();
 }
 
-BaseHairDeformer::BaseHairDeformer() {
+BaseHairDeformer::BaseHairDeformer(): mDirty(true) {
 	printf("BaseHairDeformer::BaseHairDeformer()\n");
 }
 
@@ -62,7 +62,7 @@ void BaseHairDeformer::setHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	if(pGeoPrim && mHairGeoPrimHandle == pGeoPrim) return;
 	if(!isHairGeoPrim(pGeoPrim)) {
 		mHairGeoPrimHandle.clear();
-		printf("Hair geometry prim is not \"BasisCurve\"!\n");
+		printf("Hair geometry prim is not \"BasisCurves\"!\n");
 		return;
 	}
 
@@ -74,6 +74,11 @@ void BaseHairDeformer::setHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
 }
 
 bool BaseHairDeformer::deform() {
+	if(!mMeshGeoPrimHandle || !mHairGeoPrimHandle) {
+		printf("No mesh or hair UsdPrim is set !\n");
+		return false;
+	}
+	
 	if(mDirty) {
 		if(!buildDeformerData()) {
 			printf("Error building deform data !\n");
@@ -83,6 +88,12 @@ bool BaseHairDeformer::deform() {
 	}
 
 	return deformImpl();
+}
+
+void BaseHairDeformer::setMeshRestPositionAttrName(const std::string& name) {
+	if(mRestPositionAttrName == name) return;
+	mRestPositionAttrName = name;
+	mDirty = true;
 }
 
 const std::string& BaseHairDeformer::toString() const {
