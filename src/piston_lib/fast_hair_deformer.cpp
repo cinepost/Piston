@@ -23,12 +23,12 @@ bool FastHairDeformer::deformImpl() {
 bool FastHairDeformer::buildDeformerData() {
 	printf("FastHairDeformer::buildDeformerData()\n");
 
-	pxr::UsdGeomPrimvarsAPI primvarsApi = mMeshGeoPrimHandle.getPrimvarsAPI();
+	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = mMeshGeoPrimHandle.getPrimvarsAPI();
 
 	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
 
 	// Store rest positions
-	pxr::UsdGeomPrimvar restPositionPrimVar = primvarsApi.GetPrimvar(pxr::TfToken(mRestPositionAttrName));
+	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(mRestPositionAttrName));
 	if(!restPositionPrimVar) {
 		printf("No valid primvar \"%s\" exists in mesh !\n", mRestPositionAttrName.c_str());
 		return false;
@@ -48,6 +48,20 @@ bool FastHairDeformer::buildDeformerData() {
 
 	if(!mesh.GetPointsAttr().Get(&points, time)) {
 		return false;
+	}
+
+	// Hair to mesh binding data
+	{
+		pxr::UsdGeomPrimvarsAPI hairPrimvarsApi = mMeshGeoPrimHandle.getPrimvarsAPI();
+
+		pxr::UsdGeomPrimvar hairToMeshBindingPrimVar = hairPrimvarsApi.GetPrimvar(pxr::TfToken(mHairToMeshBindingAttrName));
+		if(!hairToMeshBindingPrimVar) {
+			printf("No valid hair primvar \"%s\" exists. Building now.\n", mHairToMeshBindingAttrName.c_str());
+			if(!buildHairToMeshBindingData()) {
+				return false;
+			}
+		}
+
 	}
 
 	return true;

@@ -11,6 +11,10 @@
 
 namespace Piston {
 
+namespace {
+	const std::string kHairToMeshBindingAttrName = "bind_to_tri";
+}
+
 class UsdPrimHandle {
 	public:
 		UsdPrimHandle();
@@ -37,6 +41,14 @@ class UsdPrimHandle {
 
 };
 
+struct PhantomMeshTriface {
+	static constexpr uint32_t kInvalidID = std::numeric_limits<uint32_t>::max();
+	uint32_t a, b, c;
+
+	PhantomMeshTriface(): a(kInvalidID), b(kInvalidID), c(kInvalidID) {}
+	PhantomMeshTriface(uint32_t _a, uint32_t _b, uint32_t _c): a(_a), b(_b), c(_c) {}
+};
+
 class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<BaseHairDeformer>;
@@ -55,6 +67,7 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		void setMeshRestPositionAttrName(const std::string& name);
 		const std::string& getMeshRestPositionAttrName() const { return mRestPositionAttrName; }
 
+		bool buildHairToMeshBindingData();
 		bool deform();
 
 		virtual const std::string& toString() const;
@@ -69,9 +82,13 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		UsdPrimHandle mHairGeoPrimHandle;
 
 		std::string   mRestPositionAttrName = "rest_p";
+		std::string   mHairToMeshBindingAttrName = kHairToMeshBindingAttrName;
 		
 	private:
 		virtual bool buildDeformerData() = 0;
+
+		std::vector<PhantomMeshTriface> mPhantomMesh;
+
 		bool mDirty = true;
 
 };

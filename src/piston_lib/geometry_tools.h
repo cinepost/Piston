@@ -10,9 +10,14 @@
 
 #include <glm/vec3.hpp> // glm::vec3
 
+#include <base_hair_deformer.h>
+
+
 namespace Piston {
 
 bool buildGeometryFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode time = pxr::UsdTimeCode::Default());
+
+bool buildPhantomTriMesh(const pxr::UsdGeomMesh& mesh, std::vector<PhantomMeshTriface>& phantomMesh, pxr::UsdTimeCode time = pxr::UsdTimeCode::Default());
 
 } // namespace Piston
 

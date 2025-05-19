@@ -31,6 +31,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setHairGeoPrim", &BaseHairDeformer::setHairGeoPrim)
 		.def("setMeshRestPositionAttrName", &BaseHairDeformer::setMeshRestPositionAttrName)
 		.def("getMeshRestPositionAttrName", &BaseHairDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
+		.def("buildHairToMeshBindingData", &BaseHairDeformer::buildHairToMeshBindingData)
 		.def("deform", &BaseHairDeformer::deform)
 		.def("toString", &BaseHairDeformer::toString, return_value_policy<copy_const_reference>())
 	;

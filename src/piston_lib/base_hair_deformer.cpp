@@ -1,4 +1,5 @@
 #include "base_hair_deformer.h"
+#include "geometry_tools.h"
 
 namespace Piston {
 
@@ -94,6 +95,22 @@ void BaseHairDeformer::setMeshRestPositionAttrName(const std::string& name) {
 	if(mRestPositionAttrName == name) return;
 	mRestPositionAttrName = name;
 	mDirty = true;
+}
+
+bool BaseHairDeformer::buildHairToMeshBindingData() {
+	if(!mMeshGeoPrimHandle || !mHairGeoPrimHandle) {
+		printf("No mesh or hair UsdPrim is set !\n");
+		return false;
+	}
+
+	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
+
+	if(!buildPhantomTriMesh(mesh, mPhantomMesh)) {
+		printf("Error building mesh topology data !\n");
+		return false;
+	}
+
+	return true;
 }
 
 const std::string& BaseHairDeformer::toString() const {
