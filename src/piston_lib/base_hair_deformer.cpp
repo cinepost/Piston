@@ -41,6 +41,8 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim* pPrim) const {
 
 BaseHairDeformer::BaseHairDeformer(): mDirty(true) {
 	printf("BaseHairDeformer::BaseHairDeformer()\n");
+
+	mpTempStage = pxr::UsdStage::CreateInMemory();
 }
 
 void BaseHairDeformer::setMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
@@ -74,7 +76,7 @@ void BaseHairDeformer::setHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	//printf("Address of hair geometry prim is %p\n", (void *)pGeoPrim); 
 }
 
-bool BaseHairDeformer::deform() {
+bool BaseHairDeformer::deform(pxr::UsdTimeCode time_code) {
 	if(!mMeshGeoPrimHandle || !mHairGeoPrimHandle) {
 		printf("No mesh or hair UsdPrim is set !\n");
 		return false;
@@ -88,29 +90,13 @@ bool BaseHairDeformer::deform() {
 		mDirty = false;
 	}
 
-	return deformImpl();
+	return deformImpl(time_code);
 }
 
 void BaseHairDeformer::setMeshRestPositionAttrName(const std::string& name) {
 	if(mRestPositionAttrName == name) return;
 	mRestPositionAttrName = name;
 	mDirty = true;
-}
-
-bool BaseHairDeformer::buildHairToMeshBindingData() {
-	if(!mMeshGeoPrimHandle || !mHairGeoPrimHandle) {
-		printf("No mesh or hair UsdPrim is set !\n");
-		return false;
-	}
-
-	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
-
-	if(!buildPhantomTriMesh(mesh, mPhantomMesh)) {
-		printf("Error building mesh topology data !\n");
-		return false;
-	}
-
-	return true;
 }
 
 const std::string& BaseHairDeformer::toString() const {

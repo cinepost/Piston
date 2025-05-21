@@ -3,6 +3,8 @@
 
 #include "framework.h"
 #include "base_hair_deformer.h"
+#include "adjacency.h"
+#include "phantom_trimesh.h"
 
 #include <memory>
 #include <string>
@@ -23,15 +25,17 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 
 	protected:
 		FastHairDeformer();
-		virtual bool deformImpl();
+		virtual bool deformImpl(pxr::UsdTimeCode time_code);
 
 	protected:
-		pxr::VtArray<pxr::GfVec3f> mMeshRestPositions;
+		pxr::VtArray<pxr::GfVec3f> 	mMeshRestPositions;
 
 	private:
 		virtual bool buildDeformerData() override;
+		bool buildHairToMeshBindingData();
 
-		std::vector<glm::vec3> mRestFaceNormals;
+		UsdGeomMeshFaceAdjacency	mAdjacency;
+		std::vector<glm::vec3> 		mRestFaceNormals;
 };
 
 } // namespace Piston

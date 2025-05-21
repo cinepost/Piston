@@ -8,16 +8,21 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 
-#include <glm/vec3.hpp> // glm::vec3
+#include <glm/vec3.hpp>
+#include <glm/glm.hpp>  
+
+#include <pxr/base/gf/matrix3f.h>
 
 #include <base_hair_deformer.h>
 
 
 namespace Piston {
 
-bool buildGeometryFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode time = pxr::UsdTimeCode::Default());
+bool buildUsdGeomMeshFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode timeCode = pxr::UsdTimeCode::Default());
 
-bool buildPhantomTriMesh(const pxr::UsdGeomMesh& mesh, std::vector<PhantomMeshTriface>& phantomMesh, pxr::UsdTimeCode time = pxr::UsdTimeCode::Default());
+glm::mat3 rotateAlign( glm::vec3 v1, glm::vec3 v2);
+
+pxr::GfMatrix3f rotateAlign( pxr::GfVec3f v1, pxr::GfVec3f v2);
 
 } // namespace Piston
 

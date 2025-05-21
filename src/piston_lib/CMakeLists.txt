@@ -5,6 +5,8 @@ include_directories(
 )
 
 file( GLOB SOURCES
+    ./adjacency.cpp
+    ./phantom_trimesh.cpp
     ./geometry_tools.cpp
     ./base_hair_deformer.cpp
     ./fast_hair_deformer.cpp

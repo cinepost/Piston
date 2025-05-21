@@ -1,4 +1,6 @@
 #include "fast_hair_deformer.h"
+#include "kdtree.hpp"
+
 
 namespace Piston {
 
@@ -15,7 +17,7 @@ const std::string& FastHairDeformer::toString() const {
 	return kFastDeformerString;
 }
 
-bool FastHairDeformer::deformImpl() {
+bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	printf("FastHairDeformer::deformImpl()\n");
 	return true;
 }
@@ -26,6 +28,9 @@ bool FastHairDeformer::buildDeformerData() {
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = mMeshGeoPrimHandle.getPrimvarsAPI();
 
 	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
+
+	// Create adjacency data
+	mAdjacency = UsdGeomMeshFaceAdjacency::create(mesh);
 
 	// Store rest positions
 	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(mRestPositionAttrName));
@@ -63,6 +68,17 @@ bool FastHairDeformer::buildDeformerData() {
 		}
 
 	}
+
+	return true;
+}
+
+bool FastHairDeformer::buildHairToMeshBindingData() {
+	if(!mMeshGeoPrimHandle || !mHairGeoPrimHandle) {
+		printf("No mesh or hair UsdPrim is set !\n");
+		return false;
+	}
+
+	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
 
 	return true;
 }

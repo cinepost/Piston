@@ -1,8 +1,11 @@
 #include "geometry_tools.h"
 
+#include <pxr/base/gf/math.h>
+
+
 namespace Piston {
 
-bool buildGeometryFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode time) {
+bool buildUsdGeomMeshFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode time) {
 	size_t points_count;
 	
 	std::vector<pxr::GfVec3f> points;
@@ -16,51 +19,44 @@ bool buildGeometryFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec
 	return true;
 }
 
-bool buildPhantomTriMesh(const pxr::UsdGeomMesh& mesh, std::vector<PhantomMeshTriface>& phantomMesh, pxr::UsdTimeCode time) {
-	const size_t input_mesh_face_count = mesh.GetFaceCount(time);
-	phantomMesh.clear();
-	phantomMesh.reserve(input_mesh_face_count);
+pxr::GfMatrix3f rotateAlign( pxr::GfVec3f v1, pxr::GfVec3f v2) {
+    pxr::GfVec3f axis = pxr::GfCross( v1, v2 );
 
-	pxr::VtArray<int> face_vertex_counts;
-	if(!mesh.GetFaceVertexCountsAttr().Get(&face_vertex_counts, time)) {
-		printf("Error getting face vertex counts for mesh !\n");
-		return false;
-	}
+    const float cosA = pxr::GfDot( v1, v2 );
+    const float k = 1.0f / (1.0f + cosA);
 
-	pxr::VtArray<int> face_vertex_indices;
-	if(!mesh.GetFaceVertexIndicesAttr().Get(&face_vertex_indices, time)) {
-		printf("Error getting face vertex indices for mesh !\n");
-		return false;
-	}
+    pxr::GfMatrix3f result( (axis[0] * axis[0] * k) + cosA,
+		(axis[1] * axis[0] * k) - axis[2], 
+		(axis[2] * axis[0] * k) + axis[1],
+		(axis[0] * axis[1] * k) + axis[2],  
+		(axis[1] * axis[1] * k) + cosA,      
+		(axis[2] * axis[1] * k) - axis[0],
+		(axis[0] * axis[2] * k) - axis[1],  
+		(axis[1] * axis[2] * k) + axis[0],  
+		(axis[2] * axis[2] * k) + cosA 
+	);
 
-	// triangulate if necessary
-	size_t idx = 0;
-	for(const int indices_count: face_vertex_counts) {
-		printf("%d\n", indices_count);
-		size_t _i = idx;
-		idx += indices_count;
-
-		// no trinagulation
-		if(indices_count == 3) {
-			phantomMesh.push_back({face_vertex_indices[_i], face_vertex_indices[_i+1], face_vertex_indices[_i+2]});
-			continue;
-		}
-
-		// simple ear-clipping triangulation
-		if(indices_count > 3) {
-			const bool edge_count_is_even = indices_count % 2;
-			std::vector<uint32_t> inner_indices;
-
-			for(uint32_t i = 0; i < (edge_count_is_even ? (indices_count - 1) : (indices_count - 2)); i+=2) {
-
-			}
-
-		}
-
-	} 
-
-	return true;
+    return result;
 }
 
+glm::mat3 rotateAlign( glm::vec3 v1, glm::vec3 v2) {
+    glm::vec3 axis = cross( v1, v2 );
+
+    const float cosA = dot( v1, v2 );
+    const float k = 1.0f / (1.0f + cosA);
+
+    glm::mat3 result( (axis.x * axis.x * k) + cosA,
+		(axis.y * axis.x * k) - axis.z, 
+		(axis.z * axis.x * k) + axis.y,
+		(axis.x * axis.y * k) + axis.z,  
+		(axis.y * axis.y * k) + cosA,      
+		(axis.z * axis.y * k) - axis.x,
+		(axis.x * axis.z * k) - axis.y,  
+		(axis.y * axis.z * k) + axis.x,  
+		(axis.z * axis.z * k) + cosA 
+	);
+
+    return result;
+}
 
 } // namespace Piston

@@ -23,6 +23,9 @@ class UsdPrimHandle {
 
 		pxr::UsdPrim getPrim() const;
 
+		bool isMeshGeoPrim() const { return getPrim().GetTypeName() == "Mesh"; }
+		bool isHairGeoPrim() const { return getPrim().GetTypeName() == "BasisCurves"; }
+
 		const std::string&  	getName() const { return mPath.GetName(); }
 		const pxr::SdfPath& 	getPath() const { return mPath; }
 		pxr::UsdStageWeakPtr 	getStage() { return mpStage; }
@@ -39,14 +42,6 @@ class UsdPrimHandle {
 		pxr::UsdStageWeakPtr 	mpStage;
 		pxr::SdfPath 			mPath;
 
-};
-
-struct PhantomMeshTriface {
-	static constexpr uint32_t kInvalidID = std::numeric_limits<uint32_t>::max();
-	uint32_t a, b, c;
-
-	PhantomMeshTriface(): a(kInvalidID), b(kInvalidID), c(kInvalidID) {}
-	PhantomMeshTriface(uint32_t _a, uint32_t _b, uint32_t _c): a(_a), b(_b), c(_c) {}
 };
 
 class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
@@ -67,15 +62,14 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		void setMeshRestPositionAttrName(const std::string& name);
 		const std::string& getMeshRestPositionAttrName() const { return mRestPositionAttrName; }
 
-		bool buildHairToMeshBindingData();
-		bool deform();
+		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		virtual const std::string& toString() const;
 
 	protected:
 		BaseHairDeformer();
 
-		virtual bool deformImpl() = 0;
+		virtual bool deformImpl(pxr::UsdTimeCode time_code) = 0;
 
 	protected:
 		UsdPrimHandle mMeshGeoPrimHandle;
@@ -87,8 +81,7 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 	private:
 		virtual bool buildDeformerData() = 0;
 
-		std::vector<PhantomMeshTriface> mPhantomMesh;
-
+		pxr::UsdStageRefPtr mpTempStage;
 		bool mDirty = true;
 
 };
