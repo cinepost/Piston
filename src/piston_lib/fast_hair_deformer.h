@@ -17,7 +17,8 @@ namespace Piston {
 class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_this<BaseHairDeformer, FastHairDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<FastHairDeformer>;
-		
+		using PxrIndexType = int;
+
 	public:
 		static SharedPtr create();
 
@@ -34,8 +35,8 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 		virtual bool buildDeformerData() override;
 		bool buildHairToMeshBindingData();
 
-		UsdGeomMeshFaceAdjacency	mAdjacency;
-		std::vector<glm::vec3> 		mRestFaceNormals;
+		UsdGeomMeshFaceAdjacency				mAdjacency;
+		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
 };
 
 } // namespace Piston

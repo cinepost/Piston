@@ -19,6 +19,15 @@ const std::string& FastHairDeformer::toString() const {
 
 bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	printf("FastHairDeformer::deformImpl()\n");
+
+	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
+
+	pxr::VtArray<pxr::GfVec3f> points; // TODO: make member
+
+	if(!mesh.GetPointsAttr().Get(&points, time_code)) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -32,41 +41,25 @@ bool FastHairDeformer::buildDeformerData() {
 	// Create adjacency data
 	mAdjacency = UsdGeomMeshFaceAdjacency::create(mesh);
 
-	// Store rest positions
-	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(mRestPositionAttrName));
-	if(!restPositionPrimVar) {
-		printf("No valid primvar \"%s\" exists in mesh !\n", mRestPositionAttrName.c_str());
-		return false;
-	}
+	// Create phantom mesh
+	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mRestPositionAttrName);
 
-	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
-	
-	if(!restPosAttr.Get(&mMeshRestPositions, pxr::UsdTimeCode::Default())) {
-		printf("Error getting mesh rest positions !\n");
-		return false;
-	}
-
-	printf("Mesh face count: %zu\n", mesh.GetFaceCount());
-
-	pxr::UsdTimeCode time = pxr::UsdTimeCode::Default();
-	pxr::VtArray<pxr::GfVec3f> points;
-
-	if(!mesh.GetPointsAttr().Get(&points, time)) {
-		return false;
-	}
+	// Build kdtree
+	static const bool threaded_kdtree_creation = false;
+	neighbour_search::KDTree<float, 3> kdtree(mpPhantomTrimesh->getRestPositions(), threaded_kdtree_creation);
 
 	// Hair to mesh binding data
+	// Iterate hair curves and test/bind root points
 	{
-		pxr::UsdGeomPrimvarsAPI hairPrimvarsApi = mMeshGeoPrimHandle.getPrimvarsAPI();
+		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> nearest_points;
+		neighbour_search::KDTree<float, 3>::PointType curve_root_point;
 
-		pxr::UsdGeomPrimvar hairToMeshBindingPrimVar = hairPrimvarsApi.GetPrimvar(pxr::TfToken(mHairToMeshBindingAttrName));
-		if(!hairToMeshBindingPrimVar) {
-			printf("No valid hair primvar \"%s\" exists. Building now.\n", mHairToMeshBindingAttrName.c_str());
-			if(!buildHairToMeshBindingData()) {
-				return false;
-			}
+		kdtree.findKNearestNeighbours(curve_root_point, 3, nearest_points);
+
+		if(nearest_points.size() == 3) {
+			auto tri_face = mpPhantomTrimesh->getOrCreate(
+				static_cast<PxrIndexType>(nearest_points[0].first), static_cast<PxrIndexType>(nearest_points[1].first), static_cast<PxrIndexType>(nearest_points[2].first));
 		}
-
 	}
 
 	return true;

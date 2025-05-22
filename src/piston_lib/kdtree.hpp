@@ -24,6 +24,10 @@
 #include <utility>     // std::pair
 #include <vector>      // std::vector
 
+#include "pxr/base/gf/vec3f.h"
+#include "pxr/base/vt/array.h"
+
+
 namespace neighbour_search {
 
 const static auto DEFAULT_RECURSION_DEPTH = static_cast<std::uint32_t>(std::floor(std::log2(std::thread::hardware_concurrency())));
@@ -33,6 +37,7 @@ template <typename CoordinateType, std::size_t number_of_dimensions, typename = 
 using Point = std::array<CoordinateType, number_of_dimensions>;
 
 template <typename CoordinateType, std::size_t number_of_dimensions> class KDTree final {
+  public:
     using PointType = Point<CoordinateType, number_of_dimensions>;
     using KDTreeType = KDTree<CoordinateType, number_of_dimensions>;
     using ReturnType = std::pair<std::size_t, CoordinateType>; // Index + Distance
@@ -49,6 +54,28 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
     /// @param threaded Flag that specifies whether threaded execution should be enabled
     /// @throw std::runtime_error if constructed KDTree is empty
     explicit KDTree(const std::vector<PointType> &points, bool threaded = false) : root_(nullptr) {
+        nodes_.reserve(points.size());
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            nodes_.emplace_back(points[i], i);
+        }
+
+        if (threaded) {
+            // Concurrent build
+            root_ = buildTreeRecursivelyParallel(nodes_.begin(), nodes_.end(), 0UL);
+        } else {
+            // Sequential build
+            root_ = buildTreeRecursively(nodes_.begin(), nodes_.end(), 0UL);
+        }
+
+        if (root_ == nullptr) {
+            throw std::runtime_error("KDTree is empty.");
+        }
+    }
+
+    explicit KDTree(const pxr::VtArray<pxr::GfVec3f>& points, bool threaded = false) : root_(nullptr) {
+        static_assert(number_of_dimensions == 3);
+        static_assert(std::is_same<CoordinateType, float>::value);
+
         nodes_.reserve(points.size());
         for (std::size_t i = 0; i < points.size(); ++i) {
             nodes_.emplace_back(points[i], i);
@@ -171,6 +198,12 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
     /// @brief Node structure containing point, pointer to left and right subtrees
     struct Node final {
         explicit Node(const PointType &point, std::size_t index) : point(point), index(index), left(nullptr), right(nullptr) {}
+
+        explicit Node(const pxr::GfVec3f &point, std::size_t index) : point({point[0], point[1], point[2]}), index(index), left(nullptr), right(nullptr) {
+            static_assert(number_of_dimensions == 3);
+            static_assert(std::is_same<CoordinateType, float>::value);
+        }
+
         ~Node() {
             left = nullptr;
             right = nullptr;
