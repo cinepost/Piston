@@ -159,6 +159,14 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         }
     }
 
+    void findKNearestNeighbours(const pxr::GfVec3f& target, std::size_t k, std::vector<ReturnType> &result) const {
+        static_assert(number_of_dimensions == 3);
+        static_assert(std::is_same<CoordinateType, float>::value);
+
+        const PointType pt({target[0], target[1], target[2]});
+        findKNearestNeighbours(pt, k, result);
+    }
+
     /// @brief Find K Nearest Neighbours closest to target
     /// @param target Target point
     /// @param k Number of neighbours

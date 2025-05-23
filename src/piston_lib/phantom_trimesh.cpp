@@ -5,10 +5,10 @@
 namespace Piston {
 
 template<typename IndexType>
-typename PhantomTrimesh<IndexType>::SharedPtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default()) {
+typename PhantomTrimesh<IndexType>::SharedPtr PhantomTrimesh<IndexType>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
 	assert(prim_handle.isMeshGeoPrim());
 
-	typename PhantomTrimesh<IndexType>::SharedPtr pPhantomTrimesh = std::make_shared<PhantomTrimesh<IndexType>>();
+	typename PhantomTrimesh<IndexType>::SharedPtr pPhantomTrimesh = PhantomTrimesh<IndexType>::SharedPtr( new PhantomTrimesh<IndexType>());
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
@@ -32,18 +32,32 @@ typename PhantomTrimesh<IndexType>::SharedPtr create(const UsdPrimHandle& prim_h
 }
 
 template<typename IndexType>
-typename PhantomTrimesh<IndexType>::TrifaceRetType PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexType c) {	
+size_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexType c) {	
 	auto it = mFaceMap.find({a, b, c});
 	if(it != mFaceMap.end()) {
-		return {&mFaces[it.second], it.second};
+		return it->second;
 	}
 
-	const size_t idx = mFaces.size_t();
+	const size_t idx = mFaces.size();
 
 	mFaces.push_back({a, b, c});
-	mFaces.back().restNormal = pxr::GfNormalize(pxr::GfCross(mUsdMeshRestPositions[b] - mUsdMeshRestPositions[a], mUsdMeshRestPositions[c] - mUsdMeshRestPositions[a]));
+	mFaces.back().restNormal = pxr::GfGetNormalized(pxr::GfCross(mUsdMeshRestPositions[b] - mUsdMeshRestPositions[a], mUsdMeshRestPositions[c] - mUsdMeshRestPositions[a]));
 
-	return {&mFaces.back(), idx};
+	return idx;
 }
+
+template<typename IndexType>
+bool PhantomTrimesh<IndexType>::projectPoint(const pxr::GfVec3f& pt, size_t triface_id) const {
+	const TriFace& face = mFaces[triface_id];
+	float t, u, v;
+	return pointTriangleProject(pt, face.getRestNormal(), mUsdMeshRestPositions[face[0]], mUsdMeshRestPositions[face[1]], mUsdMeshRestPositions[face[2]], t, u, v);
+}
+
+// Specialisation
+template PhantomTrimesh<int>::SharedPtr PhantomTrimesh<int>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code); 
+
+template size_t PhantomTrimesh<int>::getOrCreate(int a, int b, int c);
+
+template bool PhantomTrimesh<int>::projectPoint(const pxr::GfVec3f& pt, size_t triface_id) const;
 
 } // namespace Piston

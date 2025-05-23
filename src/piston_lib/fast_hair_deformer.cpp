@@ -52,13 +52,16 @@ bool FastHairDeformer::buildDeformerData() {
 	// Iterate hair curves and test/bind root points
 	{
 		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> nearest_points;
-		neighbour_search::KDTree<float, 3>::PointType curve_root_point;
+		const pxr::GfVec3f curve_root_pt(0.f, 0.f, 0.f);
 
-		kdtree.findKNearestNeighbours(curve_root_point, 3, nearest_points);
+		kdtree.findKNearestNeighbours(curve_root_pt, 3, nearest_points);
 
 		if(nearest_points.size() == 3) {
-			auto tri_face = mpPhantomTrimesh->getOrCreate(
+			const size_t tri_face_id = mpPhantomTrimesh->getOrCreate(
 				static_cast<PxrIndexType>(nearest_points[0].first), static_cast<PxrIndexType>(nearest_points[1].first), static_cast<PxrIndexType>(nearest_points[2].first));
+		
+			bool projected = mpPhantomTrimesh->projectPoint(curve_root_pt, tri_face_id);
+
 		}
 	}
 

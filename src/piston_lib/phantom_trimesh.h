@@ -6,6 +6,7 @@
 #include "base_hair_deformer.h"
 
 #include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/base/gf/matrix3f.h>
 
 #include <limits>
 #include <string>
@@ -36,36 +37,41 @@ struct IndicesArrayHasher {
 template<typename IndexType> 
 class PhantomTrimesh {
 	public:
-		static constexpr size_t kInvalidTrifaceID = std::numeric_limits<size_t>::max();
+		static constexpr size_t kInvalidTriFaceID = std::numeric_limits<size_t>::max();
 
 		using SharedPtr = std::shared_ptr<PhantomTrimesh>;
 
-		struct Triface {
+		struct TriFace {
 			using IndicesList = std::array<IndexType, 3>;
 			static constexpr IndexType kInvalidVertexID = std::numeric_limits<IndexType>::max();
 
-			Triface(): indices{kInvalidVertexID} { }
-			Triface(IndexType a, IndexType b, IndexType c): indices{a, b, c} { }
-			Triface(const std::array<IndexType, 3>& d): indices{d} { }
+			TriFace(): indices{kInvalidVertexID} { }
+			TriFace(IndexType a, IndexType b, IndexType c): indices{a, b, c} { }
+			TriFace(const std::array<IndexType, 3>& d): indices{d} { }
 
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
 
+			const pxr::GfVec3f& getRestNormal() const { return restNormal; }
+
+			const IndexType& operator[](size_t index) const { return indices[index]; }
+
 			IndicesList indices;
 
-			pxr::GfVec3f restNormal;
+			pxr::GfVec3f 	restNormal;
+			pxr::GfMatrix3f	alignMat;
 		};
 
-	private:
+	protected:
 		PhantomTrimesh() : mValid(false) {};
 
 	public:
-		using TrifaceRetType = typename std::pair<Triface*, size_t>;
-
 		static PhantomTrimesh::SharedPtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
 
-		TrifaceRetType getOrCreate(IndexType a, IndexType b, IndexType c);
+		size_t getOrCreate(IndexType a, IndexType b, IndexType c);
+
+		bool projectPoint(const pxr::GfVec3f& pt, size_t triface_id) const;
 
 		bool isValid() const { return mValid; }
 
@@ -73,7 +79,7 @@ class PhantomTrimesh {
 		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
 
 		std::unordered_map<std::array<IndexType, 3>, size_t, IndicesArrayHasher<IndexType, 3>> mFaceMap;
-		std::vector<Triface> 									mFaces;
+		std::vector<TriFace> 									mFaces;
 
 		bool                                        			mValid;
 };

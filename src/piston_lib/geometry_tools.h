@@ -24,6 +24,8 @@ glm::mat3 rotateAlign( glm::vec3 v1, glm::vec3 v2);
 
 pxr::GfMatrix3f rotateAlign( pxr::GfVec3f v1, pxr::GfVec3f v2);
 
+bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &t, float &u, float &v);
+
 } // namespace Piston
 
 #endif // PISTON_LIB_GEOMETRY_TOOLS_H_

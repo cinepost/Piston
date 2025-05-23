@@ -33,7 +33,7 @@ class HairDeformerFactory {
     	// Static method to get the HairDeformerFactory instance
 	    static HairDeformerFactory& getInstance();
 
-	    FastHairDeformer::SharedPtr getFastDeformer(const std::string& name);
+	    static FastHairDeformer::SharedPtr getFastDeformer(const std::string& name);
 
 	private:
 		BaseHairDeformer::SharedPtr getDeformer(BaseHairDeformer::Type type, const std::string& name);

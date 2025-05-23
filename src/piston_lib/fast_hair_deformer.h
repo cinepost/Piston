@@ -28,9 +28,6 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 		FastHairDeformer();
 		virtual bool deformImpl(pxr::UsdTimeCode time_code);
 
-	protected:
-		pxr::VtArray<pxr::GfVec3f> 	mMeshRestPositions;
-
 	private:
 		virtual bool buildDeformerData() override;
 		bool buildHairToMeshBindingData();

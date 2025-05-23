@@ -2,6 +2,8 @@
 
 #include <pxr/base/gf/math.h>
 
+#include <limits>
+
 
 namespace Piston {
 
@@ -57,6 +59,39 @@ glm::mat3 rotateAlign( glm::vec3 v1, glm::vec3 v2) {
 	);
 
     return result;
+}
+
+bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &t, float &u, float &v) {
+    static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
+
+    pxr::GfVec3f v0v1 = v1 - v0;
+    pxr::GfVec3f v0v2 = v2 - v0;
+    pxr::GfVec3f pvec = pxr::GfCross(-n, v0v2);
+    float det = pxr::GfDot(v0v1, pvec);
+
+#ifdef CHECK_CULLING
+    // If the determinant is negative, the triangle is back-facing.
+    // If the determinant is close to 0, the ray misses the triangle.
+    if (det < kEpsilon) return false;
+#else
+#ifdef CHECK_PARALLEL
+    // If det is close to 0, the ray and triangle are parallel.
+    if (fabs(det) < kEpsilon) return false;
+#endif // CHECK_PARALLEL
+#endif // CHECK_CULLING
+    float invDet = 1.f / det;
+
+    pxr::GfVec3f tvec = pt - v0;
+    u = pxr::GfDot(tvec, pvec) * invDet;
+    if ((u < 0.f) || (u > 1.f)) return false;
+
+    pxr::GfVec3f qvec = pxr::GfCross(tvec, v0v1);
+    v = pxr::GfDot(-n, qvec) * invDet;
+    if ((v < 0.f) || ((u + v) > 1.f)) return false;
+    
+    t = pxr::GfDot(v0v2, qvec) * invDet;
+    
+    return true;
 }
 
 } // namespace Piston

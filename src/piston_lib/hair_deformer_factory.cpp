@@ -13,7 +13,7 @@ HairDeformerFactory& HairDeformerFactory::getInstance() {
 }
 
 FastHairDeformer::SharedPtr HairDeformerFactory::getFastDeformer(const std::string& name) {
-	return std::dynamic_pointer_cast<FastHairDeformer>(getDeformer(BaseHairDeformer::Type::FAST, name));
+	return std::dynamic_pointer_cast<FastHairDeformer>(getInstance().getDeformer(BaseHairDeformer::Type::FAST, name));
 }
 
 BaseHairDeformer::SharedPtr HairDeformerFactory::getDeformer(BaseHairDeformer::Type type, const std::string& name) {
