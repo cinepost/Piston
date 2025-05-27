@@ -106,6 +106,18 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         return std::make_pair(nearest_node->index, min_distance_squared);
     }
 
+    [[nodiscard]] ReturnType findNearestNeighbour(const pxr::GfVec3f& target) const {
+        static_assert(number_of_dimensions == 3);
+        static_assert(std::is_same<CoordinateType, float>::value);
+
+        Node *nearest_node = nullptr;
+        CoordinateType min_distance_squared = std::numeric_limits<CoordinateType>::max();
+
+        findNearestNeighbourRecursively(root_, {target[0], target[1], target[2]}, 0UL, min_distance_squared, nearest_node);
+
+        return std::make_pair(nearest_node->index, min_distance_squared);
+    }
+
     /// @brief Find a single nearest neighbour for each provided target point
     /// @param targets Points of interest
     /// @param neighbours A List of neighbour for each target point

@@ -52,12 +52,14 @@ class PhantomTrimesh {
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
 
 			const pxr::GfVec3f& getRestNormal() const { return restNormal; }
+			const pxr::GfVec3f& getLiveNormal() const { return liveNormal; }
 
 			const IndexType& operator[](size_t index) const { return indices[index]; }
 
 			IndicesList indices;
 
 			pxr::GfVec3f 	restNormal;
+			pxr::GfVec3f 	liveNormal;
 			pxr::GfMatrix3f	alignMat;
 		};
 
@@ -69,14 +71,21 @@ class PhantomTrimesh {
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
 
-		size_t getOrCreate(IndexType a, IndexType b, IndexType c);
+		uint32_t getOrCreate(IndexType a, IndexType b, IndexType c);
 
-		bool projectPoint(const pxr::GfVec3f& pt, size_t triface_id) const;
+		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
+
+		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
+
+		pxr::GfVec3f getInterpolatedPosition(uint32_t face_id, float u, float v, float dist = 0.f) const;
 
 		bool isValid() const { return mValid; }
 
+		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+
 	private:
 		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
+		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshLivePositions;
 
 		std::unordered_map<std::array<IndexType, 3>, size_t, IndicesArrayHasher<IndexType, 3>> mFaceMap;
 		std::vector<TriFace> 									mFaces;

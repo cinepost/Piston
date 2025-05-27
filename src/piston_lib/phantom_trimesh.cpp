@@ -32,13 +32,13 @@ typename PhantomTrimesh<IndexType>::SharedPtr PhantomTrimesh<IndexType>::create(
 }
 
 template<typename IndexType>
-size_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexType c) {	
+uint32_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexType c) {	
 	auto it = mFaceMap.find({a, b, c});
 	if(it != mFaceMap.end()) {
 		return it->second;
 	}
 
-	const size_t idx = mFaces.size();
+	const uint32_t idx = static_cast<uint32_t>(mFaces.size());
 
 	mFaces.push_back({a, b, c});
 	mFaces.back().restNormal = pxr::GfGetNormalized(pxr::GfCross(mUsdMeshRestPositions[b] - mUsdMeshRestPositions[a], mUsdMeshRestPositions[c] - mUsdMeshRestPositions[a]));
@@ -47,17 +47,52 @@ size_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexTyp
 }
 
 template<typename IndexType>
-bool PhantomTrimesh<IndexType>::projectPoint(const pxr::GfVec3f& pt, size_t triface_id) const {
-	const TriFace& face = mFaces[triface_id];
-	float t, u, v;
-	return pointTriangleProject(pt, face.getRestNormal(), mUsdMeshRestPositions[face[0]], mUsdMeshRestPositions[face[1]], mUsdMeshRestPositions[face[2]], t, u, v);
+bool PhantomTrimesh<IndexType>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const {
+	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
+	return pointTriangleProject(pt, face.getRestNormal(), mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], dist, u, v);
+}
+
+template<typename IndexType>
+pxr::GfVec3f PhantomTrimesh<IndexType>::getInterpolatedPosition(uint32_t face_id, float u, float v, float dist) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
+
+	auto const& face = mFaces[face_id];
+	return (u * mUsdMeshLivePositions[face.indices[1]] + v * mUsdMeshLivePositions[face.indices[2]] + (1.f - u - v) * mUsdMeshLivePositions[face.indices[0]]) + face.getLiveNormal() * dist;// + face.getLiveNormal();
+};
+
+template<typename IndexType>
+bool PhantomTrimesh<IndexType>::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
+	assert(prim_handle.isMeshGeoPrim());
+
+	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
+
+	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
+		printf("Error getting point positions!\n");
+		return false;
+	}
+
+	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
+		printf("Rest and live mesh point positions count mismatch!\n");
+		return false;
+	}
+
+	for(auto& face: mFaces) {
+		face.liveNormal = pxr::GfGetNormalized(
+			pxr::GfCross(mUsdMeshLivePositions[face.indices[1]] - mUsdMeshLivePositions[face.indices[0]], mUsdMeshLivePositions[face.indices[2]] - mUsdMeshLivePositions[face.indices[0]])
+		);
+	}
+
+	return true;
 }
 
 // Specialisation
 template PhantomTrimesh<int>::SharedPtr PhantomTrimesh<int>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code); 
 
-template size_t PhantomTrimesh<int>::getOrCreate(int a, int b, int c);
+template uint32_t PhantomTrimesh<int>::getOrCreate(int a, int b, int c);
 
-template bool PhantomTrimesh<int>::projectPoint(const pxr::GfVec3f& pt, size_t triface_id) const;
+template bool PhantomTrimesh<int>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
 
+template pxr::GfVec3f PhantomTrimesh<int>::getInterpolatedPosition(uint32_t face_id, float u, float v, float dist) const;
+
+template bool PhantomTrimesh<int>::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);
 } // namespace Piston

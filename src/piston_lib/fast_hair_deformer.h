@@ -7,10 +7,13 @@
 #include "phantom_trimesh.h"
 
 #include <memory>
+#include <limits>
 #include <string>
 #include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usdGeom/curves.h>
 
 #include <glm/vec3.hpp> // glm::vec3
+
 
 namespace Piston {
 
@@ -18,6 +21,16 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 	public:
 		using SharedPtr = std::shared_ptr<FastHairDeformer>;
 		using PxrIndexType = int;
+
+	private:
+		struct CurveBindData {
+			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
+			uint32_t face_id;
+			float u, v, dist;
+			glm::vec3 offset;
+
+			CurveBindData(): face_id(kInvalidFaceID) {};
+		};
 
 	public:
 		static SharedPtr create();
@@ -29,11 +42,16 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 		virtual bool deformImpl(pxr::UsdTimeCode time_code);
 
 	private:
-		virtual bool buildDeformerData() override;
-		bool buildHairToMeshBindingData();
+		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) override;
+		bool buildCurvesBindingData(pxr::UsdTimeCode reference_time_code);
 
+		size_t                                  mCurvesCount;
 		UsdGeomMeshFaceAdjacency				mAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
+		pxr::VtArray<pxr::GfVec3f>              mCurveRefPoints;
+		std::vector<CurveBindData>              mCurveBinds;
+		pxr::VtArray<int> 						mCurveVertexCounts;
+		std::vector<uint32_t> 					mCurveOffsets;
 };
 
 } // namespace Piston

@@ -39,7 +39,7 @@ UsdGeomMeshFaceAdjacency UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh
 
 	adjacency.mCounts.resize(mesh_vertex_count);
 	adjacency.mOffsets.resize(mesh_vertex_count);
-	adjacency.mData.resize(mesh_index_count);
+	adjacency.mFaceData.resize(mesh_index_count);
 
 	// fill prim counts
 	memset(adjacency.mCounts.data(), 0, mesh_vertex_count * sizeof(uint32_t));
@@ -63,7 +63,7 @@ UsdGeomMeshFaceAdjacency UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh
 	size_t curent_face_start_index = 0;
 	for (size_t c = 0; c < mesh_face_count; ++c) {
 		for(int i = 0; i < face_vertex_counts[c]; ++i) {
-			adjacency.mData[adjacency.mOffsets[getIndex(curent_face_start_index + i)]++] = uint32_t(c);
+			adjacency.mFaceData[adjacency.mOffsets[getIndex(curent_face_start_index + i)]++] = uint32_t(c);
 		}
 
 		curent_face_start_index += face_vertex_counts[c];
@@ -75,6 +75,13 @@ UsdGeomMeshFaceAdjacency UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh
 		adjacency.mOffsets[i] -= adjacency.mCounts[i];
 	}
 
+	// neighbor indices data
+	for(size_t i = 0; i < adjacency.mCounts.size(); ++i) {
+		uint32_t count = adjacency.mCounts[i];
+		uint32_t offset = adjacency.mOffsets[i];
+
+	}
+
 	adjacency.mValid = true;
 
 	return adjacency;
@@ -83,7 +90,7 @@ UsdGeomMeshFaceAdjacency UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh
 void UsdGeomMeshFaceAdjacency::invalidate() {
 	mCounts.clear();
 	mOffsets.clear();
-	mData.clear();
+	mFaceData.clear();
 	mPointToVerticesMap.clear();
 	mValid = false;
 	mHash = 0;
@@ -99,15 +106,33 @@ size_t UsdGeomMeshFaceAdjacency::getHash() const {
 		for(size_t i = 0; i < mOffsets.size(); ++i) mHash += mOffsets[i]*i;
 		mHash += mOffsets.size();
 
-		for(size_t i = 0; i < mData.size(); ++i) mHash += mData[i]*i;
-		mHash += mData.size();
+		for(size_t i = 0; i < mFaceData.size(); ++i) mHash += mFaceData[i]*i;
+		mHash += mFaceData.size();
 	}
 
 	return mHash;
 }
 
 bool UsdGeomMeshFaceAdjacency::isValid() const { 
-	return mValid && !mCounts.empty() && !mOffsets.empty() && !mData.empty(); 
+	return mValid && !mCounts.empty() && !mOffsets.empty() && !mFaceData.empty(); 
+}
+
+std::string UsdGeomMeshFaceAdjacency::toString() const {
+	if(!isValid()) return "Invalid UsdGeomMeshFaceAdjacency";
+
+	std::string s = "[\n";
+	for(size_t i = 0; i < mCounts.size(); ++i) {
+		s += std::to_string(i) + ":[";
+		uint32_t count = mCounts[i];
+		uint32_t offset = mOffsets[i];
+		for(uint32_t j = 0; j < count; ++j) {
+			s += std::to_string(mFaceData[j]) + " ";
+		}
+		s += "]\n";
+	}
+
+	s += "]\n";
+	return s;
 }
 
 } // namespace Piston

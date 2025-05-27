@@ -79,7 +79,7 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		std::string   mHairToMeshBindingAttrName = kHairToMeshBindingAttrName;
 		
 	private:
-		virtual bool buildDeformerData() = 0;
+		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
 
 		pxr::UsdStageRefPtr mpTempStage;
 		bool mDirty = true;

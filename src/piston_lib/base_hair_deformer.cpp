@@ -83,7 +83,8 @@ bool BaseHairDeformer::deform(pxr::UsdTimeCode time_code) {
 	}
 	
 	if(mDirty) {
-		if(!buildDeformerData()) {
+		pxr::UsdTimeCode reference_time_code = pxr::UsdTimeCode::Default();
+		if(!buildDeformerData(reference_time_code)) {
 			printf("Error building deform data !\n");
 			return false;
 		}

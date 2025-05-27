@@ -21,10 +21,13 @@ class UsdGeomMeshFaceAdjacency {
 
 		size_t getHash() const;
 
+		std::string toString() const;
+
 	private:
-    	std::vector<uint32_t> mCounts;   // per vertex neighbor faces counts
-    	std::vector<uint32_t> mOffsets;  // per vertex neighbor offsets in data array
-    	std::vector<uint32_t> mData;     // face indices
+    	std::vector<uint32_t> mCounts;   	// per vertex neighbor faces counts
+    	std::vector<uint32_t> mOffsets;  	// per vertex neighbor offsets in data array
+    	std::vector<uint32_t> mFaceData;    // neighbor face indices
+    	std::vector<uint32_t> mVertexData;	// neighbor vertex indices
     
     	std::vector<std::vector<uint32_t>> mPointToVerticesMap; // point index to vertices map
 
@@ -32,6 +35,10 @@ class UsdGeomMeshFaceAdjacency {
     
     	mutable size_t mHash;
 };
+
+inline std::string to_string(const UsdGeomMeshFaceAdjacency& a) {
+	return a.toString();
+}
 
 
 } // namespace Piston
