@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "common.h"
+#include "curves_container.h"
 
 #include <memory>
 #include <string>
@@ -50,6 +51,8 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		std::string   mRestPositionAttrName = "rest_p";
 		std::string   mHairToMeshBindingAttrName = kHairToMeshBindingAttrName;
 		
+		PxrCurvesContainer::UniquePtr mpCurvesContainer;
+
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
 

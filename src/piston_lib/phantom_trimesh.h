@@ -60,7 +60,6 @@ class PhantomTrimesh {
 
 			pxr::GfVec3f 	restNormal;
 			pxr::GfVec3f 	liveNormal;
-			pxr::GfMatrix3f	alignMat;
 		};
 
 	protected:

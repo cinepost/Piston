@@ -20,9 +20,9 @@ namespace Piston {
 
 bool buildUsdGeomMeshFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode timeCode = pxr::UsdTimeCode::Default());
 
-glm::mat3 rotateAlign( glm::vec3 v1, glm::vec3 v2);
+glm::mat3 rotateAlign(const glm::vec3& v1, const glm::vec3& v2);
 
-pxr::GfMatrix3f rotateAlign( pxr::GfVec3f v1, pxr::GfVec3f v2);
+pxr::GfMatrix3f rotateAlign(const pxr::GfVec3f& v1, const pxr::GfVec3f& v2);
 
 bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &t, float &u, float &v);
 

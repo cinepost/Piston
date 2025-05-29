@@ -1,12 +1,13 @@
 #include "fast_hair_deformer.h"
 #include "kdtree.hpp"
+#include "geometry_tools.h"
 
 #include <random>
 
 
 namespace Piston {
 
-FastHairDeformer::FastHairDeformer(): BaseHairDeformer(), mCurvesCount(0) {
+FastHairDeformer::FastHairDeformer(): BaseHairDeformer() {
 	printf("FastHairDeformer::FastHairDeformer()\n");
 }
 
@@ -28,29 +29,29 @@ bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	}
 
 	pxr::UsdGeomCurves curves(mHairGeoPrimHandle.getPrim());
-	pxr::VtArray<pxr::GfVec3f> points = mCurveRefPoints;
+	PxrCurvesContainer* pCurves = mpCurvesContainer.get();
 
-	assert(mCurveBinds.size() == mCurvesCount);
+	pxr::VtArray<pxr::GfVec3f> points(pCurves->getTotalVertexCount());
 
-	for(uint32_t i = 0; i < mCurvesCount; ++i) {
+	assert(mCurveBinds.size() == pCurves->getCurvesCount());
+
+	for(uint32_t i = 0; i < pCurves->getCurvesCount(); ++i) {
 		const auto& bind = mCurveBinds[i];
 		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
 
-		auto root_orig = points[mCurveOffsets[i]];
+		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
+		const pxr::GfMatrix3f rotate_mat = rotateAlign(face.getRestNormal(), face.getLiveNormal());
 
 		// try to move curve root point
 		auto root_pt_pos = mpPhantomTrimesh->getInterpolatedPosition(bind.face_id, bind.u, bind.v, bind.dist);
-		points[mCurveOffsets[i]] = root_pt_pos;
+		uint32_t vertex_offset = pCurves->getCurveVertexOffset(i);
+		points[vertex_offset++] = root_pt_pos;
+		PxrCurvesContainer::CurveDataPtr curve_data_ptr = pCurves->getCurveDataPtr(i);
 
-		const pxr::GfVec3f translate = root_pt_pos - mCurveRefPoints[mCurveOffsets[i]];
-		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			points[mCurveOffsets[i] + j] += translate;
+		for(size_t j = 1; j < curve_data_ptr.first; ++j) {
+			//points[offset++] = root_pt_pos + (rotate_mat * (*(curve_data_ptr.second + j)));
+			points[vertex_offset++] = root_pt_pos + (*(curve_data_ptr.second + j));
 		}
-
-		//points[mCurveOffsets[i]] = root_orig;
-
-		//printf("Deformed curve %d\n", i);
-		//printf("Deformed curve dist %4.4f\n", bind.dist);
 	}
 
 	if(!curves.GetPointsAttr().Set(points, time_code)) {
@@ -72,37 +73,9 @@ bool FastHairDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {
 
 	// Create phantom mesh
 	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mRestPositionAttrName);
-	if(!mpPhantomTrimesh) return false;
-
-	auto geom_hair = pxr::UsdGeomCurves(mHairGeoPrimHandle.getPrim());
-	if(!geom_hair) {
-		printf("Error getting hair geometry !\n");
+	if(!mpPhantomTrimesh) {
+		printf("Error creating phantom trimesh !\n");
 		return false;
-	}
-
-	// Curves information
-	mCurvesCount = geom_hair.GetCurveCount(reference_time_code);
-	mCurveBinds.resize(mCurvesCount);
-	mCurveOffsets.resize(mCurvesCount);
-
-	// Curves. points
-	if(!geom_hair.GetPointsAttr().Get(&mCurveRefPoints, reference_time_code)) {
-		printf("Error getting curve points !\n");
-		return false;
-	}
-
-	// Curves. Counts/offsets
-	if(!geom_hair.GetCurveVertexCountsAttr().Get(&mCurveVertexCounts, reference_time_code)){
-		printf("Error getting curve vertices counts !\n");
-		return false;
-	}
-
-	assert(mCurvesCount == mCurveVertexCounts.size());
-
-	uint32_t offset = 0u;
-	for(size_t i = 0; i < mCurvesCount; ++i) {
-		mCurveOffsets[i] = offset;
-		offset += mCurveVertexCounts[i];
 	}
 
 	return buildCurvesBindingData(reference_time_code);
@@ -110,6 +83,7 @@ bool FastHairDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {
 
 bool FastHairDeformer::buildCurvesBindingData(pxr::UsdTimeCode reference_time_code) {
 	if(!mpPhantomTrimesh) return false;
+	if(!mpCurvesContainer) return false;
 
 	// Build kdtree
 	static const bool threaded_kdtree_creation = false;
@@ -118,9 +92,11 @@ bool FastHairDeformer::buildCurvesBindingData(pxr::UsdTimeCode reference_time_co
 	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> nearest_points;
 	neighbour_search::KDTree<float, 3>::ReturnType nearest_point;
 
-	for(uint32_t i = 0; i < mCurvesCount; ++i) {
+	mCurveBinds.resize(mpCurvesContainer->getCurvesCount());
 
-		const pxr::GfVec3f curve_root_pt = mCurveRefPoints[mCurveOffsets[i]];
+	for(size_t i = 0; i < mpCurvesContainer->getCurvesCount(); ++i) {
+
+		const pxr::GfVec3f curve_root_pt = mpCurvesContainer->getCurveRootPoint(i);
 
 		kdtree.findKNearestNeighbours(curve_root_pt, 3, nearest_points);
 		nearest_point = kdtree.findNearestNeighbour(curve_root_pt);

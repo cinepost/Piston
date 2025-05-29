@@ -21,7 +21,7 @@ bool buildUsdGeomMeshFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::
 	return true;
 }
 
-pxr::GfMatrix3f rotateAlign( pxr::GfVec3f v1, pxr::GfVec3f v2) {
+pxr::GfMatrix3f rotateAlign(const pxr::GfVec3f& v1, const pxr::GfVec3f& v2) {
     pxr::GfVec3f axis = pxr::GfCross( v1, v2 );
 
     const float cosA = pxr::GfDot( v1, v2 );
@@ -41,7 +41,7 @@ pxr::GfMatrix3f rotateAlign( pxr::GfVec3f v1, pxr::GfVec3f v2) {
     return result;
 }
 
-glm::mat3 rotateAlign( glm::vec3 v1, glm::vec3 v2) {
+glm::mat3 rotateAlign(const glm::vec3& v1, const glm::vec3& v2) {
     glm::vec3 axis = cross( v1, v2 );
 
     const float cosA = dot( v1, v2 );

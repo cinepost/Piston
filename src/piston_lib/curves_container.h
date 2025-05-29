@@ -2,8 +2,8 @@
 #define PISTON_LIB_CURVES_CONTAINER_H_
 
 #include "framework.h"
+#include "common.h"
 #include "kdtree.hpp"
-#include "base_hair_deformer.h"
 
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/curves.h>
@@ -14,6 +14,7 @@
 #include <array>
 #include <unordered_map>
 #include <memory>
+#include <utility>
 
 
 namespace Piston {
@@ -21,8 +22,21 @@ namespace Piston {
 class PxrCurvesContainer {
 	public:
 		using UniquePtr = std::unique_ptr<PxrCurvesContainer>;
+		using CurveDataPtr = std::pair<int, pxr::GfVec3f*>;
 
-		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code = pxr::UsdTimeCode::Default());
+		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
+
+		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code);
+
+		size_t 		getCurvesCount() const { return mCurvesCount; }
+		size_t 		getTotalVertexCount() const { return mCurveRestVectors.size(); }
+		uint32_t	getCurveVertexOffset(size_t idx) const { return mCurveOffsets[idx]; }
+
+		int getCurveVertexCount(size_t idx) const { return mCurveVertexCounts[idx]; }
+
+		CurveDataPtr getCurveDataPtr(size_t idx);
+
+		const pxr::GfVec3f& getCurveRootPoint(size_t idx) const;
 
 	private:
 		PxrCurvesContainer();
@@ -31,6 +45,7 @@ class PxrCurvesContainer {
 		size_t                                  mCurvesCount;
 		pxr::VtArray<int> 						mCurveVertexCounts;
 		std::vector<uint32_t> 					mCurveOffsets;
+		pxr::VtArray<pxr::GfVec3f>              mCurveRestVectors;
 };
 
 } // namespace Piston

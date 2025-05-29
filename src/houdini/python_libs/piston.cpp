@@ -39,7 +39,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &BaseHairDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
-	class_<FastHairDeformer, FastHairDeformer::SharedPtr, bases<BaseHairDeformer>>("FastHairDeformer",  no_init)
+	class_<FastHairDeformer, FastHairDeformer::SharedPtr, bases<BaseHairDeformer>, boost::noncopyable>("FastHairDeformer", no_init)
 		.def("create", &FastHairDeformer::create)
 		.staticmethod("create")
 		.def("toString", &FastHairDeformer::toString, return_value_policy<copy_const_reference>())

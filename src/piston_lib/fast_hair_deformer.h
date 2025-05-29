@@ -46,13 +46,9 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) override;
 		bool buildCurvesBindingData(pxr::UsdTimeCode reference_time_code);
 
-		size_t                                  mCurvesCount;
 		UsdGeomMeshFaceAdjacency				mAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
-		pxr::VtArray<pxr::GfVec3f>              mCurveRefPoints;
 		std::vector<CurveBindData>              mCurveBinds;
-		pxr::VtArray<int> 						mCurveVertexCounts;
-		std::vector<uint32_t> 					mCurveOffsets;
 };
 
 } // namespace Piston

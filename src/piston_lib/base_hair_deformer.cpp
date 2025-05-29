@@ -83,8 +83,15 @@ bool BaseHairDeformer::deform(pxr::UsdTimeCode time_code) {
 	}
 	
 	if(mDirty) {
-		pxr::UsdTimeCode reference_time_code = pxr::UsdTimeCode::Default();
-		if(!buildDeformerData(reference_time_code)) {
+		pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default();
+
+		mpCurvesContainer = PxrCurvesContainer::create(mHairGeoPrimHandle, rest_time_code);
+		if(!mpCurvesContainer) {
+			printf("Error creating curves container !\n");
+			return false;
+		}
+
+		if(!buildDeformerData(rest_time_code)) {
 			printf("Error building deform data !\n");
 			return false;
 		}
