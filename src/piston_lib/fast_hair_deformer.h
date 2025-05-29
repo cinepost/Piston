@@ -5,6 +5,7 @@
 #include "base_hair_deformer.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
+#include "curves_container.h"
 
 #include <memory>
 #include <limits>

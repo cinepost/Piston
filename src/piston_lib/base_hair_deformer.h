@@ -2,6 +2,7 @@
 #define PISTON_LIB_BASE_HAIR_DEFORMER_H_
 
 #include "framework.h"
+#include "common.h"
 
 #include <memory>
 #include <string>
@@ -14,35 +15,6 @@ namespace Piston {
 namespace {
 	const std::string kHairToMeshBindingAttrName = "bind_to_tri";
 }
-
-class UsdPrimHandle {
-	public:
-		UsdPrimHandle();
-		UsdPrimHandle(pxr::UsdStageWeakPtr pStage, const pxr::SdfPath& path);
-		UsdPrimHandle(const pxr::UsdPrim* pPrim);
-
-		pxr::UsdPrim getPrim() const;
-
-		bool isMeshGeoPrim() const { return getPrim().GetTypeName() == "Mesh"; }
-		bool isHairGeoPrim() const { return getPrim().GetTypeName() == "BasisCurves"; }
-
-		const std::string&  	getName() const { return mPath.GetName(); }
-		const pxr::SdfPath& 	getPath() const { return mPath; }
-		pxr::UsdStageWeakPtr 	getStage() { return mpStage; }
-
-		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(mpStage, mPath); }
-
-		/* Invalidate handle */
-		void                    clear();
-
-		bool operator==(const pxr::UsdPrim* pPrim) const;
-		explicit operator bool() const { return mpStage && mpStage->GetPrimAtPath(mPath).IsValid(); };
-
-	private:
-		pxr::UsdStageWeakPtr 	mpStage;
-		pxr::SdfPath 			mPath;
-
-};
 
 class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 	public:

@@ -40,7 +40,7 @@ uint32_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexT
 
 	const uint32_t idx = static_cast<uint32_t>(mFaces.size());
 
-	mFaces.push_back({a, b, c});
+	mFaces.emplace_back(a, b, c);
 	mFaces.back().restNormal = pxr::GfGetNormalized(pxr::GfCross(mUsdMeshRestPositions[b] - mUsdMeshRestPositions[a], mUsdMeshRestPositions[c] - mUsdMeshRestPositions[a]));
 
 	return idx;
