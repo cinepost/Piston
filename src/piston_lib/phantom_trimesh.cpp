@@ -33,15 +33,22 @@ typename PhantomTrimesh<IndexType>::SharedPtr PhantomTrimesh<IndexType>::create(
 
 template<typename IndexType>
 uint32_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexType c) {	
-	auto it = mFaceMap.find({a, b, c});
+	std::array<IndexType, 3> indices{a, b, c};
+	std::sort(indices.begin(), indices.end());
+
+	auto it = mFaceMap.find(indices);
 	if(it != mFaceMap.end()) {
 		return it->second;
 	}
 
 	const uint32_t idx = static_cast<uint32_t>(mFaces.size());
 
-	mFaces.emplace_back(a, b, c);
-	mFaces.back().restNormal = pxr::GfGetNormalized(pxr::GfCross(mUsdMeshRestPositions[b] - mUsdMeshRestPositions[a], mUsdMeshRestPositions[c] - mUsdMeshRestPositions[a]));
+	mFaces.emplace_back(indices);
+	mFaces.back().restNormal = pxr::GfGetNormalized(
+		pxr::GfCross(mUsdMeshRestPositions[indices[1]] - mUsdMeshRestPositions[indices[0]], mUsdMeshRestPositions[indices[2]] - mUsdMeshRestPositions[indices[0]])
+	);
+
+	mFaceMap[indices] = idx;
 
 	return idx;
 }

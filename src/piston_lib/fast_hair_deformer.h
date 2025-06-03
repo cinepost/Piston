@@ -46,7 +46,7 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) override;
 		bool buildCurvesBindingData(pxr::UsdTimeCode reference_time_code);
 
-		UsdGeomMeshFaceAdjacency				mAdjacency;
+		UsdGeomMeshFaceAdjacency	mAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
 		std::vector<CurveBindData>              mCurveBinds;
 };

@@ -83,14 +83,17 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 
     pxr::GfVec3f tvec = pt - v0;
     u = pxr::GfDot(tvec, pvec) * invDet;
-    if ((u < 0.f) || (u > 1.f)) return false;
+    if ((u < 0.f) || (u > 1.f)) {
+    	return false;
+    }
 
     pxr::GfVec3f qvec = pxr::GfCross(tvec, v0v1);
     v = pxr::GfDot(-n, qvec) * invDet;
-    if ((v < 0.f) || ((u + v) > 1.f)) return false;
-    
+    if ((v < 0.f) || ((u + v) > 1.f)) {
+    	return false;
+    }
+
     t = pxr::GfDot(v0v2, qvec) * invDet;
-    
     return true;
 }
 

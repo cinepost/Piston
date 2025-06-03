@@ -34,6 +34,8 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 		return false;
 	}
 
+	assert(mCurveVertexCounts.size() == mCurvesCount);
+
 	// Calc offsets
 	mCurveOffsets.resize(mCurvesCount);
 	uint32_t total_vertex_count = 0u;

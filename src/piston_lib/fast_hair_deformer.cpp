@@ -94,6 +94,8 @@ bool FastHairDeformer::buildCurvesBindingData(pxr::UsdTimeCode reference_time_co
 
 	mCurveBinds.resize(mpCurvesContainer->getCurvesCount());
 
+	size_t projected_curves_count = 0;
+
 	for(size_t i = 0; i < mpCurvesContainer->getCurvesCount(); ++i) {
 
 		const pxr::GfVec3f curve_root_pt = mpCurvesContainer->getCurveRootPoint(i);
@@ -106,17 +108,37 @@ bool FastHairDeformer::buildCurvesBindingData(pxr::UsdTimeCode reference_time_co
 				static_cast<PxrIndexType>(nearest_points[0].first), static_cast<PxrIndexType>(nearest_points[1].first), static_cast<PxrIndexType>(nearest_points[2].first));
 		
 			auto& bind = mCurveBinds[i];
+			bind.face_id = CurveBindData::kInvalidFaceID;
 
-			bool projected = mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist);
-			if(projected) {
+			if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
 				printf("projected\n");
+				projected_curves_count++;
 				bind.face_id = face_id;
 			} else {
-				printf("skipped\n");
-				bind.face_id = CurveBindData::kInvalidFaceID;
+				auto closest_vtx = nearest_point.first;
+				const uint32_t neighbors_count = mAdjacency.getNeighborsCount(closest_vtx);
+				if(neighbors_count > 0) {
+					const uint32_t neighbors_offset = mAdjacency.getNeighborsOffset(closest_vtx);
+					for(uint32_t i = neighbors_offset; i < (neighbors_offset + neighbors_count); ++i){
+						const auto& index_pair = mAdjacency.getCornerVertexPair(neighbors_offset);
+						const uint32_t face_id = mpPhantomTrimesh->getOrCreate(
+							static_cast<PxrIndexType>(closest_vtx), static_cast<PxrIndexType>(index_pair.first), static_cast<PxrIndexType>(index_pair.second));
+						if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
+							printf("re-projected\n");
+							bind.face_id = face_id;
+							projected_curves_count++;
+							break;
+						}
+					}
+				} else {
+					printf("skipped\n");
+				}
 			}
 		}
 	}
+
+	printf("Total curves count to bind: %zu\n", mpCurvesContainer->getCurvesCount());
+	printf("Projected curves count: %zu\n", projected_curves_count);
 	
 	return true;
 }
