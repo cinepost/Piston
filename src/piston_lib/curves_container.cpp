@@ -10,13 +10,13 @@ PxrCurvesContainer::PxrCurvesContainer() {
 bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
 	if(!geom_curves) {
-		printf("Error getting hair geometry !\n");
+		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
 		return false;
 	}
 
 	mCurvesCount = geom_curves.GetCurveCount(rest_time_code);
 	if(mCurvesCount == 0) {
-		printf("No curves exist in curves primitive !\n");
+		std::cerr << "No curves exist in primitive " << prim_handle.getName() << " !" << std::endl;
 		return false;
 	}
 
@@ -24,13 +24,13 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	pxr::VtArray<pxr::GfVec3f> curveRestPoints;
 
 	if(!geom_curves.GetPointsAttr().Get(&curveRestPoints, rest_time_code)) {
-		printf("Error getting curve points !\n");
+		std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
 		return false;
 	}
 
 	// Curves. Counts/offsets
 	if(!geom_curves.GetCurveVertexCountsAttr().Get(&mCurveVertexCounts, rest_time_code)){
-		printf("Error getting curve vertices counts !\n");
+		std::cerr << "Error getting curves vertices counts from " << prim_handle.getName() << "  !" << std::endl;
 		return false;
 	}
 

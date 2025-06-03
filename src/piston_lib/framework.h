@@ -2,9 +2,16 @@
 #define PISTON_LIB_FRAMEWORK_H_
 
 #include <memory>
+#include <iostream>
 
 #ifndef should_not_get_here
 #define should_not_get_here() assert(false)
+#endif
+
+#ifdef _DEBUG
+#define dbg_printf(...) printf(__VA_ARGS__)
+#else
+#define dbg_printf(...) {}
 #endif
 
 namespace Piston {

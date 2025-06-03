@@ -1,46 +1,11 @@
 #include "base_hair_deformer.h"
 #include "geometry_tools.h"
 
+
 namespace Piston {
 
-inline static bool isMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
-	if(pGeoPrim->GetTypeName() != "Mesh") return false;
-	return true;
-}
-
-inline static bool isHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
-	if(pGeoPrim->GetTypeName() != "BasisCurves") return false;
-	return true;
-}
-
-UsdPrimHandle::UsdPrimHandle(): mpStage(nullptr) {}
-
-UsdPrimHandle::UsdPrimHandle(pxr::UsdStageWeakPtr pStage, const pxr::SdfPath& path): mpStage(pStage), mPath(path) {
-	assert(mpStage);
-}
-
-UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim* pPrim) {
-	assert(pPrim);
-
-	mpStage = pPrim->GetStage();
-	mPath = pPrim->GetPath();
-}
-
-pxr::UsdPrim UsdPrimHandle::getPrim() const {
-	return mpStage ? mpStage->GetPrimAtPath(mPath) : pxr::UsdPrim();
-}
-
-void UsdPrimHandle::clear() {
-	mpStage = nullptr;
-}
-
-bool UsdPrimHandle::operator==(const pxr::UsdPrim* pPrim) const {
-	if(!pPrim) return false;
-	return mpStage == pPrim->GetStage() && mPath == pPrim->GetPath();
-}
-
 BaseHairDeformer::BaseHairDeformer(): mDirty(true) {
-	printf("BaseHairDeformer::BaseHairDeformer()\n");
+	dbg_printf("BaseHairDeformer::BaseHairDeformer()\n");
 
 	mpTempStage = pxr::UsdStage::CreateInMemory();
 }
@@ -50,35 +15,33 @@ void BaseHairDeformer::setMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	if(pGeoPrim && mMeshGeoPrimHandle == pGeoPrim) return;
 	if(!isMeshGeoPrim(pGeoPrim)) {
 		mMeshGeoPrimHandle.clear();
-		printf("Mesh geometry prim is not \"Mesh\"!\n");
+		std::cerr << "Mesh geometry prim is not \"Mesh\"!" << std::endl;
 		return;
 	}
 
 	mMeshGeoPrimHandle = {pGeoPrim};
 	mDirty = true;
 
-	printf("Mesh geometry prim is set to: %s\n", mMeshGeoPrimHandle.getPath().GetText());
-	//printf("Address of mesh geometry prim is %p\n", (void *)pGeoPrim);  
+	dbg_printf("Mesh geometry prim is set to: %s\n", mMeshGeoPrimHandle.getPath().GetText());
 }
 
 void BaseHairDeformer::setHairGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	if(pGeoPrim && mHairGeoPrimHandle == pGeoPrim) return;
-	if(!isHairGeoPrim(pGeoPrim)) {
+	if(!isCurvesGeoPrim(pGeoPrim)) {
 		mHairGeoPrimHandle.clear();
-		printf("Hair geometry prim is not \"BasisCurves\"!\n");
+		std::cerr << "Hair geometry prim is not \"BasisCurves\"!" << std::endl;
 		return;
 	}
 
 	mHairGeoPrimHandle = {pGeoPrim};
 	mDirty = true;
 
-	printf("Hair geometry prim is set to: %s\n", mHairGeoPrimHandle.getPath().GetText());
-	//printf("Address of hair geometry prim is %p\n", (void *)pGeoPrim); 
+	dbg_printf("Hair geometry prim is set to: %s\n", mHairGeoPrimHandle.getPath().GetText());
 }
 
 bool BaseHairDeformer::deform(pxr::UsdTimeCode time_code) {
 	if(!mMeshGeoPrimHandle || !mHairGeoPrimHandle) {
-		printf("No mesh or hair UsdPrim is set !\n");
+		std::cerr << "No mesh or curves UsdPrim is set !" << std::endl;
 		return false;
 	}
 	
@@ -87,12 +50,12 @@ bool BaseHairDeformer::deform(pxr::UsdTimeCode time_code) {
 
 		mpCurvesContainer = PxrCurvesContainer::create(mHairGeoPrimHandle, rest_time_code);
 		if(!mpCurvesContainer) {
-			printf("Error creating curves container !\n");
+			std::cerr << "Error creating curves container !" << std::endl;
 			return false;
 		}
 
 		if(!buildDeformerData(rest_time_code)) {
-			printf("Error building deform data !\n");
+			std::cerr << "Error building deform data !" << std::endl;
 			return false;
 		}
 		mDirty = false;

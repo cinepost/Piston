@@ -16,14 +16,14 @@ typename PhantomTrimesh<IndexType>::SharedPtr PhantomTrimesh<IndexType>::create(
 	// Keep rest position for further calculations
 	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
 	if(!restPositionPrimVar) {
-		printf("No valid primvar \"%s\" exists in mesh !\n", rest_p_name.c_str());
+		std::cerr << "No valid primvar \"" << rest_p_name << "\" exists in mesh " << prim_handle.getPath() << " !" << std::endl;
 		return nullptr;
 	}
 
 	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
 	if(!restPosAttr.Get(&pPhantomTrimesh->mUsdMeshRestPositions, time_code)) {
-		printf("Error getting mesh rest positions !\n");
+		std::cerr << "Error getting mesh " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
 		return nullptr;
 	}
 
@@ -74,12 +74,12 @@ bool PhantomTrimesh<IndexType>::update(const UsdPrimHandle& prim_handle, pxr::Us
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
 
 	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
-		printf("Error getting point positions!\n");
+		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
 		return false;
 	}
 
 	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
-		printf("Rest and live mesh point positions count mismatch!\n");
+		std::cerr << prim_handle.getPath() << " \"rest\" and live mesh point positions count mismatch!" << std::endl;
 		return false;
 	}
 

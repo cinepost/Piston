@@ -11,6 +11,9 @@
 
 namespace Piston {
 
+bool isMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
+bool isCurvesGeoPrim(pxr::UsdPrim* pGeoPrim);
+
 class UsdPrimHandle {
 	public:
 		UsdPrimHandle();

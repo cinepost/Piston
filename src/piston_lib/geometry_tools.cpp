@@ -16,8 +16,6 @@ bool buildUsdGeomMeshFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::
 		return false;
 	}
 
-	//if (UsdAttribute attr = prim.GetAttribute(TfToken("myAttr"))){
-
 	return true;
 }
 

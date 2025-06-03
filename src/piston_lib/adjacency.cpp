@@ -10,19 +10,19 @@ UsdGeomMeshFaceAdjacency UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh
 
 	const size_t mesh_face_count = mesh.GetFaceCount(timeCode);
 	if(mesh_face_count == 0) {
-		printf("Mesh has no faces !\n");
+		std::cerr << "Mesh " << mesh.GetPath() << " has no faces !" << std::endl;
 		return adjacency;
 	}
 
 	pxr::VtArray<int> face_vertex_counts;
 	if(!mesh.GetFaceVertexCountsAttr().Get(&face_vertex_counts, timeCode)) {
-		printf("Error getting face vertex counts for mesh !\n");
+		std::cerr << "Error getting face vertex counts for mesh " << mesh.GetPath() << " !" << std::endl;
 		return adjacency;
 	}
 
 	pxr::VtArray<int> face_vertex_indices;
 	if(!mesh.GetFaceVertexIndicesAttr().Get(&face_vertex_indices, timeCode)) {
-		printf("Error getting face vertex indices for mesh !\n");
+		std::cerr << "Error getting face vertex indices for mesh " << mesh.GetPath() << " !" << std::endl;
 		return adjacency;
 	}
 
