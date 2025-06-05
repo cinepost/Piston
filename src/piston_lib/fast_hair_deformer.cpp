@@ -38,12 +38,17 @@ bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 
 	for(uint32_t i = 0; i < pCurves->getCurvesCount(); ++i) {
 		const auto& bind = mCurveBinds[i];
-		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
+		if(bind.face_id == CurveBindData::kInvalidFaceID) {
+			dbg_printf("invalid face_id\n");
+			continue;
+		}
 
 		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
 		const pxr::GfMatrix3f rotate_mat = rotateAlign(face.getRestNormal(), face.getLiveNormal());
 
 		// try to move curve root point
+		//std::cout << bind.dist << std::endl;
+
 		auto root_pt_pos = mpPhantomTrimesh->getInterpolatedPosition(bind.face_id, bind.u, bind.v, bind.dist);
 		uint32_t vertex_offset = pCurves->getCurveVertexOffset(i);
 		points[vertex_offset++] = root_pt_pos;
@@ -51,6 +56,7 @@ bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 
 		for(size_t j = 1; j < curve_data_ptr.first; ++j) {
 			points[vertex_offset++] = root_pt_pos + rotate_mat * (*(curve_data_ptr.second + j));
+			//points[vertex_offset++] = root_pt_pos + (*(curve_data_ptr.second + j));
 		}
 	}
 

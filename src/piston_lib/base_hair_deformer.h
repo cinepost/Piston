@@ -36,6 +36,7 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		const std::string& getMeshRestPositionAttrName() const { return mRestPositionAttrName; }
 
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool deform_mp(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		virtual const std::string& toString() const;
 
