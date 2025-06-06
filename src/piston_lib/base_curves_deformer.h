@@ -1,5 +1,5 @@
-#ifndef PISTON_LIB_BASE_HAIR_DEFORMER_H_
-#define PISTON_LIB_BASE_HAIR_DEFORMER_H_
+#ifndef PISTON_LIB_BASE_CURVES_DEFORMER_H_
+#define PISTON_LIB_BASE_CURVES_DEFORMER_H_
 
 #include "framework.h"
 #include "common.h"
@@ -14,12 +14,13 @@
 namespace Piston {
 
 namespace {
-	const std::string kHairToMeshBindingAttrName = "bind_to_tri";
+	const std::string kMeshRestPositionAttrName = "rest_p";
+	const std::string kСurvesSkinPrimAttrName = "skinprim";
 }
 
-class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
+class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeformer> {
 	public:
-		using SharedPtr = std::shared_ptr<BaseHairDeformer>;
+		using SharedPtr = std::shared_ptr<BaseCurvesDeformer>;
 
 		enum class Type { 
 			FAST, 
@@ -30,10 +31,13 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		
 	public:
 		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
-		void setHairGeoPrim(pxr::UsdPrim* pGeoPrim);
+		void setCurvesGeoPrim(pxr::UsdPrim* pGeoPrim);
 
 		void setMeshRestPositionAttrName(const std::string& name);
-		const std::string& getMeshRestPositionAttrName() const { return mRestPositionAttrName; }
+		const std::string& getMeshRestPositionAttrName() const { return mMeshRestPositionAttrName; }
+
+		void setСurvesSkinPrimAttrName(const std::string& name);
+		const std::string& getСurvesSkinPrimAttrName() const { return mСurvesSkinPrimAttrName; }
 
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 		bool deform_mp(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
@@ -41,16 +45,16 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 		virtual const std::string& toString() const;
 
 	protected:
-		BaseHairDeformer();
+		BaseCurvesDeformer();
 
 		virtual bool deformImpl(pxr::UsdTimeCode time_code) = 0;
 
 	protected:
 		UsdPrimHandle mMeshGeoPrimHandle;
-		UsdPrimHandle mHairGeoPrimHandle;
+		UsdPrimHandle mCurvesGeoPrimHandle;
 
-		std::string   mRestPositionAttrName = "rest_p";
-		std::string   mHairToMeshBindingAttrName = kHairToMeshBindingAttrName;
+		std::string   mMeshRestPositionAttrName = kMeshRestPositionAttrName;
+		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 		PxrCurvesContainer::UniquePtr mpCurvesContainer;
 
@@ -64,8 +68,8 @@ class BaseHairDeformer : public std::enable_shared_from_this<BaseHairDeformer> {
 
 } // namespace Piston
 
-inline std::string to_string(Piston::BaseHairDeformer::Type mt) {
-#define t2s(t_) case Piston::BaseHairDeformer::Type::t_: return #t_;
+inline std::string to_string(Piston::BaseCurvesDeformer::Type mt) {
+#define t2s(t_) case Piston::BaseCurvesDeformer::Type::t_: return #t_;
     switch (mt) {
         t2s(FAST);
         t2s(INTERPOLATED);
@@ -77,4 +81,4 @@ inline std::string to_string(Piston::BaseHairDeformer::Type mt) {
 #undef t2s
 }
 
-#endif // PISTON_LIB_BASE_HAIR_DEFORMER_H_
+#endif // PISTON_LIB_BASE_CURVES_DEFORMER_H_

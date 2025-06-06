@@ -1,5 +1,4 @@
 #include "phantom_trimesh.h"
-#include "base_hair_deformer.h"
 #include "geometry_tools.h"
 
 namespace Piston {

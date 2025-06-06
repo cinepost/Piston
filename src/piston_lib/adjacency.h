@@ -13,15 +13,18 @@ namespace Piston {
 
 class UsdGeomMeshFaceAdjacency {
 	public:
+		using SharedPtr = std::shared_ptr<UsdGeomMeshFaceAdjacency>;
 		using PxrIndexType = int;
 
 		UsdGeomMeshFaceAdjacency();
-		static UsdGeomMeshFaceAdjacency create(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode timeCode = pxr::UsdTimeCode::Default());
+		static SharedPtr create(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
+
+		bool init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
 		bool isValid() const;
 		void invalidate();
 
-		size_t getHash() const;
+		size_t getHash() const { return isValid() ? mHash : 0; }
 
 		uint32_t getNeighborsCount(uint32_t idx) const;
 		uint32_t getNeighborsOffset(uint32_t idx) const;
@@ -31,10 +34,17 @@ class UsdGeomMeshFaceAdjacency {
 		std::string toString() const;
 
 	private:
+		size_t calcHash();
+ 
+	private:
     	std::vector<uint32_t> mCounts;   	// per vertex neighbor faces counts
     	std::vector<uint32_t> mOffsets;  	// per vertex neighbor offsets in data array
     	std::vector<uint32_t> mFaceData;    // neighbor face indices
     	std::vector<std::pair<PxrIndexType, PxrIndexType>> mCornerVertexData;	// neighbor orner vertex pair indices
+
+    	pxr::VtArray<PxrIndexType> mSrcFaceVertexIndices;
+		pxr::VtArray<PxrIndexType> mSrcFaceVertexCounts;
+		std::vector<uint32_t> 	   mSrcFaceVertexOffsets;
     
     	bool mValid; // Set by Adjacency data builder!
     

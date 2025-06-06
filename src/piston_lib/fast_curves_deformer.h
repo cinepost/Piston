@@ -1,8 +1,8 @@
-#ifndef PISTON_LIB_FAST_HAIR_DEFORMER_H_
-#define PISTON_LIB_FAST_HAIR_DEFORMER_H_
+#ifndef PISTON_LIB_FAST_CURVES_DEFORMER_H_
+#define PISTON_LIB_FAST_CURVES_DEFORMER_H_
 
 #include "framework.h"
-#include "base_hair_deformer.h"
+#include "base_curves_deformer.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 #include "curves_container.h"
@@ -18,9 +18,9 @@
 
 namespace Piston {
 
-class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_this<BaseHairDeformer, FastHairDeformer> {
+class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, FastCurvesDeformer> {
 	public:
-		using SharedPtr = std::shared_ptr<FastHairDeformer>;
+		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;
 		using PxrIndexType = int;
 
 	private:
@@ -28,7 +28,6 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
 			uint32_t face_id;
 			float u, v, dist;
-			glm::vec3 offset;
 
 			CurveBindData(): face_id(kInvalidFaceID) {};
 		};
@@ -39,18 +38,18 @@ class FastHairDeformer : public BaseHairDeformer, public inherit_shared_from_thi
 		virtual const std::string& toString() const override;
 
 	protected:
-		FastHairDeformer();
+		FastCurvesDeformer();
 		virtual bool deformImpl(pxr::UsdTimeCode time_code);
 
 	private:
-		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) override;
-		bool buildCurvesBindingData(pxr::UsdTimeCode reference_time_code);
+		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code) override;
+		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
 
-		UsdGeomMeshFaceAdjacency	mAdjacency;
+		UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
 		std::vector<CurveBindData>              mCurveBinds;
 };
 
 } // namespace Piston
 
-#endif // PISTON_LIB_FAST_HAIR_DEFORMER_H_
+#endif // PISTON_LIB_FAST_CURVES_DEFORMER_H_

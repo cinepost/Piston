@@ -2,8 +2,8 @@
 #define PISTON_LIB_PHANTOM_TRIMESH_H_
 
 #include "framework.h"
+#include "common.h"
 #include "kdtree.hpp"
-#include "base_hair_deformer.h"
 
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/base/gf/matrix3f.h>

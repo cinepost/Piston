@@ -10,9 +10,9 @@ file( GLOB SOURCES
     ./curves_container.cpp
     ./phantom_trimesh.cpp
     ./geometry_tools.cpp
-    ./base_hair_deformer.cpp
-    ./fast_hair_deformer.cpp
-    ./hair_deformer_factory.cpp
+    ./base_curves_deformer.cpp
+    ./fast_curves_deformer.cpp
+    ./curves_deformer_factory.cpp
 )
 
 # Find python and Boost - both are required dependencies

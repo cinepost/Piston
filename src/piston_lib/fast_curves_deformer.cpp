@@ -1,5 +1,6 @@
+#include "fast_curves_deformer.h"
+
 #include "common.h"
-#include "fast_hair_deformer.h"
 #include "kdtree.hpp"
 #include "geometry_tools.h"
 
@@ -8,28 +9,28 @@
 
 namespace Piston {
 
-FastHairDeformer::FastHairDeformer(): BaseHairDeformer() {
-	dbg_printf("FastHairDeformer::FastHairDeformer()\n");
+FastCurvesDeformer::FastCurvesDeformer(): BaseCurvesDeformer() {
+	dbg_printf("FastCurvesDeformer::FastCurvesDeformer()\n");
 }
 
-FastHairDeformer::SharedPtr FastHairDeformer::create() {
-	return SharedPtr(new FastHairDeformer());
+FastCurvesDeformer::SharedPtr FastCurvesDeformer::create() {
+	return SharedPtr(new FastCurvesDeformer());
 }
 
-const std::string& FastHairDeformer::toString() const {
-	static const std::string kFastDeformerString = "FastHairDeformer";
+const std::string& FastCurvesDeformer::toString() const {
+	static const std::string kFastDeformerString = "FastCurvesDeformer";
 	return kFastDeformerString;
 }
 
-bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
-	dbg_printf("FastHairDeformer::deformImpl()\n");
+bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
+	dbg_printf("FastCurvesDeformer::deformImpl()\n");
 	if(!mpPhantomTrimesh) return false;
 
 	if(!mpPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
 		return false;
 	}
 
-	pxr::UsdGeomCurves curves(mHairGeoPrimHandle.getPrim());
+	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
 	PxrCurvesContainer* pCurves = mpCurvesContainer.get();
 
 	pxr::VtArray<pxr::GfVec3f> points(pCurves->getTotalVertexCount());
@@ -67,29 +68,51 @@ bool FastHairDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	return true;
 }
 
-bool FastHairDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {
-	dbg_printf("FastHairDeformer::buildDeformerData()\n");
-
-	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = mMeshGeoPrimHandle.getPrimvarsAPI();
+bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
+	dbg_printf("FastCurvesDeformer::buildDeformerData()\n");
 
 	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
 
 	// Create adjacency data
-	mAdjacency = UsdGeomMeshFaceAdjacency::create(mesh);
+	mpAdjacency = UsdGeomMeshFaceAdjacency::create(mesh);
+	if(!mpAdjacency) {
+		return false;
+	}
+
+	std::cout << mpAdjacency->toString() << std::endl;
 
 	// Create phantom mesh
-	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mRestPositionAttrName);
+	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mMeshRestPositionAttrName);
 	if(!mpPhantomTrimesh) {
 		std::cerr << "Error creating phantom trimesh for " << mMeshGeoPrimHandle.getPath() << " !" << std::endl;
 		return false;
 	}
 
-	return buildCurvesBindingData(reference_time_code);
+	return buildCurvesBindingData(rest_time_code);
 }
 
-bool FastHairDeformer::buildCurvesBindingData(pxr::UsdTimeCode reference_time_code) {
-	if(!mpPhantomTrimesh) return false;
+bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code) {
 	if(!mpCurvesContainer) return false;
+
+	pxr::UsdGeomPrimvarsAPI curvesPrimvarsApi = mCurvesGeoPrimHandle.getPrimvarsAPI();
+
+	// First we try to bind curves using skin prim ids
+	if(!mСurvesSkinPrimAttrName.empty()) {
+		pxr::UsdGeomPrimvar skinPrimVar = curvesPrimvarsApi.GetPrimvar(pxr::TfToken(mСurvesSkinPrimAttrName));
+		if(!skinPrimVar) {
+			std::cerr << "Curves " << mCurvesGeoPrimHandle.getPath() << " has no valid primvar \"" << mСurvesSkinPrimAttrName << "\" !" << std::endl;
+		} else {
+			pxr::VtArray<int> skinPrimIndices;
+			if(!skinPrimVar.GetAttr().Get(&skinPrimIndices, rest_time_code)) {
+				std::cerr << "Error getting skin primitive indices for attr \"" << mСurvesSkinPrimAttrName << "\" !" << std::endl;
+			} else {
+				assert(skinPrimIndices.size() == mpCurvesContainer->getCurvesCount());
+				for(size_t i = 0; i < mpCurvesContainer->getCurvesCount(); ++i) {
+					const uint32_t skin_prim_id = static_cast<uint32_t>(skinPrimIndices[i]);
+				}
+			}
+		}
+	}
 
 	// Build kdtree
 	static const bool threaded_kdtree_creation = false;
@@ -123,11 +146,11 @@ bool FastHairDeformer::buildCurvesBindingData(pxr::UsdTimeCode reference_time_co
 			bind.face_id = face_id;
 		} else {
 			auto closest_vtx = nearest_points[0].first;
-			const uint32_t neighbors_count = mAdjacency.getNeighborsCount(closest_vtx);
+			const uint32_t neighbors_count = mpAdjacency->getNeighborsCount(closest_vtx);
 			if(neighbors_count > 0) {
-				const uint32_t neighbors_offset = mAdjacency.getNeighborsOffset(closest_vtx);
+				const uint32_t neighbors_offset = mpAdjacency->getNeighborsOffset(closest_vtx);
 				for(uint32_t i = neighbors_offset; i < (neighbors_offset + neighbors_count); ++i){
-					const auto& index_pair = mAdjacency.getCornerVertexPair(i);
+					const auto& index_pair = mpAdjacency->getCornerVertexPair(i);
 					const uint32_t face_id = mpPhantomTrimesh->getOrCreate(
 						static_cast<PxrIndexType>(closest_vtx), static_cast<PxrIndexType>(index_pair.first), static_cast<PxrIndexType>(index_pair.second));
 					if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
