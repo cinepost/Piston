@@ -69,6 +69,8 @@ class PhantomTrimesh {
 		static PhantomTrimesh::SharedPtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
+		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
+
 
 		uint32_t getOrCreate(IndexType a, IndexType b, IndexType c);
 

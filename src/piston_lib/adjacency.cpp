@@ -3,7 +3,7 @@
 
 namespace Piston {
 
-UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mValid(false), mHash(0) {};
+UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mFaceCount(0), mMaxFaceVertexCount(0), mValid(false), mHash(0) {};
 
 UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
 	auto pResult = UsdGeomMeshFaceAdjacency::SharedPtr(new UsdGeomMeshFaceAdjacency());
@@ -14,33 +14,37 @@ UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create(const pxr::
 }
 
 bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
-	const size_t mesh_face_count = mesh.GetFaceCount(rest_time_code);
-	if(mesh_face_count == 0) {
+	mFaceCount = mesh.GetFaceCount(rest_time_code);
+	if(mFaceCount == 0) {
 		std::cerr << "Mesh " << mesh.GetPath() << " has no faces !" << std::endl;
 		return false;
 	}
 
-	mSrcFaceVertexCounts.reserve(mesh_face_count);
+	mSrcFaceVertexCounts.reserve(mFaceCount);
 	if(!mesh.GetFaceVertexCountsAttr().Get(&mSrcFaceVertexCounts, rest_time_code)) {
 		std::cerr << "Error getting face vertex counts for mesh " << mesh.GetPath() << " !" << std::endl;
 		return false;
 	}
 
-	mSrcFaceVertexIndices.reserve(mesh_face_count);
+	assert(mSrcFaceVertexCounts.size() == mFaceCount);
+
+	mSrcFaceVertexIndices.reserve(mFaceCount);
 	if(!mesh.GetFaceVertexIndicesAttr().Get(&mSrcFaceVertexIndices, rest_time_code)) {
 		std::cerr << "Error getting face vertex indices for mesh " << mesh.GetPath() << " !" << std::endl;
 		return false;
 	}
 
 	{
-		// fill prim vertices offsets
+		// fill prim vertices offsets and calc mMaxFaceVertexCount
 		uint32_t face_vertex_offset = 0;
-		mSrcFaceVertexOffsets.resize(mesh_face_count);
+		mSrcFaceVertexOffsets.resize(mFaceCount);
 		for(uint32_t i = 0; i < mSrcFaceVertexCounts.size(); ++i) {
 			mSrcFaceVertexOffsets[i] = face_vertex_offset;
 			face_vertex_offset += mSrcFaceVertexCounts[i];
+			mMaxFaceVertexCount = std::max(mMaxFaceVertexCount, static_cast<size_t>(mSrcFaceVertexCounts[i]));
 		}
 	}
+
 
 	auto getIndex = [&] (int i) {
 		return mSrcFaceVertexIndices[i];
@@ -78,7 +82,7 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 
 	// fill face data
 	size_t curent_face_start_index = 0;
-	for (size_t c = 0; c < mesh_face_count; ++c) {
+	for (size_t c = 0; c < mFaceCount; ++c) {
 		for(int i = 0; i < mSrcFaceVertexCounts[c]; ++i) {
 			mFaceData[mOffsets[getIndex(curent_face_start_index + i)]++] = uint32_t(c);
 		}
@@ -94,8 +98,8 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 
 	// neighbor indices data
 	uint32_t face_vertex_offset = 0;
-	std::vector<uint32_t> face_vertex_offsets(mesh_face_count);
-	for(size_t i = 0; i < mesh_face_count; ++i) {
+	std::vector<uint32_t> face_vertex_offsets(mFaceCount);
+	for(size_t i = 0; i < mFaceCount; ++i) {
 		face_vertex_offsets[i] = face_vertex_offset;
 		face_vertex_offset += mSrcFaceVertexCounts[i];
 	}
@@ -132,6 +136,8 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 }
 
 void UsdGeomMeshFaceAdjacency::invalidate() {
+	mFaceCount = 0;
+	mMaxFaceVertexCount = 0;
 	mCounts.clear();
 	mOffsets.clear();
 	mFaceData.clear();
@@ -166,6 +172,27 @@ uint32_t UsdGeomMeshFaceAdjacency::getNeighborsCount(uint32_t idx) const {
 uint32_t UsdGeomMeshFaceAdjacency::getNeighborsOffset(uint32_t idx) const {
 	assert(idx < mOffsets.size());
 	return mOffsets[idx]; 
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexOffset(uint32_t face_idx) const {
+	assert(face_idx < mSrcFaceVertexOffsets.size());
+	return mSrcFaceVertexOffsets[face_idx];
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexCount(uint32_t face_idx) const {
+	assert(face_idx < mSrcFaceVertexCounts.size());
+	return static_cast<uint32_t>(mSrcFaceVertexCounts[face_idx]);
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t vtx_idx) const {
+	assert(vtx_idx < mSrcFaceVertexIndices.size());
+	return static_cast<uint32_t>(mSrcFaceVertexIndices[vtx_idx]);
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t face_idx, uint32_t local_vertex_index) const {
+	assert(face_idx < mSrcFaceVertexCounts.size());
+	assert(local_vertex_index < mSrcFaceVertexCounts[face_idx]);
+	return static_cast<uint32_t>(mSrcFaceVertexIndices[mSrcFaceVertexOffsets[face_idx] + local_vertex_index]);
 }
 
 const std::pair<UsdGeomMeshFaceAdjacency::PxrIndexType, UsdGeomMeshFaceAdjacency::PxrIndexType>& UsdGeomMeshFaceAdjacency::getCornerVertexPair(uint32_t offset) const {

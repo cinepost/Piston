@@ -5,7 +5,14 @@
 #include "geometry_tools.h"
 
 #include <random>
+#include <algorithm>
 
+static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &p2) {
+	const auto dx = p1[0] - p2[0];
+	const auto dy = p1[1] - p2[1];
+	const auto dz = p1[2] - p2[2];
+	return (dx * dx) + (dy * dy) + (dz * dz);
+}
 
 namespace Piston {
 
@@ -79,6 +86,8 @@ bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 		return false;
 	}
 
+	assert(mpAdjacency->getMaxFaceVertexCount() > 0);
+
 	std::cout << mpAdjacency->toString() << std::endl;
 
 	// Create phantom mesh
@@ -96,6 +105,15 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 
 	pxr::UsdGeomPrimvarsAPI curvesPrimvarsApi = mCurvesGeoPrimHandle.getPrimvarsAPI();
 
+	mCurveBinds.resize(mpCurvesContainer->getCurvesCount());
+
+	// Clear all possible previous binds
+	for(auto& bind: mCurveBinds) {
+		bind.face_id = CurveBindData::kInvalidFaceID;
+	}
+
+	// Strategy: 1
+
 	// First we try to bind curves using skin prim ids
 	if(!mСurvesSkinPrimAttrName.empty()) {
 		pxr::UsdGeomPrimvar skinPrimVar = curvesPrimvarsApi.GetPrimvar(pxr::TfToken(mСurvesSkinPrimAttrName));
@@ -107,8 +125,22 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 				std::cerr << "Error getting skin primitive indices for attr \"" << mСurvesSkinPrimAttrName << "\" !" << std::endl;
 			} else {
 				assert(skinPrimIndices.size() == mpCurvesContainer->getCurvesCount());
+				std::vector<float> squared_distances(mpAdjacency->getMaxFaceVertexCount());
+
 				for(size_t i = 0; i < mpCurvesContainer->getCurvesCount(); ++i) {
+					const pxr::GfVec3f curve_root_pt = mpCurvesContainer->getCurveRootPoint(i);
 					const uint32_t skin_prim_id = static_cast<uint32_t>(skinPrimIndices[i]);
+					const uint32_t prim_vertex_count = mpAdjacency->getFaceVertexCount(skin_prim_id);
+					const uint32_t prim_vertex_offset = mpAdjacency->getFaceVertexOffset(skin_prim_id);
+
+					for(size_t j = 0; j < prim_vertex_count; ++j) {
+						squared_distances[j] = distanceSquared(curve_root_pt, mpPhantomTrimesh->getRestPositions()[mpAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+					}
+
+					std::vector<float>::iterator it = std::min_element(squared_distances.begin(), squared_distances.begin() + (prim_vertex_count));
+					uint32_t closest_vtx = mpAdjacency->getFaceVertex(prim_vertex_offset + std::distance(std::begin(squared_distances), it));
+
+					dbg_printf("curve %zu face %u closest vtx %u\n", i, skin_prim_id, closest_vtx);
 				}
 			}
 		}
@@ -119,8 +151,6 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 	neighbour_search::KDTree<float, 3> kdtree(mpPhantomTrimesh->getRestPositions(), threaded_kdtree_creation);
 
 	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> nearest_points;
-
-	mCurveBinds.resize(mpCurvesContainer->getCurvesCount());
 
 	size_t projected_curves_count = 0;
 
