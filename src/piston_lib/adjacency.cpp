@@ -117,7 +117,7 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 			for(uint32_t k = 0; k < prim_vtx_count; ++k) {
 				if(i == mSrcFaceVertexIndices[face_vertex_offsets[prim_id] + k]) {
 					neighbor_vtx_pairs.emplace_back(
-						mSrcFaceVertexIndices[face_vertex_offsets[prim_id] + ((static_cast<int>(k) - 1) % prim_vtx_count)],
+						mSrcFaceVertexIndices[face_vertex_offsets[prim_id] + ((static_cast<int>(k) + prim_vtx_count - 1) % prim_vtx_count)],
 						mSrcFaceVertexIndices[face_vertex_offsets[prim_id] + ((static_cast<int>(k) + 1) % prim_vtx_count)]
 					);
 					break;
@@ -184,15 +184,15 @@ uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexCount(uint32_t face_idx) const {
 	return static_cast<uint32_t>(mSrcFaceVertexCounts[face_idx]);
 }
 
-uint32_t UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t vtx_idx) const {
+UsdGeomMeshFaceAdjacency::PxrIndexType UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t vtx_idx) const {
 	assert(vtx_idx < mSrcFaceVertexIndices.size());
-	return static_cast<uint32_t>(mSrcFaceVertexIndices[vtx_idx]);
+	return mSrcFaceVertexIndices[vtx_idx];
 }
 
-uint32_t UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t face_idx, uint32_t local_vertex_index) const {
+UsdGeomMeshFaceAdjacency::PxrIndexType UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t face_idx, uint32_t local_vertex_index) const {
 	assert(face_idx < mSrcFaceVertexCounts.size());
 	assert(local_vertex_index < mSrcFaceVertexCounts[face_idx]);
-	return static_cast<uint32_t>(mSrcFaceVertexIndices[mSrcFaceVertexOffsets[face_idx] + local_vertex_index]);
+	return mSrcFaceVertexIndices[mSrcFaceVertexOffsets[face_idx] + local_vertex_index];
 }
 
 const std::pair<UsdGeomMeshFaceAdjacency::PxrIndexType, UsdGeomMeshFaceAdjacency::PxrIndexType>& UsdGeomMeshFaceAdjacency::getCornerVertexPair(uint32_t offset) const {
