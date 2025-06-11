@@ -3,7 +3,7 @@
 
 namespace Piston {
 
-UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mFaceCount(0), mMaxFaceVertexCount(0), mValid(false), mHash(0) {};
+UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mFaceCount(0), mVertexCount(0), mMaxFaceVertexCount(0), mValid(false), mHash(0) {};
 
 UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
 	auto pResult = UsdGeomMeshFaceAdjacency::SharedPtr(new UsdGeomMeshFaceAdjacency());
@@ -45,35 +45,36 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 		}
 	}
 
-
 	auto getIndex = [&] (int i) {
 		return mSrcFaceVertexIndices[i];
 	};
 
 	size_t mesh_index_count = mSrcFaceVertexIndices.size();
 	
-	size_t mesh_vertex_count = 0;
+	for(int c: mSrcFaceVertexIndices) {
+		mVertexCount = std::max(mVertexCount, static_cast<size_t>(c));
+	}
+	
+	mVertexCount += 1;
 
-	for(int c: mSrcFaceVertexIndices) mesh_vertex_count = std::max(mesh_vertex_count, static_cast<size_t>(c));
-	mesh_vertex_count += 1;
-
-	mCounts.resize(mesh_vertex_count);
-	mOffsets.resize(mesh_vertex_count);
+	mCounts.resize(mVertexCount);
+	mOffsets.resize(mVertexCount);
+	mVtxToFace.resize(mVertexCount);
 	mFaceData.resize(mesh_index_count);
 	mCornerVertexData.resize(mesh_index_count);
 
 	// fill prim counts
-	memset(mCounts.data(), 0, mesh_vertex_count * sizeof(uint32_t));
+	memset(mCounts.data(), 0, mVertexCount * sizeof(uint32_t));
 
 	for (size_t i = 0; i < static_cast<size_t>(mesh_index_count); ++i) {
-		assert(getIndex(i) < mesh_vertex_count);
+		assert(getIndex(i) < mVertexCount);
 		mCounts[getIndex(i)]++;
 	}
 
 	// fill offset table
 	uint32_t offset = 0;
 
-	for (size_t i = 0; i < static_cast<size_t>(mesh_vertex_count); ++i) {
+	for (size_t i = 0; i < static_cast<size_t>(mVertexCount); ++i) {
 		mOffsets[i] = offset;
 		offset += mCounts[i];
 	}
@@ -91,7 +92,7 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 	}
 
 	// fix offsets that have been disturbed by the previous pass
-	for (size_t i = 0; i < static_cast<size_t>(mesh_vertex_count); ++i) {
+	for (size_t i = 0; i < static_cast<size_t>(mVertexCount); ++i) {
 		assert(mOffsets[i] >= mCounts[i]);
 		mOffsets[i] -= mCounts[i];
 	}
@@ -129,10 +130,25 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 		mCornerVertexData.insert(mCornerVertexData.begin() + offset, neighbor_vtx_pairs.begin(), neighbor_vtx_pairs.end());
 	}
 
+	// build reverse vertex to face relations data 
+	{
+		uint32_t face_vertex_offset = 0;
+		for (size_t face_id = 0; face_id < mFaceCount; ++face_id) {
+			for(uint32_t j = mSrcFaceVertexOffsets[face_id]; j < mSrcFaceVertexOffsets[face_id] + mSrcFaceVertexCounts[face_id]; ++j) {
+				mVtxToFace[mSrcFaceVertexIndices[j]] = face_id;
+			}
+		}
+	}
+
 	mHash = calcHash();
 	mValid = true;
 
 	return mValid;
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::getVertexFaceId(uint32_t vtx) const {
+	assert(vtx < mVtxToFace.size());
+	return mVtxToFace[vtx];
 }
 
 void UsdGeomMeshFaceAdjacency::invalidate() {
@@ -180,7 +196,7 @@ uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexOffset(uint32_t face_idx) const 
 }
 
 uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexCount(uint32_t face_idx) const {
-	assert(face_idx < mSrcFaceVertexCounts.size());
+	if(face_idx >= mSrcFaceVertexCounts.size()) return 0;
 	return static_cast<uint32_t>(mSrcFaceVertexCounts[face_idx]);
 }
 

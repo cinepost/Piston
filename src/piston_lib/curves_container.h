@@ -22,7 +22,7 @@ namespace Piston {
 class PxrCurvesContainer {
 	public:
 		using UniquePtr = std::unique_ptr<PxrCurvesContainer>;
-		using CurveDataPtr = std::pair<int, pxr::GfVec3f*>;
+		using CurveDataPtr = std::pair<int, pxr::GfVec3f*>;  // curve <count, ptr> pair
 
 		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
@@ -45,6 +45,7 @@ class PxrCurvesContainer {
 		size_t                                  mCurvesCount;
 		pxr::VtArray<int> 						mCurveVertexCounts;
 		std::vector<uint32_t> 					mCurveOffsets;
+		std::vector<pxr::GfVec3f>              	mCurveRestRootPositions;
 		pxr::VtArray<pxr::GfVec3f>              mCurveRestVectors;
 };
 

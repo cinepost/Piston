@@ -23,6 +23,12 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;
 		using PxrIndexType = int;
 
+		enum class DeformMode {
+			FACET 	 = 0,
+			SMOOTH 	 = 1,
+			ACCURATE = 2
+		};
+
 	private:
 		struct CurveBindData {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
@@ -33,7 +39,12 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		};
 
 	public:
+		~FastCurvesDeformer();
+
 		static SharedPtr create();
+
+		void setDeformMode(DeformMode mode);
+		DeformMode getDeformMode() const { return mDeformMode; }
 
 		virtual const std::string& toString() const override;
 
@@ -45,9 +56,22 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code) override;
 		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
 
-		UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
-		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
-		std::vector<CurveBindData>              mCurveBinds;
+		bool calcPerBindNormals(bool build_live);
+		bool calcPerBindTangentsAndBiNormals(bool build_live);
+
+		void transformCurvesToNTB();
+
+		DeformMode mDeformMode = DeformMode::FACET;
+
+		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
+		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
+		std::vector<CurveBindData>              			mCurveBinds;
+
+		std::vector<pxr::GfVec3f>               			mPerBindRestNormals;
+		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memeory to save on per-frame reallocations
+
+		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindRestTBs; // per curve-bind binormal and bangent vector pairs
+		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindLiveTBs; // we keep memeory to save on per-frame reallocations
 };
 
 } // namespace Piston

@@ -97,18 +97,19 @@ else()
       GIT_REPOSITORY https://github.com/boostorg/boost.git
       GIT_TAG boost-${EXTERNAL_BOOST_VERSION}
       UPDATE_DISCONNECTED true
-
-      CONFIGURE_COMMAND ./bootstrap.bat
-      BUILD_COMMAND ./b2 define=_GLIBCXX_USE_CXX11_ABI=0 --disable-icu --build-dir=${EXTERNALS_BINARY_DIR}/boost install -j8 toolset=msvc-14.2 address-model=64 architecture=x86 link=${BOOST_LINK_STYLE} variant=${BOOST_BUILD_TYPE} threading=multi runtime-link=${BOOST_LINK_STYLE} ${BOOST_CXX_FLAGS} ${BOOST_C_FLAGS}
-        --with-system
-        --with-python
-        --with-date_time
-        --with-iostreams
-        --with-regex
-        --with-log 
-        --with-thread
-        --with-json
-        --prefix=${EXTERNALS_INSTALL_DIR}
+#      CONFIGURE_COMMAND ./bootstrap.bat
+#      BUILD_COMMAND ./b2 define=_GLIBCXX_USE_CXX11_ABI=0 --disable-icu --build-dir=${EXTERNALS_BINARY_DIR}/boost install -j8 toolset=msvc-14.2 address-model=64 architecture=x86 link=${BOOST_LINK_STYLE} variant=${BOOST_BUILD_TYPE} threading=multi runtime-link=${BOOST_LINK_STYLE} ${BOOST_CXX_FLAGS} ${BOOST_C_FLAGS}
+#        --with-system
+#        --with-python
+#        --with-date_time
+#        --with-iostreams
+#        --with-regex
+#        --with-log 
+#        --with-thread
+#        --with-json
+#        --prefix=${EXTERNALS_INSTALL_DIR}
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ""
       BUILD_IN_SOURCE 1
       INSTALL_COMMAND ""
       INSTALL_DIR ${EXTERNALS_INSTALL_DIR}
@@ -117,35 +118,16 @@ else()
     )
   else()
     ExternalProject_Add ( Boost
-      PREFIX ${EXTERNALS_SOURCE_DIR}/${BOOST_PREFIX}
-      GIT_REPOSITORY https://github.com/boostorg/boost.git
-      GIT_TAG boost-${EXTERNAL_BOOST_VERSION}
-      UPDATE_DISCONNECTED true
-      CONFIGURE_COMMAND ./bootstrap.sh
-        --with-python=${HOUDINI_PYTHON_DIR}/python3
-        --with-libraries=system
-        --with-libraries=python
-        --with-libraries=date_time
-        --with-libraries=iostreams
-        --with-libraries=regex
-        --with-libraries=log 
-        --with-libraries=thread
-        --with-libraries=json
-        --prefix=<INSTALL_DIR>
-#      BUILD_COMMAND ./b2 --with-python --disable-icu --build-dir=${EXTERNALS_BINARY_DIR}/boost install define=_GLIBCXX_USE_CXX11_ABI=0 link=${BOOST_LINK_STYLE} variant=${BOOST_BUILD_TYPE} threading=multi runtime-link=${BOOST_LINK_STYLE} ${BOOST_CXX_FLAGS} ${BOOST_C_FLAGS}
-      BUILD_COMMAND ./b2
-        --with-python 
-        --disable-icu
-        --build-dir=${EXTERNALS_BINARY_DIR}/boost
-        python=3.11 
-        link=${BOOST_LINK_STYLE}
-        untime-link=${BOOST_LINK_STYLE} 
-        threading=multi
-        install
-      BUILD_IN_SOURCE 1
+      URL       https://archives.boost.io/release/1.82.0/source/boost_1_82_0.tar.gz
+      URL_HASH  SHA256=66a469b6e608a51f8347236f4912e27dc5c60c60d7d53ae9bfe4683316c6f04c
+      CONFIGURE_COMMAND ""
+      BUILD_COMMAND ""
+      BUILD_IN_SOURCE true
       INSTALL_COMMAND ""
       INSTALL_DIR ${EXTERNALS_INSTALL_DIR}
       TMP_DIR ${EXTERNALS_TMP_DIR}/boost
+      DOWNLOAD_DIR ${EXTERNALS_SOURCE_DIR}/${BOOST_PREFIX}
+      SOURCE_DIR ${EXTERNALS_SOURCE_DIR}/${BOOST_PREFIX}/src
       STAMP_DIR ${EXTERNALS_STAMP_DIR}/boost
     )
   endif()

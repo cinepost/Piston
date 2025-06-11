@@ -46,13 +46,16 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	}
 
 	// Calc curves derivs
+	mCurveRestRootPositions.resize(mCurvesCount);
 	mCurveRestVectors.resize(total_vertex_count);
 	for(size_t i = 0; i < mCurvesCount; ++i) {
-		auto curve_root_pt = curveRestPoints[mCurveOffsets[i]];
-		mCurveRestVectors[mCurveOffsets[i]] = curve_root_pt;
+		mCurveRestRootPositions[i] = curveRestPoints[mCurveOffsets[i]];
+		
+		//mCurveRestVectors[mCurveOffsets[i]] = curve_root_pt;
+		mCurveRestVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
 
 		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			mCurveRestVectors[mCurveOffsets[i] + j] = curveRestPoints[mCurveOffsets[i] + j] - curve_root_pt;
+			mCurveRestVectors[mCurveOffsets[i] + j] = curveRestPoints[mCurveOffsets[i] + j] - mCurveRestRootPositions[i];
 		}
 	}
 
@@ -75,9 +78,9 @@ PxrCurvesContainer::CurveDataPtr PxrCurvesContainer::getCurveDataPtr(size_t idx)
 }
 
 const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t idx) const {
-	assert(idx < mCurveOffsets.size());
+	assert(idx < mCurveRestRootPositions.size());
 
-	return mCurveRestVectors[mCurveOffsets[idx]];
+	return mCurveRestRootPositions[idx];
 }
 	
 
