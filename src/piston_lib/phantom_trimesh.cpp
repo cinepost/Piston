@@ -54,6 +54,7 @@ uint32_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexT
 
 template<typename IndexType>
 bool PhantomTrimesh<IndexType>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
 	if(face_id == kInvalidTriFaceID) return false;
 	
 	const TriFace& face = mFaces[static_cast<size_t>(face_id)];

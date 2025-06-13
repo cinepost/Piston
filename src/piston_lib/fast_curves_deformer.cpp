@@ -263,7 +263,7 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 		};
 
 		for(size_t j = 0; j < curve_data_ptr.first; ++j) {
-			*(curve_data_ptr.second + j) = (*(curve_data_ptr.second + j)) * m;
+			*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j));
 		}
 	}
 }

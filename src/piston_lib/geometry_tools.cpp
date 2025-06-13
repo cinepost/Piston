@@ -14,40 +14,37 @@ static const pxr::GfMatrix3f kRotMat180 = {
 	0.f, 0.f,-1.f
 };
 
-bool buildUsdGeomMeshFaceNormals(const pxr::UsdGeomMesh& mesh, std::vector<glm::vec3>& normals, pxr::UsdTimeCode time) {
-	size_t points_count;
-	
-	std::vector<pxr::GfVec3f> points;
+pxr::GfMatrix3f rotateAlign(const pxr::GfVec3f& n1, const pxr::GfVec3f& n2) {
+    const float cosA = pxr::GfDot(n1, n2);
+    const pxr::GfVec3f axis = pxr::GfCross(n1, n2);
+    const float k = (cosA == -1.f) ? (1.0f / (1.0f + cosA)) : 0.0f;
 
-	if(!mesh.GetPointsAttr().Get<pxr::GfVec3f>(points.data(), time)) {
-		return false;
-	}
-
-	return true;
-}
-
-pxr::GfMatrix3f rotateAlign(const pxr::GfVec3f& v1, const pxr::GfVec3f& v2) {
-    const float cosA = pxr::GfDot( v1, v2 );
-    const pxr::GfVec3f axis = pxr::GfCross( v1, v2 );
-    const float k = (cosA < -1.f) ? (1.0f / (1.0f + cosA)) : 0.0f;
-
-    pxr::GfMatrix3f result( (axis[0] * axis[0] * k) + cosA,
-		(axis[1] * axis[0] * k) - axis[2], 
-		(axis[2] * axis[0] * k) + axis[1],
-		(axis[0] * axis[1] * k) + axis[2],  
-		(axis[1] * axis[1] * k) + cosA,      
-		(axis[2] * axis[1] * k) - axis[0],
-		(axis[0] * axis[2] * k) - axis[1],  
-		(axis[1] * axis[2] * k) + axis[0],  
-		(axis[2] * axis[2] * k) + cosA 
+    pxr::GfMatrix3f result( 
+        (axis[0] * axis[0] * k) + cosA,    (axis[1] * axis[0] * k) - axis[2], (axis[2] * axis[0] * k) + axis[1],
+		(axis[0] * axis[1] * k) + axis[2], (axis[1] * axis[1] * k) + cosA,    (axis[2] * axis[1] * k) - axis[0],
+		(axis[0] * axis[2] * k) - axis[1], (axis[1] * axis[2] * k) + axis[0], (axis[2] * axis[2] * k) + cosA 
 	);
 
     return result;
 }
 
-glm::mat3 rotateAlign(const glm::vec3& v1, const glm::vec3& v2) {
-    const float cosA = dot( v1, v2 );
-    const glm::vec3 axis = cross( v1, v2 );
+pxr::GfMatrix3f rotateAlign2(const pxr::GfVec3f& n1, const pxr::GfVec3f& n2) {
+    const pxr::GfVec3f axis = pxr::GfCross(n1, n2);
+    const float c = pxr::GfDot(n1, n2);
+    const float s = sqrt(1.f - c * c); 
+    const float t = 1.f - c;
+    
+    return { 
+        (axis[0] * axis[0] * t) + c,            (axis[0] * axis[1] * t) - axis[2] * s,  (axis[0] * axis[2] * t) + axis[1] * s,
+        (axis[0] * axis[1] * t) + axis[2] * s,  (axis[1] * axis[1] * t) + c,            (axis[1] * axis[2] * t) - axis[0] * s,
+        (axis[0] * axis[2] * t) - axis[1] * s,  (axis[1] * axis[2] * t) + axis[0] * s,  (axis[2] * axis[2] * t) + c 
+    };
+}
+
+
+glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2) {
+    const float cosA = dot(n1, n2);
+    const glm::vec3 axis = cross(n1, n2);
     const float k = 1.0f / (1.0f + cosA);
 
     glm::mat3 result( (axis.x * axis.x * k) + cosA,
