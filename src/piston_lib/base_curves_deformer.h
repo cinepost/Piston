@@ -30,6 +30,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		};
 		
 	public:
+		virtual ~BaseCurvesDeformer() {}
+
 		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
 		void setCurvesGeoPrim(pxr::UsdPrim* pGeoPrim);
 
@@ -50,6 +52,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool deformImpl(pxr::UsdTimeCode time_code) = 0;
 
 	protected:
+		bool mDirty = true;
+		
 		UsdPrimHandle mMeshGeoPrimHandle;
 		UsdPrimHandle mCurvesGeoPrimHandle;
 
@@ -57,13 +61,10 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 		PxrCurvesContainer::UniquePtr mpCurvesContainer;
-
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
 
 		pxr::UsdStageRefPtr mpTempStage;
-		bool mDirty = true;
-
 };
 
 } // namespace Piston

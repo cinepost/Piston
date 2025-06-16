@@ -54,6 +54,8 @@ class PhantomTrimesh {
 			const pxr::GfVec3f& getRestNormal() const { return restNormal; }
 			const pxr::GfVec3f& getLiveNormal() const { return liveNormal; }
 
+			const IndicesList&  getIndices() const { return indices; }
+
 			const IndexType& operator[](size_t index) const { return indices[index]; }
 
 			IndicesList indices;
@@ -74,7 +76,9 @@ class PhantomTrimesh {
 
 		uint32_t getOrCreate(IndexType a, IndexType b, IndexType c);
 
+		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
+		size_t getFaceCount() const { return mFaces.size(); }
 
 		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
 
