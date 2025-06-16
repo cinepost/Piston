@@ -48,6 +48,8 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr mpPhantomTrimesh;
 		std::vector<CurveBindData>              mCurveBinds;
+
+		std::vector<pxr::GfVec3f> 				mPerBindRestNormals;
 };
 
 } // namespace Piston
