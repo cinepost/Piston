@@ -83,7 +83,7 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 			N[2], T[2], B[2]
 		};
 
-			rotate_mat = m.GetInverse();
+			rotate_mat = m;//.GetInverse();
 		} else {
 			rotate_mat = mDeformMode == DeformMode::FACET ? rotateAlign(face.getRestNormal(), face.getLiveNormal()) : rotateAlign(mPerBindRestNormals[i], mPerBindLiveNormals[i]);
 		}
@@ -238,7 +238,7 @@ bool FastCurvesDeformer::calcPerBindTangentsAndBiNormals(bool build_live) {
 
 		const auto& face = faces[bind.face_id];
 		const pxr::GfVec3f root_proj_pos = bind.u * pt_positions[face.indices[0]] + bind.v * pt_positions[face.indices[2]] + (1.f - bind.u - bind.v) * pt_positions[face.indices[1]];
-		const pxr::GfVec3f tmp_binormal = pxr::GfCross(perBindNormals[i], face_center_points[bind.face_id] - root_proj_pos);
+		const pxr::GfVec3f tmp_binormal = face_center_points[bind.face_id] - root_proj_pos;
 		mPerBindTBs[i].first = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], tmp_binormal)); // tangent
 		mPerBindTBs[i].second = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], mPerBindTBs[i].first)); //binormal
 	}
@@ -256,11 +256,10 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 		const pxr::GfVec3f& T = mPerBindRestTBs[i].first;
 		const pxr::GfVec3f& B = mPerBindRestTBs[i].second;
 
-		const pxr::GfMatrix3f m = {
+		const pxr::GfMatrix3f m = pxr::GfMatrix3f(
 			N[0], T[0], B[0], 
 			N[1], T[1], B[1],
-			N[2], T[2], B[2]
-		};
+			N[2], T[2], B[2]).GetInverse();
 
 		for(size_t j = 0; j < curve_data_ptr.first; ++j) {
 			*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j));
