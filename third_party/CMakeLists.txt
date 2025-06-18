@@ -93,27 +93,16 @@ else()
 
   if(WIN32)
     ExternalProject_Add ( Boost
-      PREFIX ${EXTERNALS_SOURCE_DIR}/${BOOST_PREFIX}
-      GIT_REPOSITORY https://github.com/boostorg/boost.git
-      GIT_TAG boost-${EXTERNAL_BOOST_VERSION}
-      UPDATE_DISCONNECTED true
-#      CONFIGURE_COMMAND ./bootstrap.bat
-#      BUILD_COMMAND ./b2 define=_GLIBCXX_USE_CXX11_ABI=0 --disable-icu --build-dir=${EXTERNALS_BINARY_DIR}/boost install -j8 toolset=msvc-14.2 address-model=64 architecture=x86 link=${BOOST_LINK_STYLE} variant=${BOOST_BUILD_TYPE} threading=multi runtime-link=${BOOST_LINK_STYLE} ${BOOST_CXX_FLAGS} ${BOOST_C_FLAGS}
-#        --with-system
-#        --with-python
-#        --with-date_time
-#        --with-iostreams
-#        --with-regex
-#        --with-log 
-#        --with-thread
-#        --with-json
-#        --prefix=${EXTERNALS_INSTALL_DIR}
+      URL       https://archives.boost.io/release/1.82.0/source/boost_1_82_0.zip
+      URL_HASH  SHA256=f7c9e28d242abcd7a2c1b962039fcdd463ca149d1883c3a950bbcc0ce6f7c6d9
       CONFIGURE_COMMAND ""
       BUILD_COMMAND ""
-      BUILD_IN_SOURCE 1
+      BUILD_IN_SOURCE true
       INSTALL_COMMAND ""
       INSTALL_DIR ${EXTERNALS_INSTALL_DIR}
       TMP_DIR ${EXTERNALS_TMP_DIR}/boost
+      DOWNLOAD_DIR ${EXTERNALS_SOURCE_DIR}/${BOOST_PREFIX}
+      SOURCE_DIR ${EXTERNALS_SOURCE_DIR}/${BOOST_PREFIX}/src
       STAMP_DIR ${EXTERNALS_STAMP_DIR}/boost
     )
   else()
