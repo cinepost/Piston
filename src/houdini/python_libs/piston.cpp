@@ -45,15 +45,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("create", &FastCurvesDeformer::create)
 		.staticmethod("create")
 		.def("toString", &FastCurvesDeformer::toString, return_value_policy<copy_const_reference>())
-		.def("setDeformMode", &FastCurvesDeformer::setDeformMode)
-		.def("getDeformMode", &FastCurvesDeformer::getDeformMode)
 	;
-
-	enum_<FastCurvesDeformer::DeformMode>("DeformMode")
-    .value("FACET", FastCurvesDeformer::DeformMode::FACET)
-    .value("SMOOTH", FastCurvesDeformer::DeformMode::SMOOTH)
-    .value("ACCURATE", FastCurvesDeformer::DeformMode::ACCURATE)
-  ;
 	
 	def("greet", greet);
 }

@@ -60,7 +60,7 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 	mCounts.resize(mVertexCount);
 	mOffsets.resize(mVertexCount);
 	mVtxToFace.resize(mVertexCount);
-	mFaceData.resize(mesh_index_count);
+	mPrimData.resize(mesh_index_count);
 	mCornerVertexData.resize(mesh_index_count);
 
 	// fill prim counts
@@ -85,7 +85,7 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 	size_t curent_face_start_index = 0;
 	for (size_t c = 0; c < mFaceCount; ++c) {
 		for(int i = 0; i < mSrcFaceVertexCounts[c]; ++i) {
-			mFaceData[mOffsets[getIndex(curent_face_start_index + i)]++] = uint32_t(c);
+			mPrimData[mOffsets[getIndex(curent_face_start_index + i)]++] = uint32_t(c);
 		}
 
 		curent_face_start_index += mSrcFaceVertexCounts[c];
@@ -113,7 +113,7 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 		neighbor_vtx_pairs.clear();
 		// iterate neighbor prims
 		for (uint32_t j = offset; j < (offset + count); ++j) {
-			uint32_t prim_id = mFaceData[j];
+			uint32_t prim_id = mPrimData[j];
 			uint32_t prim_vtx_count = static_cast<uint32_t>(mSrcFaceVertexCounts[prim_id]);
 			for(uint32_t k = 0; k < prim_vtx_count; ++k) {
 				if(i == mSrcFaceVertexIndices[face_vertex_offsets[prim_id] + k]) {
@@ -132,7 +132,6 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 
 	// build reverse vertex to face relations data 
 	{
-		uint32_t face_vertex_offset = 0;
 		for (size_t face_id = 0; face_id < mFaceCount; ++face_id) {
 			for(uint32_t j = mSrcFaceVertexOffsets[face_id]; j < mSrcFaceVertexOffsets[face_id] + mSrcFaceVertexCounts[face_id]; ++j) {
 				mVtxToFace[mSrcFaceVertexIndices[j]] = face_id;
@@ -156,7 +155,7 @@ void UsdGeomMeshFaceAdjacency::invalidate() {
 	mMaxFaceVertexCount = 0;
 	mCounts.clear();
 	mOffsets.clear();
-	mFaceData.clear();
+	mPrimData.clear();
 	mValid = false;
 	mHash = 0;
 }
@@ -170,14 +169,14 @@ size_t UsdGeomMeshFaceAdjacency::calcHash() {
 	for(size_t i = 0; i < mOffsets.size(); ++i) hash += mOffsets[i]*i;
 	hash += mOffsets.size();
 
-	for(size_t i = 0; i < mFaceData.size(); ++i) hash += mFaceData[i]*i;
-	hash += mFaceData.size();
+	for(size_t i = 0; i < mPrimData.size(); ++i) hash += mPrimData[i]*i;
+	hash += mPrimData.size();
 
 	return hash;
 }
 
 bool UsdGeomMeshFaceAdjacency::isValid() const { 
-	return mValid && !mCounts.empty() && !mOffsets.empty() && !mFaceData.empty(); 
+	return mValid && !mCounts.empty() && !mOffsets.empty() && !mPrimData.empty(); 
 }
 
 uint32_t UsdGeomMeshFaceAdjacency::getNeighborsCount(uint32_t idx) const { 
@@ -188,6 +187,11 @@ uint32_t UsdGeomMeshFaceAdjacency::getNeighborsCount(uint32_t idx) const {
 uint32_t UsdGeomMeshFaceAdjacency::getNeighborsOffset(uint32_t idx) const {
 	assert(idx < mOffsets.size());
 	return mOffsets[idx]; 
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::getNeighborPrim(uint32_t prim_offset) const {
+	assert(prim_offset < mPrimData.size());
+	return mPrimData[prim_offset];
 }
 
 uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexOffset(uint32_t face_idx) const {
@@ -225,7 +229,7 @@ std::string UsdGeomMeshFaceAdjacency::toString() const {
 		uint32_t count = mCounts[i];
 		uint32_t offset = mOffsets[i];
 		for(uint32_t j = 0; j < count; ++j) {
-			s += std::to_string(mFaceData[offset + j]) + " ";
+			s += std::to_string(mPrimData[offset + j]) + " ";
 		}
 		s += "]\n";
 	}

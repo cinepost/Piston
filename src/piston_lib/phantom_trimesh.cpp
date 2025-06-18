@@ -53,20 +53,56 @@ uint32_t PhantomTrimesh<IndexType>::getOrCreate(IndexType a, IndexType b, IndexT
 }
 
 template<typename IndexType>
+bool PhantomTrimesh<IndexType>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
+	if(face_id == kInvalidTriFaceID) return false;
+	
+	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
+	return rayTriangleIntersect(pt, -face.getRestNormal(), mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], u, v);
+}
+
+template<typename IndexType>
 bool PhantomTrimesh<IndexType>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 	if(face_id == kInvalidTriFaceID) return false;
 	
 	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	return pointTriangleProject(pt, face.getRestNormal(), mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], dist, u, v);
+	return rayTriangleIntersect(pt, -face.getRestNormal(), mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], dist, u, v);
 }
 
 template<typename IndexType>
-pxr::GfVec3f PhantomTrimesh<IndexType>::getInterpolatedPosition(uint32_t face_id, float u, float v, float dist) const {
+bool PhantomTrimesh<IndexType>::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
+	if(face_id == kInvalidTriFaceID) return false;
+
+	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
+	return rayTriangleIntersect(orig, dir, mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], u, v);
+}
+
+template<typename IndexType>
+bool PhantomTrimesh<IndexType>::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v, float& dist) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
+	if(face_id == kInvalidTriFaceID) return false;
+
+	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
+	return rayTriangleIntersect(orig, dir, mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], dist, u, v);
+}
+
+template<typename IndexType>
+pxr::GfVec3f PhantomTrimesh<IndexType>::getInterpolatedRestPosition(uint32_t face_id, float u, float v) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& face = mFaces[face_id];
-	return (u * mUsdMeshLivePositions[face.indices[1]] + v * mUsdMeshLivePositions[face.indices[2]] + (1.f - u - v) * mUsdMeshLivePositions[face.indices[0]]) + face.getLiveNormal() * dist;// + face.getLiveNormal();
+	return u * mUsdMeshRestPositions[face.indices[1]] + v * mUsdMeshRestPositions[face.indices[2]] + (1.f - u - v) * mUsdMeshRestPositions[face.indices[0]];
+};
+
+
+template<typename IndexType>
+pxr::GfVec3f PhantomTrimesh<IndexType>::getInterpolatedLivePosition(uint32_t face_id, float u, float v) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
+
+	auto const& face = mFaces[face_id];
+	return u * mUsdMeshLivePositions[face.indices[1]] + v * mUsdMeshLivePositions[face.indices[2]] + (1.f - u - v) * mUsdMeshLivePositions[face.indices[0]];
 };
 
 template<typename IndexType>
@@ -85,12 +121,6 @@ bool PhantomTrimesh<IndexType>::update(const UsdPrimHandle& prim_handle, pxr::Us
 		return false;
 	}
 
-	for(auto& face: mFaces) {
-		face.liveNormal = pxr::GfGetNormalized(
-			pxr::GfCross(mUsdMeshLivePositions[face.indices[1]] - mUsdMeshLivePositions[face.indices[0]], mUsdMeshLivePositions[face.indices[2]] - mUsdMeshLivePositions[face.indices[0]])
-		);
-	}
-
 	return true;
 }
 
@@ -99,9 +129,14 @@ template PhantomTrimesh<int>::SharedPtr PhantomTrimesh<int>::create(const UsdPri
 
 template uint32_t PhantomTrimesh<int>::getOrCreate(int a, int b, int c);
 
+template bool PhantomTrimesh<int>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v) const;
 template bool PhantomTrimesh<int>::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
 
-template pxr::GfVec3f PhantomTrimesh<int>::getInterpolatedPosition(uint32_t face_id, float u, float v, float dist) const;
+template bool PhantomTrimesh<int>::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& vec, uint32_t face_id, float& u, float& v) const;
+template bool PhantomTrimesh<int>::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& vec, uint32_t face_id, float& u, float& v, float& dist) const;
+
+template pxr::GfVec3f PhantomTrimesh<int>::getInterpolatedRestPosition(uint32_t face_id, float u, float v) const;
+template pxr::GfVec3f PhantomTrimesh<int>::getInterpolatedLivePosition(uint32_t face_id, float u, float v) const;
 
 template bool PhantomTrimesh<int>::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);
 } // namespace Piston

@@ -30,13 +30,13 @@ class PxrCurvesContainer {
 
 		size_t 		getCurvesCount() const { return mCurvesCount; }
 		size_t 		getTotalVertexCount() const { return mCurveRestVectors.size(); }
-		uint32_t	getCurveVertexOffset(size_t idx) const { return mCurveOffsets[idx]; }
+		uint32_t	getCurveVertexOffset(size_t curve_idx) const { return mCurveOffsets[curve_idx]; }
 
-		int getCurveVertexCount(size_t idx) const { return mCurveVertexCounts[idx]; }
+		int getCurveVertexCount(size_t curve_idx) const { return mCurveVertexCounts[curve_idx]; }
 
-		CurveDataPtr getCurveDataPtr(size_t idx);
+		CurveDataPtr getCurveDataPtr(size_t curve_idx);
 
-		const pxr::GfVec3f& getCurveRootPoint(size_t idx) const;
+		const pxr::GfVec3f& getCurveRootPoint(size_t curve_idx) const;
 
 	private:
 		PxrCurvesContainer();

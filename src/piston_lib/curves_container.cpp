@@ -71,16 +71,16 @@ PxrCurvesContainer::UniquePtr PxrCurvesContainer::create(const UsdPrimHandle& pr
 	return pResult;
 }
 
-PxrCurvesContainer::CurveDataPtr PxrCurvesContainer::getCurveDataPtr(size_t idx) {
-	assert(idx < mCurveOffsets.size());
+PxrCurvesContainer::CurveDataPtr PxrCurvesContainer::getCurveDataPtr(size_t curve_idx) {
+	assert(curve_idx < mCurveOffsets.size());
 
-	return {mCurveVertexCounts[idx], &mCurveRestVectors[mCurveOffsets[idx]]};
+	return {mCurveVertexCounts[curve_idx], &mCurveRestVectors[mCurveOffsets[curve_idx]]};
 }
 
-const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t idx) const {
-	assert(idx < mCurveRestRootPositions.size());
+const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t curve_idx) const {
+	assert(curve_idx < mCurveRestRootPositions.size());
 
-	return mCurveRestRootPositions[idx];
+	return mCurveRestRootPositions[curve_idx];
 }
 	
 

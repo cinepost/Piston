@@ -28,6 +28,8 @@ class UsdGeomMeshFaceAdjacency {
 
 		uint32_t getNeighborsCount(uint32_t idx) const;
 		uint32_t getNeighborsOffset(uint32_t idx) const;
+		uint32_t getNeighborPrim(uint32_t prim_offset) const;
+
 
 		uint32_t getFaceVertexOffset(uint32_t face_idx) const;
 		uint32_t getFaceVertexCount(uint32_t face_idx) const;
@@ -39,6 +41,8 @@ class UsdGeomMeshFaceAdjacency {
 		size_t getVertexCount() const { return mVertexCount; }
 		size_t getFaceCount() const { return mFaceCount; }
 		size_t getMaxFaceVertexCount() const { return mMaxFaceVertexCount; }
+
+		const std::vector<uint32_t>& getPrimData() const { return mPrimData; }
 
 		const std::pair<PxrIndexType, PxrIndexType>& getCornerVertexPair(uint32_t offset) const;
 
@@ -54,7 +58,7 @@ class UsdGeomMeshFaceAdjacency {
 
     	std::vector<uint32_t> mCounts;   	// per vertex neighbor faces counts
     	std::vector<uint32_t> mOffsets;  	// per vertex neighbor offsets in data array
-    	std::vector<uint32_t> mFaceData;    // neighbor face indices
+    	std::vector<uint32_t> mPrimData;    // neighbor prim indices
     	std::vector<uint32_t> mVtxToFace;   // simple reverse relations vertex to face
     	std::vector<std::pair<PxrIndexType, PxrIndexType>> mCornerVertexData;	// neighbor corner vertex pair indices
 

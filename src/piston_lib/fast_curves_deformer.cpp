@@ -5,6 +5,8 @@
 #include "geometry_tools.h"
 #include "simple_profiler.h"
 
+#include <pxr/base/gf/matrix4f.h>
+
 #include <random>
 #include <algorithm>
 
@@ -17,7 +19,7 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 
 namespace Piston {
 
-FastCurvesDeformer::FastCurvesDeformer(): BaseCurvesDeformer(), mDeformMode(DeformMode::FACET) {
+FastCurvesDeformer::FastCurvesDeformer(): BaseCurvesDeformer() {
 	dbg_printf("FastCurvesDeformer::FastCurvesDeformer()\n");
 }
 
@@ -46,17 +48,13 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 		return false;
 	}
 
-	if(mDeformMode != DeformMode::FACET) {
-		const bool build_live = true; // build using live data
-		if(!calcPerBindNormals(build_live)) {
-			std::cerr << "Error building interpolated live normals !" << std::endl;
-			return false;
-		}
-
-		if(mDeformMode == DeformMode::ACCURATE) {
-			calcPerBindTangentsAndBiNormals(build_live);
-		}
+	const bool build_live = true; // build using live data
+	if(!calcPerBindNormals(build_live)) {
+		std::cerr << "Error building interpolated live normals !" << std::endl;
+		return false;
 	}
+
+	calcPerBindTangentsAndBiNormals(build_live);
 
 	pxr::VtArray<pxr::GfVec3f> points(pCurves->getTotalVertexCount());
 
@@ -65,14 +63,10 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	for(uint32_t i = 0; i < pCurves->getCurvesCount(); ++i) {
 		const auto& bind = mCurveBinds[i];
 		if(bind.face_id == CurveBindData::kInvalidFaceID) {
-			//dbg_printf("invalid face_id\n");
+			// invalid face_id
 			continue;
 		}
 
-		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
-		pxr::GfMatrix3f rotate_mat;
-
-		if(mDeformMode == DeformMode::ACCURATE) {
 		const pxr::GfVec3f& N = mPerBindLiveNormals[i];
 		const pxr::GfVec3f& T = mPerBindLiveTBs[i].first;
 		const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
@@ -83,22 +77,12 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 			N[2], T[2], B[2]
 		};
 
-			rotate_mat = m;//.GetInverse();
-		} else {
-			rotate_mat = mDeformMode == DeformMode::FACET ? rotateAlign(face.getRestNormal(), face.getLiveNormal()) : rotateAlign(mPerBindRestNormals[i], mPerBindLiveNormals[i]);
-		}
-
-
-		// try to move curve root point
-		//std::cout << bind.dist << std::endl;
-
-		auto root_pt_pos = mpPhantomTrimesh->getInterpolatedPosition(bind.face_id, bind.u, bind.v, bind.dist);
+		auto curve_bind_pos = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v);
 		uint32_t vertex_offset = pCurves->getCurveVertexOffset(i);
-		points[vertex_offset++] = root_pt_pos;
 		PxrCurvesContainer::CurveDataPtr curve_data_ptr = pCurves->getCurveDataPtr(i);
 
-		for(size_t j = 1; j < curve_data_ptr.first; ++j) {
-			points[vertex_offset++] = root_pt_pos + rotate_mat * (*(curve_data_ptr.second + j));
+		for(size_t j = 0; j < curve_data_ptr.first; ++j) {
+			points[vertex_offset++] = curve_bind_pos + m * (*(curve_data_ptr.second + j));
 		}
 	}
 
@@ -107,12 +91,6 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	}
 
 	return true;
-}
-
-void FastCurvesDeformer::setDeformMode(FastCurvesDeformer::DeformMode mode) {
-	if(mDeformMode == mode) return;
-	mDeformMode = mode;
-	mDirty = true;
 }
 
 bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
@@ -129,8 +107,6 @@ bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 
 	assert(mpAdjacency->getMaxFaceVertexCount() > 0);
 
-	std::cout << mpAdjacency->toString() << std::endl;
-
 	// Create phantom mesh
 	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mMeshRestPositionAttrName);
 	if(!mpPhantomTrimesh) {
@@ -142,11 +118,6 @@ bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 		return false;
 	}
 
-	// We've done for simplest FACET mode
-	if(mDeformMode == DeformMode::FACET) {
-		return true;
-	}
-
 	// Additional per-bind rest normals if needed
 	const bool build_live_per_bind_data = false; // build using rest data
 	if(!calcPerBindNormals(build_live_per_bind_data)) {
@@ -154,13 +125,13 @@ bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 		return false;
 	}
 
-	if(mDeformMode == DeformMode::ACCURATE) {
-		if(!calcPerBindTangentsAndBiNormals(build_live_per_bind_data)) {
-			std::cerr << "Error building per curve " << (build_live_per_bind_data ? "\"live\"" : "\"rest\"") << " tangents and binormals !" << std::endl;
-			return false;
-		}
-		transformCurvesToNTB();
+	if(!calcPerBindTangentsAndBiNormals(build_live_per_bind_data)) {
+		std::cerr << "Error building per curve " << (build_live_per_bind_data ? "\"live\"" : "\"rest\"") << " tangents and binormals !" << std::endl;
+		return false;
 	}
+
+	// transform curves to NTB spaces
+	transformCurvesToNTB();
 
 	return true; 
 }
@@ -247,24 +218,58 @@ bool FastCurvesDeformer::calcPerBindTangentsAndBiNormals(bool build_live) {
 }
 
 void FastCurvesDeformer::transformCurvesToNTB() {
-	PxrCurvesContainer* pCurves = mpCurvesContainer.get();
+	assert(mpCurvesContainer);
+	assert(mpPhantomTrimesh);
+	assert(mCurveBinds.size() == mpCurvesContainer->getCurvesCount());
 
-	for(size_t i = 0; i < mCurveBinds.size(); ++i) {
-		PxrCurvesContainer::CurveDataPtr curve_data_ptr = pCurves->getCurveDataPtr(i);
+	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
+		PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
+		const auto& bind = mCurveBinds[curve_index];
+		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
 
-		const pxr::GfVec3f& N = mPerBindRestNormals[i];
-		const pxr::GfVec3f& T = mPerBindRestTBs[i].first;
-		const pxr::GfVec3f& B = mPerBindRestTBs[i].second;
-
+		const auto root_pos_offset = mpCurvesContainer->getCurveRootPoint(curve_index) - mpPhantomTrimesh->getInterpolatedRestPosition(bind.face_id, bind.u, bind.v);
+		const pxr::GfVec3f& N = mPerBindRestNormals[curve_index];
+		const pxr::GfVec3f& T = mPerBindRestTBs[curve_index].first;
+		const pxr::GfVec3f& B = mPerBindRestTBs[curve_index].second;
 		const pxr::GfMatrix3f m = pxr::GfMatrix3f(
-			N[0], T[0], B[0], 
+			N[0], T[0], B[0],
 			N[1], T[1], B[1],
-			N[2], T[2], B[2]).GetInverse();
+			N[2], T[2], B[2]
+		).GetInverse();
 
 		for(size_t j = 0; j < curve_data_ptr.first; ++j) {
-			*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j));
+			*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j) + root_pos_offset);
+			//*(curve_data_ptr.second + j) = m.Transform(*(curve_data_ptr.second + j) + root_pos_offset);
 		}
 	}
+}
+
+bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind) {
+	PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
+	// first we try to itersect one of the curves segments
+	if(curve_data_ptr.first < 2 || !curve_data_ptr.second) return false; // invalid curve
+
+	const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+
+	for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first - 1); ++ptr_offset) {
+		const pxr::GfVec3f orig = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
+		const pxr::GfVec3f dir  = *(curve_data_ptr.second + ptr_offset + 1) - *(curve_data_ptr.second + ptr_offset); 
+		if(mpPhantomTrimesh->intersectRay(orig, dir, face_id, bind.u, bind.v)) {
+			bind.face_id = face_id;
+			return true;
+		}
+	}
+
+	// if we failed to intersect one of curves segments, then try to project one of its points starting from root
+	for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
+		if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v)) {
+			bind.face_id = face_id;
+			return true;
+		}
+	}
+
+
+	return false;
 }
 
 bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code) {
@@ -272,9 +277,12 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 
 	pxr::UsdGeomPrimvarsAPI curvesPrimvarsApi = mCurvesGeoPrimHandle.getPrimvarsAPI();
 
-	mCurveBinds.resize(mpCurvesContainer->getCurvesCount());
-	size_t bound_curves_count = 0;
+	const size_t total_curves_count = mpCurvesContainer->getCurvesCount();
+
+	mCurveBinds.resize(total_curves_count);
 	size_t skin_bound_curves_count = 0;
+	size_t kdtree_bound_curves_count = 0;
+	size_t bforce_bound_curves_count = 0;
 
 
 	// Clear all possible previous binds
@@ -284,7 +292,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 
 	std::vector<float> tmp_squared_distances(mpAdjacency->getMaxFaceVertexCount());
 
-	auto bindToPrimIndex = [&] (CurveBindData& bind, const pxr::GfVec3f curve_root_pt, uint32_t prim_id) {
+	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id) {
 		bool isBound = false;
 		const uint32_t prim_vertex_count = mpAdjacency->getFaceVertexCount(prim_id);
 		const uint32_t prim_vertex_offset = mpAdjacency->getFaceVertexOffset(prim_id);
@@ -292,7 +300,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 		// try to bind face corner "ear"
 
 		for(size_t j = 0; j < prim_vertex_count; ++j) {
-			tmp_squared_distances[j] = distanceSquared(curve_root_pt, mpPhantomTrimesh->getRestPositions()[mpAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+			tmp_squared_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), mpPhantomTrimesh->getRestPositions()[mpAdjacency->getFaceVertex(prim_vertex_offset + j)]);
 		}
 
 		std::vector<float>::iterator it = std::min_element(tmp_squared_distances.begin(), tmp_squared_distances.begin() + prim_vertex_count);
@@ -304,8 +312,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 			mpAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
 		);
 
-		if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
-			bind.face_id = face_id;
+		if(bindCurveToTriface(curve_index, face_id, bind)) {
 			isBound = true;
 		} else if ( prim_vertex_count > 3u){
 			// Try to bind using face "fan" triangulation
@@ -316,19 +323,19 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 					mpAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
 				);
 
-				if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
-					bind.face_id = face_id;
+				if(bindCurveToTriface(curve_index, face_id, bind)) {
 					isBound = true;
 					break;
 				} 
 			}
 		}
-	
+
 		return isBound;
 	};
 
-	// Strategy: 1
+	dbg_printf("Total curves count to bind: %zu\n", total_curves_count);
 
+	// Strategy: 1
 	// First we try to bind curves using skin prim ids
 	if(!mСurvesSkinPrimAttrName.empty()) {
 		pxr::UsdGeomPrimvar skinPrimVar = curvesPrimvarsApi.GetPrimvar(pxr::TfToken(mСurvesSkinPrimAttrName));
@@ -337,24 +344,33 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 		} else {
 			pxr::VtArray<int> skinPrimIndices;
 			if(skinPrimVar.GetAttr().Get(&skinPrimIndices, rest_time_code)) {
-				assert(skinPrimIndices.size() == mpCurvesContainer->getCurvesCount());
+				assert(skinPrimIndices.size() == total_curves_count);
 				std::vector<float> squared_distances(mpAdjacency->getMaxFaceVertexCount());
 
-				for(size_t i = 0; i < mpCurvesContainer->getCurvesCount(); ++i) {
-					if(skinPrimIndices[i] < 0) continue; // pixar uses negative indices as invalid
+				for(uint32_t curve_index = 0; curve_index < total_curves_count; ++curve_index) {
+					if(skinPrimIndices[curve_index] < 0) continue; // pixar uses negative indices as invalid
 
-					auto& bind = mCurveBinds[i];
-					const pxr::GfVec3f curve_root_pt = mpCurvesContainer->getCurveRootPoint(i);
-					const uint32_t skin_prim_id = static_cast<uint32_t>(skinPrimIndices[i]);
+					auto& bind = mCurveBinds[curve_index];
+					const uint32_t skin_prim_id = static_cast<uint32_t>(skinPrimIndices[curve_index]);
 					
-					if(bindToPrimIndex(bind, curve_root_pt, skin_prim_id)) {
-						skin_bound_curves_count += 1;
-						printf("skin bound\n");
+					if(bindCurveToPrim(curve_index, bind, skin_prim_id)) {
+						skin_bound_curves_count++;
+						//dbg_printf("skin bound\n");
 					}
 				}
 			}
 		}
 	}
+
+	dbg_printf("Skin bound curves count: %zu\n", skin_bound_curves_count);
+
+	if(total_curves_count == skin_bound_curves_count) {
+		// all curves were bound using skinPrimVar
+		return true;
+	}
+
+	// Strategy: 2
+	// Bind ramaining curves using nearest point
 
 	// Build kdtree
 	static const bool threaded_kdtree_creation = false;
@@ -362,52 +378,53 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 
 	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> nearest_points;
 
-	for(size_t i = 0; i < mpCurvesContainer->getCurvesCount(); ++i) {
+	for(uint32_t curve_index = 0; curve_index < total_curves_count; ++curve_index) {
+		auto& bind = mCurveBinds[curve_index];
+		if(bind.face_id != CurveBindData::kInvalidFaceID) continue; // bound already
 
-		const pxr::GfVec3f curve_root_pt = mpCurvesContainer->getCurveRootPoint(i);
+		const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = kdtree.findNearestNeighbour(curve_root_pt);
 
-		nearest_points.clear();
-		kdtree.findKNearestNeighbours(curve_root_pt, 3, nearest_points);
-		if(nearest_points.size() < 3) {
-			continue;
-		}
-
-		const uint32_t face_id = mpPhantomTrimesh->getOrCreate(
-			static_cast<PxrIndexType>(nearest_points[0].first), static_cast<PxrIndexType>(nearest_points[1].first), static_cast<PxrIndexType>(nearest_points[2].first));
-	
-		auto& bind = mCurveBinds[i];
-		if(bind.face_id != CurveBindData::kInvalidFaceID) continue;
-
-		if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
-			dbg_printf("projected\n");
-			bound_curves_count++;
-			bind.face_id = face_id;
-		} else {
-			auto closest_vtx = nearest_points[0].first;
-			const uint32_t neighbors_count = mpAdjacency->getNeighborsCount(closest_vtx);
-			if(neighbors_count > 0) {
-				const uint32_t neighbors_offset = mpAdjacency->getNeighborsOffset(closest_vtx);
-				for(uint32_t i = neighbors_offset; i < (neighbors_offset + neighbors_count); ++i){
-					const auto& index_pair = mpAdjacency->getCornerVertexPair(i);
-					const uint32_t face_id = mpPhantomTrimesh->getOrCreate(
-						static_cast<PxrIndexType>(closest_vtx), static_cast<PxrIndexType>(index_pair.first), static_cast<PxrIndexType>(index_pair.second));
-					if(mpPhantomTrimesh->projectPoint(curve_root_pt, face_id, bind.u, bind.v, bind.dist)) {
-						dbg_printf("re-projected\n");
-						bind.face_id = face_id;
-						bound_curves_count++;
-						break;
-					}
+		const auto nearest_vtx = nearest_pt.first;
+		const uint32_t neighbors_count = mpAdjacency->getNeighborsCount(nearest_vtx);
+		if(neighbors_count > 0) {
+			const uint32_t neighbors_offset = mpAdjacency->getNeighborsOffset(nearest_vtx);
+			for(uint32_t prim_offset = neighbors_offset; prim_offset < (neighbors_offset + neighbors_count); ++prim_offset){
+				const auto skin_prim_id = mpAdjacency->getNeighborPrim(prim_offset);
+				if(bindCurveToPrim(curve_index, bind, skin_prim_id)) {
+					//dbg_printf("kdtree bound\n");
+					kdtree_bound_curves_count++;
+					break;
 				}
-			} else {
-				dbg_printf("skipped\n");
 			}
 		}
 	}
 
-	dbg_printf("Total curves count to bind: %zu\n", mpCurvesContainer->getCurvesCount());
-	dbg_printf("Skin bound curves count: %zu\n", skin_bound_curves_count);
-	dbg_printf("Bound curves count: %zu\n", bound_curves_count);
-	
+	dbg_printf("KDtree bound curves count: %zu\n", kdtree_bound_curves_count);
+
+	if(total_curves_count == (skin_bound_curves_count + kdtree_bound_curves_count)) {
+		// all remaining curves were bound using kdtree
+		return true;
+	}
+
+	// Strategy: 3
+	// Brute force binding
+	for(uint32_t curve_index = 0; curve_index < total_curves_count; ++curve_index) {
+		auto& bind = mCurveBinds[curve_index];
+		if(bind.face_id != CurveBindData::kInvalidFaceID) continue; // bound already
+
+		for(const auto& skin_prim_id: mpAdjacency->getPrimData()) {
+			if(bindCurveToPrim(curve_index, bind, skin_prim_id)) {
+				//dbg_printf("bforce bound\n");
+				bforce_bound_curves_count++;
+				break;
+			}
+		}
+
+	}
+
+	dbg_printf("Brute force bounf curves count: %zu\n", bforce_bound_curves_count);
+
 	return true;
 }
 

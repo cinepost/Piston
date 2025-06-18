@@ -52,7 +52,6 @@ class PhantomTrimesh {
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
 
 			const pxr::GfVec3f& getRestNormal() const { return restNormal; }
-			const pxr::GfVec3f& getLiveNormal() const { return liveNormal; }
 
 			const IndicesList&  getIndices() const { return indices; }
 
@@ -61,7 +60,6 @@ class PhantomTrimesh {
 			IndicesList indices;
 
 			pxr::GfVec3f 	restNormal;
-			pxr::GfVec3f 	liveNormal;
 		};
 
 	protected:
@@ -80,9 +78,13 @@ class PhantomTrimesh {
 		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
 		size_t getFaceCount() const { return mFaces.size(); }
 
+		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v) const;
 		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
+		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v) const;
+		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v, float& dist) const;
 
-		pxr::GfVec3f getInterpolatedPosition(uint32_t face_id, float u, float v, float dist = 0.f) const;
+		pxr::GfVec3f getInterpolatedRestPosition(uint32_t face_id, float u, float v) const;
+		pxr::GfVec3f getInterpolatedLivePosition(uint32_t face_id, float u, float v) const;
 
 		bool isValid() const { return mValid; }
 

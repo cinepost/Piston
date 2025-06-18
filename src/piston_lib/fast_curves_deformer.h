@@ -23,18 +23,11 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;
 		using PxrIndexType = int;
 
-		enum class DeformMode {
-			FACET 	 = 0,
-			SMOOTH 	 = 1,
-			ACCURATE = 2
-		};
-
 	private:
 		struct CurveBindData {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
 			uint32_t face_id;
-			float u, v, dist;
-
+			float u, v;
 			CurveBindData(): face_id(kInvalidFaceID) {};
 		};
 
@@ -42,10 +35,6 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		~FastCurvesDeformer();
 
 		static SharedPtr create();
-
-		void setDeformMode(DeformMode mode);
-		DeformMode getDeformMode() const { return mDeformMode; }
-
 		virtual const std::string& toString() const override;
 
 	protected:
@@ -61,7 +50,7 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 		void transformCurvesToNTB();
 
-		DeformMode mDeformMode = DeformMode::FACET;
+		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind);
 
 		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
