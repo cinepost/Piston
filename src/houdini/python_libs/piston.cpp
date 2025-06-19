@@ -14,6 +14,7 @@ namespace boost = hboost;
 #include "../../piston_lib/base_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
 #include "../../piston_lib/curves_deformer_factory.h"
+#include "../../piston_lib/tests.h"
 
 char const* greet() {
 	return "Parovoz Piston python library!";
@@ -46,6 +47,8 @@ BOOST_PYTHON_MODULE(_piston) {
 		.staticmethod("create")
 		.def("toString", &FastCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
+
+	def("runTests", &Tests::runTests);
 	
 	def("greet", greet);
 }

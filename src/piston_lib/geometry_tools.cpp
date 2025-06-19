@@ -8,6 +8,8 @@
 
 namespace Piston {
 
+static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
+
 static const pxr::GfMatrix3f kRotMat180 = {
 	1.f, 0.f, 0.f,
 	0.f,-1.f, 0.f,
@@ -62,8 +64,6 @@ glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2) {
 }
 
 bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &u, float &v) {
-    static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
-
     pxr::GfVec3f v0v1 = v1 - v0;
     pxr::GfVec3f v0v2 = v2 - v0;
     pxr::GfVec3f pvec = pxr::GfCross(-n, v0v2);
@@ -97,8 +97,6 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 }
 
 bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v) {
-    static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
-
     pxr::GfVec3f v0v1 = v1 - v0;
     pxr::GfVec3f v0v2 = v2 - v0;
     pxr::GfVec3f pvec = pxr::GfCross(-n, v0v2);
@@ -133,8 +131,6 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 }
 
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &u, float &v) {
-    static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
-
     pxr::GfVec3f v0v1 = v1 - v0;
     pxr::GfVec3f v0v2 = v2 - v0;
     pxr::GfVec3f pvec = pxr::GfCross(dir, v0v2);
@@ -168,8 +164,6 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 }
 
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v) {
-    static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
-
     pxr::GfVec3f v0v1 = v1 - v0;
     pxr::GfVec3f v0v2 = v2 - v0;
     pxr::GfVec3f pvec = pxr::GfCross(dir, v0v2);

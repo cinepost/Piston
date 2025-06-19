@@ -13,8 +13,6 @@
 
 #include <pxr/base/gf/matrix3f.h>
 
-#include <base_curves_deformer.h>
-
 
 namespace Piston {
 

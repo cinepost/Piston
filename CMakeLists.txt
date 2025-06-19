@@ -36,7 +36,7 @@ if (NOT DEFINED ENV{HIH})
   message( FATAL_ERROR "Houdini HIH environment variable not set. Source houdini_setup first!" )
 endif()
 
-set(HROOT "$ENV{HFS}")
+set(HROOT $ENV{HFS})
 message( "Using Houdini installation path: " ${HROOT}/toolkit/cmake)
 list( APPEND CMAKE_PREFIX_PATH "${HROOT}/toolkit/cmake" )
 
@@ -85,10 +85,10 @@ if(UNIX)
   set( CMAKE_INSTALL_PREFIX "/opt/piston" )
 elseif(WIN32)
   if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX "D:/Piston/install" CACHE PATH "Piston install prefix" FORCE)
+    set(CMAKE_INSTALL_PREFIX "D:/work/piston" CACHE PATH "Piston install prefix" FORCE)
   endif()
-  message("CMAKE_INSTALL_PREFIX: " ${CMAKE_INSTALL_PREFIX})
 endif()
+message("CMAKE_INSTALL_PREFIX: " ${CMAKE_INSTALL_PREFIX})
 
 # Specify build paths
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bin)
@@ -134,8 +134,6 @@ set( CMAKE_THIRD_PARTY_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 include_directories(
   ${PISTON_INCLUDE_ROOT_DIR}
   ${PISTON_INCLUDE_ROOT_DIR}/Piston
-  ${PISTON_INCLUDE_ROOT_DIR}/Piston/Core
-
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 

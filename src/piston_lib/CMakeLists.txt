@@ -6,6 +6,7 @@ include_directories(
 )
 
 file( GLOB SOURCES
+    ./tests.cpp
     ./common.cpp
     ./adjacency.cpp
     ./curves_container.cpp
