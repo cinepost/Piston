@@ -1,5 +1,6 @@
 #include "simple_profiler.h"
 
+
 namespace Piston {
 
 namespace {

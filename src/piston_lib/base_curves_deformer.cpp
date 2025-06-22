@@ -4,9 +4,10 @@
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer(): mDirty(true) {
+BaseCurvesDeformer::BaseCurvesDeformer() {
 	dbg_printf("BaseCurvesDeformer::BaseCurvesDeformer()\n");
 
+	makeDirty();
 	mpTempStage = pxr::UsdStage::CreateInMemory();
 }
 
@@ -20,7 +21,7 @@ void BaseCurvesDeformer::setMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	}
 
 	mMeshGeoPrimHandle = {pGeoPrim};
-	mDirty = true;
+	makeDirty();
 
 	dbg_printf("Mesh geometry prim is set to: %s\n", mMeshGeoPrimHandle.getPath().GetText());
 }
@@ -34,7 +35,7 @@ void BaseCurvesDeformer::setCurvesGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	}
 
 	mCurvesGeoPrimHandle = {pGeoPrim};
-	mDirty = true;
+	makeDirty();
 
 	dbg_printf("Curves geometry prim is set to: %s\n", mCurvesGeoPrimHandle.getPath().GetText());
 }
@@ -67,12 +68,17 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {
 void BaseCurvesDeformer::setMeshRestPositionAttrName(const std::string& name) {
 	if(mMeshRestPositionAttrName == name) return;
 	mMeshRestPositionAttrName = name;
-	mDirty = true;
+	makeDirty();
 }
 
 void BaseCurvesDeformer::setСurvesSkinPrimAttrName(const std::string& name) {
 	if(mСurvesSkinPrimAttrName == name) return;
 	mСurvesSkinPrimAttrName = name;
+	makeDirty();
+}
+
+void BaseCurvesDeformer::makeDirty() {
+	mStats.clear();
 	mDirty = true;
 }
 

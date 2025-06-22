@@ -6,7 +6,6 @@ include_directories(
 )
 
 file( GLOB SOURCES
-    ./tests.cpp
     ./common.cpp
     ./adjacency.cpp
     ./curves_container.cpp
@@ -16,6 +15,8 @@ file( GLOB SOURCES
     ./fast_curves_deformer.cpp
     ./curves_deformer_factory.cpp
     ./simple_profiler.cpp
+    ./deformer_stats.cpp
+    ./tests.cpp
 )
 
 # Find python and Boost - both are required dependencies

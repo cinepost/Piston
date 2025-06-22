@@ -1,9 +1,10 @@
+#include "simple_profiler.h"
 #include "fast_curves_deformer.h"
 
 #include "common.h"
 #include "kdtree.hpp"
 #include "geometry_tools.h"
-#include "simple_profiler.h"
+//#include "simple_profiler.h"
 
 #include <pxr/base/gf/matrix4f.h>
 

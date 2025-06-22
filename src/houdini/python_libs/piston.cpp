@@ -14,6 +14,7 @@ namespace boost = hboost;
 #include "../../piston_lib/base_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
 #include "../../piston_lib/curves_deformer_factory.h"
+#include "../../piston_lib/deformer_stats.h"
 #include "../../piston_lib/tests.h"
 
 char const* greet() {
@@ -46,6 +47,10 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("create", &FastCurvesDeformer::create)
 		.staticmethod("create")
 		.def("toString", &FastCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+	;
+
+	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)
+		.def("toString", &DeformerStats::toString)
 	;
 
 	def("runTests", &Tests::runTests);

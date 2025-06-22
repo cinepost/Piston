@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "common.h"
 #include "curves_container.h"
+#include "deformer_stats.h"
 
 #include <memory>
 #include <string>
@@ -46,6 +47,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		virtual const std::string& toString() const;
 
+		const DeformerStats& getStats() const { return mStats; }
+
 	protected:
 		BaseCurvesDeformer();
 
@@ -61,8 +64,12 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 		PxrCurvesContainer::UniquePtr mpCurvesContainer;
+
+		DeformerStats mStats;
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
+
+		void makeDirty();
 
 		pxr::UsdStageRefPtr mpTempStage;
 };
