@@ -60,6 +60,14 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	}
 
 	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
+
+	mPointsCache.resize(curveRestPoints.size());
+	for(size_t i = 0; i < curveRestPoints.size(); ++i) {
+		mPointsCache[i] = curveRestPoints[i];
+	}
+
+	assert(mPointsCache.size() == curveRestPoints.size());
+
 	return true;
 }
 

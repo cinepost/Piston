@@ -3,6 +3,7 @@
 
 #include "base_curves_deformer.h"
 #include "fast_curves_deformer.h"
+#include "wrap_curves_deformer.h"
 
 #include <string>
 #include <vector>
@@ -34,13 +35,14 @@ class CurvesDeformerFactory {
 	    static CurvesDeformerFactory& getInstance();
 
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
+	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 
 	private:
 		BaseCurvesDeformer::SharedPtr getDeformer(BaseCurvesDeformer::Type type, const std::string& name);
 
 	private:
 		std::map<Key, BaseCurvesDeformer::SharedPtr> mDeformers;
-
+		
 		// Mutex to ensure thread safety
     	static std::mutex mMutex;
 

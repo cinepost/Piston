@@ -3,6 +3,7 @@ include(${PROJECT_SOURCE_DIR}/third_party/external_versions.cmake)
 include_directories( 
     ${EXTERNALS_INSTALL_DIR}
     ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/boost/src
+    ${CMAKE_THIRD_PARTY_SOURCE_DIR}/bs_thread_pool
 )
 
 file( GLOB SOURCES
@@ -13,6 +14,7 @@ file( GLOB SOURCES
     ./geometry_tools.cpp
     ./base_curves_deformer.cpp
     ./fast_curves_deformer.cpp
+    ./wrap_curves_deformer.cpp
     ./curves_deformer_factory.cpp
     ./simple_profiler.cpp
     ./deformer_stats.cpp

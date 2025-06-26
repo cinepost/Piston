@@ -6,11 +6,15 @@
 #include "curves_container.h"
 #include "deformer_stats.h"
 
-#include <memory>
-#include <string>
+#include "BS_thread_pool.hpp" // BS::multi_future, BS::thread_pool
+
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
+
+#include <memory>
+#include <string>
+
 
 namespace Piston {
 
@@ -25,8 +29,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		enum class Type { 
 			FAST, 
-			INTERPOLATED, 
-			VOLUMETRIC,
+			WRAP, 
 			UNKNOWN 
 		};
 		
@@ -65,6 +68,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		
 		PxrCurvesContainer::UniquePtr mpCurvesContainer;
 
+		BS::thread_pool<BS::tp::none> mPool;
 		DeformerStats mStats;
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
@@ -80,8 +84,7 @@ inline std::string to_string(Piston::BaseCurvesDeformer::Type mt) {
 #define t2s(t_) case Piston::BaseCurvesDeformer::Type::t_: return #t_;
     switch (mt) {
         t2s(FAST);
-        t2s(INTERPOLATED);
-        t2s(VOLUMETRIC);
+        t2s(WRAP);
         default:
             should_not_get_here();
             return "UNKNOWN";

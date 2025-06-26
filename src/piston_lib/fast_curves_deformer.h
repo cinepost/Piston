@@ -56,6 +56,9 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
 		std::vector<CurveBindData>              			mCurveBinds;
 
+		std::vector<pxr::GfVec3f> 							mRestVertexNormals;
+		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
+
 		std::vector<pxr::GfVec3f>               			mPerBindRestNormals;
 		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memeory to save on per-frame reallocations
 

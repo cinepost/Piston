@@ -1,10 +1,12 @@
 #include "base_curves_deformer.h"
 #include "geometry_tools.h"
 
+#include <thread>
+
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer() {
+BaseCurvesDeformer::BaseCurvesDeformer(): mPool(std::thread::hardware_concurrency() - 1) {
 	dbg_printf("BaseCurvesDeformer::BaseCurvesDeformer()\n");
 
 	makeDirty();

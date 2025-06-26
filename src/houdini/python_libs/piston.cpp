@@ -13,6 +13,7 @@ namespace boost = hboost;
 
 #include "../../piston_lib/base_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
+#include "../../piston_lib/wrap_curves_deformer.h"
 #include "../../piston_lib/curves_deformer_factory.h"
 #include "../../piston_lib/deformer_stats.h"
 #include "../../piston_lib/tests.h"
@@ -30,6 +31,7 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>())
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
+		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
 	;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
@@ -47,6 +49,12 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("create", &FastCurvesDeformer::create)
 		.staticmethod("create")
 		.def("toString", &FastCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+	;
+
+	class_<WrapCurvesDeformer, WrapCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("WrapCurvesDeformer", no_init)
+		.def("create", &WrapCurvesDeformer::create)
+		.staticmethod("create")
+		.def("toString", &WrapCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)

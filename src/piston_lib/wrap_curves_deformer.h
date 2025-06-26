@@ -1,0 +1,62 @@
+#ifndef PISTON_LIB_WRAP_CURVES_DEFORMER_H_
+#define PISTON_LIB_WRAP_CURVES_DEFORMER_H_
+
+#include "framework.h"
+#include "base_curves_deformer.h"
+#include "adjacency.h"
+#include "phantom_trimesh.h"
+#include "curves_container.h"
+#include "geometry_tools.h"
+
+#include <memory>
+#include <limits>
+#include <string>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usdGeom/curves.h>
+
+#include <glm/vec3.hpp> // glm::vec3
+
+
+namespace Piston {
+
+class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, WrapCurvesDeformer> {
+	public:
+		using SharedPtr = std::shared_ptr<WrapCurvesDeformer>;
+		using PxrIndexType = int;
+
+	private:
+		struct PointBindData {
+			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
+			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
+			uint32_t face_id;
+			float u, v, dist;
+			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
+		};
+
+	public:
+		~WrapCurvesDeformer();
+
+		static SharedPtr create();
+		virtual const std::string& toString() const override;
+
+	protected:
+		WrapCurvesDeformer();
+		virtual bool deformImpl(pxr::UsdTimeCode time_code);
+
+	private:
+		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code) override;
+		bool buildPointsBindingData(pxr::UsdTimeCode rest_time_code);
+
+		bool bindCurveVertexToTriface(uint32_t curve_vtx, uint32_t face_id, PointBindData& bind);
+
+		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
+		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
+		
+		std::vector<PointBindData>               			mPointBinds;
+
+		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
+};
+
+} // namespace Piston
+
+#endif // PISTON_LIB_WRAP_CURVES_DEFORMER_H_

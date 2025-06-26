@@ -45,7 +45,7 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
 	PxrCurvesContainer* pCurves = mpCurvesContainer.get();
 
-	if(!pCurves || pCurves->getCurvesCount() == 0) {
+	if(!pCurves || pCurves->empty()) {
 		return false;
 	}
 
@@ -57,7 +57,7 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 
 	calcPerBindTangentsAndBiNormals(build_live);
 
-	pxr::VtArray<pxr::GfVec3f> points(pCurves->getTotalVertexCount());
+	pxr::VtArray<pxr::GfVec3f>& points = pCurves->getPointsCache();
 
 	assert(mCurveBinds.size() == pCurves->getCurvesCount());
 
@@ -145,29 +145,9 @@ bool FastCurvesDeformer::calcPerBindNormals(bool build_live) {
 
 	const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? mpPhantomTrimesh->getLivePositions() : mpPhantomTrimesh->getRestPositions();
 
-	pxr::VtArray<pxr::GfVec3f> vertex_normals(mpAdjacency->getVertexCount());
+	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mRestVertexNormals;
 
-	const auto& faces = mpPhantomTrimesh->getFaces();
-	std::set<PxrIndexType> vertices;
-	for(const auto& face: faces) {
-		vertices.insert(face.indices[0]);
-		vertices.insert(face.indices[1]);
-		vertices.insert(face.indices[2]);
-	}
-
-	for(PxrIndexType vtx: vertices) {
-		pxr::GfVec3f vn = {0.f, 0.f, 0.f};
-
-		const uint32_t edges_count = mpAdjacency->getNeighborsCount(vtx);
-		const uint32_t vtx_offset = mpAdjacency->getNeighborsOffset(vtx);
-		
-		for(uint32_t i = 0; i < edges_count; ++i) {
-			const auto& vtx_pair = mpAdjacency->getCornerVertexPair(vtx_offset + i);
-			vn += pxr::GfGetNormalized(pxr::GfCross(pt_positions[vtx_pair.first] - pt_positions[vtx], pt_positions[vtx_pair.second] - pt_positions[vtx]));
-		}
-
-		vertex_normals[vtx] = pxr::GfGetNormalized(vn);
-	}
+	buildVertexNormals(mpAdjacency.get(), mpPhantomTrimesh.get(), vertex_normals, build_live);
 
 	// Build per bind normals
 	auto& perBindNormals = build_live ? mPerBindLiveNormals : mPerBindRestNormals;
@@ -317,7 +297,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 			isBound = true;
 		} else if ( prim_vertex_count > 3u){
 			// Try to bind using face "fan" triangulation
-			for(uint32_t i = 1; i < (prim_vertex_count - 2); ++i) {
+			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
 				const uint32_t face_id = mpPhantomTrimesh->getOrCreate(
 					mpAdjacency->getFaceVertex(prim_id, local_index), 
 					mpAdjacency->getFaceVertex(prim_id, (local_index + i) % prim_vertex_count),

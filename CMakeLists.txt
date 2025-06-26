@@ -111,20 +111,20 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 if ( MSVC )
-  ADD_DEFINITIONS(/W3 /std:c++17 /MP /wd4005 /wd4068)
+  ADD_DEFINITIONS(/W3 /std:c++17 /permissive- /MP /wd4005 /wd4068)
   add_compile_options($<$<CONFIG:DEBUG>:/bigobj>)
 elseif ( UNIX ) #(CMAKE_COMPILER_IS_GNUCXX)
 
-  set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+  set(CMAKE_CXX_FLAGS "-pthread -Wall -Wextra")
   
-  set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+  set(CMAKE_C_FLAGS_DEBUG "-std=c++17 -pthread -g -O0")
+  set(CMAKE_CXX_FLAGS_DEBUG "-std=c++17 -pthread -g -O0")
 
   set(CMAKE_C_FLAGS_RELEASE "-O3")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 
-  ADD_DEFINITIONS(-Wall -fPIC -Wfatal-errors) # -Wno-reorder -pedantic
+  ADD_DEFINITIONS(-std=c++17 -pthread -Wall -fPIC -Wfatal-errors) # -Wno-reorder -pedantic
 else ()
   MESSAGE(FATAL_ERROR "CMakeLists.txt has not been tested/written for your compiler.")
 endif ()

@@ -1,4 +1,6 @@
 #include "geometry_tools.h"
+#include "adjacency.h"
+#include "phantom_trimesh.h"
 
 #include <pxr/base/gf/math.h>
 
@@ -196,5 +198,43 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
     dist = pxr::GfDot(v0v2, qvec) * invDet;
     return true;
 }
+
+template<typename IndexType>
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh<IndexType>* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live) {
+    assert(pAdjacency);
+    assert(pTrimesh);
+
+    vertex_normals.resize(pAdjacency->getVertexCount());
+
+    const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? pTrimesh->getLivePositions() : pTrimesh->getRestPositions();
+
+    const auto& faces = pTrimesh->getFaces();
+    std::unordered_set<IndexType> vertices;
+    vertices.reserve(pAdjacency->getVertexCount());
+
+    for(const auto& face: faces) {
+        vertices.insert(face.indices[0]);
+        vertices.insert(face.indices[1]);
+        vertices.insert(face.indices[2]);
+    }
+
+    for(IndexType vtx: vertices) {
+        pxr::GfVec3f vn = {0.f, 0.f, 0.f};
+
+        const uint32_t edges_count = pAdjacency->getNeighborsCount(vtx);
+        const uint32_t vtx_offset = pAdjacency->getNeighborsOffset(vtx);
+        
+        for(uint32_t i = 0; i < edges_count; ++i) {
+            const auto& vtx_pair = pAdjacency->getCornerVertexPair(vtx_offset + i);
+            vn += pxr::GfGetNormalized(pxr::GfCross(pt_positions[vtx_pair.first] - pt_positions[vtx], pt_positions[vtx_pair.second] - pt_positions[vtx]));
+        }
+
+        vertex_normals[vtx] = pxr::GfGetNormalized(vn);
+    }
+}
+
+// Specialisation
+template void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh<int>* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live); 
+
 
 } // namespace Piston
