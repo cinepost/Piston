@@ -36,8 +36,10 @@ class PxrCurvesContainer {
 
 		int 		getCurveVertexCount(size_t curve_idx) const { return mCurveVertexCounts[curve_idx]; }
 
-		pxr::VtArray<pxr::GfVec3f>& getPointsCache() { return mPointsCache; }
-		const pxr::VtArray<pxr::GfVec3f>& getPointsCache() const { return mPointsCache; }
+		std::vector<pxr::GfVec3f>& getPointsCache() { return mPointsCache; }
+		const std::vector<pxr::GfVec3f>& getPointsCache() const { return mPointsCache; }
+
+		pxr::VtArray<pxr::GfVec3f> getPointsCacheVtArray() const;
 
 		CurveDataPtr getCurveDataPtr(size_t curve_idx);
 
@@ -53,7 +55,9 @@ class PxrCurvesContainer {
 		std::vector<pxr::GfVec3f>              	mCurveRestRootPositions;
 		pxr::VtArray<pxr::GfVec3f>              mCurveRestVectors;
 
-		pxr::VtArray<pxr::GfVec3f> 				mPointsCache;
+		std::vector<pxr::GfVec3f> 				mPointsCache;
+
+		mutable pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
 };
 
 } // namespace Piston

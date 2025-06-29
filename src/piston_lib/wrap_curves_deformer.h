@@ -31,6 +31,8 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 			uint32_t face_id;
 			float u, v, dist;
 			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
+
+			bool isValid() const { return face_id != kInvalidFaceID; }
 		};
 
 	public:

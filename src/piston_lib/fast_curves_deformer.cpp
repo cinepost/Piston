@@ -57,7 +57,7 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 
 	calcPerBindTangentsAndBiNormals(build_live);
 
-	pxr::VtArray<pxr::GfVec3f>& points = pCurves->getPointsCache();
+	std::vector<pxr::GfVec3f>& points = pCurves->getPointsCache();
 
 	assert(mCurveBinds.size() == pCurves->getCurvesCount());
 
@@ -87,7 +87,7 @@ bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 		}
 	}
 
-	if(!curves.GetPointsAttr().Set(points, time_code)) {
+	if(!curves.GetPointsAttr().Set(pCurves->getPointsCacheVtArray(), time_code)) {
 		return false;
 	}
 
