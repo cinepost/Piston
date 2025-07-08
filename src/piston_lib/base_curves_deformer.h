@@ -56,7 +56,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		BaseCurvesDeformer();
 
 		virtual bool deformImpl(pxr::UsdTimeCode time_code) = 0;
-
+		void makeDirty();
+		
 	protected:
 		bool mDirty = true;
 		
@@ -72,8 +73,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		DeformerStats mStats;
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
-
-		void makeDirty();
 
 		pxr::UsdStageRefPtr mpTempStage;
 };

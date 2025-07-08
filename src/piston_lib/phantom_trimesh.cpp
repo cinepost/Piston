@@ -106,6 +106,15 @@ pxr::GfVec3f PhantomTrimesh<IndexType>::getInterpolatedLivePosition(uint32_t fac
 };
 
 template<typename IndexType>
+pxr::GfVec3f PhantomTrimesh<IndexType>::getFaceRestCentroid(uint32_t face_id) const {
+	assert(static_cast<size_t>(face_id) < mFaces.size());
+
+	auto const& face = mFaces[face_id];
+	static constexpr float kInvThree = 1.f / 3.f;
+	return (mUsdMeshRestPositions[face.indices[0]] + mUsdMeshRestPositions[face.indices[1]] + mUsdMeshRestPositions[face.indices[2]]) * kInvThree;
+}
+
+template<typename IndexType>
 bool PhantomTrimesh<IndexType>::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
 	assert(prim_handle.isMeshGeoPrim());
 
@@ -137,6 +146,7 @@ template bool PhantomTrimesh<int>::intersectRay(const pxr::GfVec3f& orig, const 
 
 template pxr::GfVec3f PhantomTrimesh<int>::getInterpolatedRestPosition(uint32_t face_id, float u, float v) const;
 template pxr::GfVec3f PhantomTrimesh<int>::getInterpolatedLivePosition(uint32_t face_id, float u, float v) const;
+template pxr::GfVec3f PhantomTrimesh<int>::getFaceRestCentroid(uint32_t face_id) const;
 
 template bool PhantomTrimesh<int>::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);
 } // namespace Piston

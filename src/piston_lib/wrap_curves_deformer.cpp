@@ -16,8 +16,9 @@
 namespace Piston {
 
 static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
+static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
-WrapCurvesDeformer::WrapCurvesDeformer(): BaseCurvesDeformer() {
+WrapCurvesDeformer::WrapCurvesDeformer(): BaseCurvesDeformer(), mBindMode(BindMode::SPACE) {
 	dbg_printf("WrapCurvesDeformer::WrapCurvesDeformer()\n");
 }
 
@@ -51,23 +52,17 @@ bool WrapCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 
 	buildVertexNormals(mpAdjacency.get(), mpPhantomTrimesh.get(), mLiveVertexNormals, true);
 
-	mPool.detach_blocks(0, mPointBinds.size(),
-        [&](const std::size_t start, const std::size_t end)
-        {
-        	for(size_t i = start; i < end; ++i) {
-        		const auto& bind = mPointBinds[i];
-        		if(bind.face_id == PointBindData::kInvalidFaceID) continue;
+	bool result = false;
+	switch(mBindMode) {
+		case BindMode::SPACE:
+			result = deformImpl_SpaceMode(points, time_code);
+			break;
+		default:
+			result = deformImpl_DistMode(points, time_code);
+			break;
+	}
 
-        		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
-        		pxr::GfVec3f interpolated_normal = 
-        			pxr::GfGetNormalized(bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]);
-        		
-        		points[i] = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (interpolated_normal * bind.dist);
-        	}
-
-        }
-    );
-    mPool.wait();
+	if(!result) return false;
 
 	if(!curves.GetPointsAttr().Set(mpCurvesContainer->getPointsCacheVtArray(), time_code)) {
 		return false;
@@ -76,10 +71,44 @@ bool WrapCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	return true;
 }
 
-bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
-	PROFILE("WrapCurvesDeformer::buildDeformerData");
-	dbg_printf("WrapCurvesDeformer::buildDeformerData()\n");
+static inline bool saturate(bool a) {
+	return a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
+}
 
+bool WrapCurvesDeformer::deformImpl_SpaceMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
+	mPool.detach_blocks(0, mPointBinds.size(),
+        [&](const std::size_t start, const std::size_t end)
+        {
+        	for(size_t i = start; i < end; ++i) {
+        		const auto& bind = mPointBinds[i];
+        		if(bind.face_id == PointBindData::kInvalidFaceID) continue;
+
+        		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
+				
+				//float u = saturate(bind.u);
+				//float v = saturate(bind.v); 
+				//float w = saturate(1.f - u - v);
+        		//pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(u * mLiveVertexNormals[face.indices[1]] + v * mLiveVertexNormals[face.indices[2]] + w * mLiveVertexNormals[face.indices[0]]);
+        		
+        		pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(
+        			bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]
+        		);
+
+        		points[i] = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (interpolated_normal * bind.dist);
+        	}
+
+        }
+    );
+    mPool.wait();
+
+    return true;
+}
+
+bool WrapCurvesDeformer::deformImpl_DistMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
+	return false;
+}
+
+bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
 
 	// Create adjacency data
@@ -140,17 +169,62 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 
 	// Bind curve points
 	dbg_printf("Binding %zu curves (%zu total vertices) using thread pool.\n", mpCurvesContainer->getCurvesCount(), mpCurvesContainer->getTotalVertexCount());
+	
+	const std::string bind_mode_str = mBindMode == BindMode::SPACE ? "SPACE" : "DIST";
+	dbg_printf("Using %s search method.\n", bind_mode_str.c_str());
 
+	bool result = false;
 	auto threads_timer = Timer();
 	threads_timer.start();
+
+	// Build bind data
+	switch(mBindMode) {
+		case BindMode::SPACE:
+			result = buildDeformerData_SpaceMode(rest_vertex_normals, rest_time_code);
+			break;
+		default:
+			result = buildDeformerData_DistMode(rest_vertex_normals, rest_time_code);
+			break;
+	} 
+
+	threads_timer.stop();
+	dbg_printf("%zu threads finished in %s\n", mPool.get_thread_count(), threads_timer.toString().c_str());
+
+	return result;
+}
+
+bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
+	PROFILE("WrapCurvesDeformer::buildDeformerData_DistMode");
+	dbg_printf("WrapCurvesDeformer::buildDeformerData_DistMode()\n");
+
+	// Build kdtree
+	static const bool threaded_kdtree_creation = false;
+	neighbour_search::KDTree<float, 3> kdtree(mpPhantomTrimesh->getRestPositions(), threaded_kdtree_creation);
+
+	return false;
+}
+
+bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
+	PROFILE("WrapCurvesDeformer::buildDeformerData_SpaceMode");
+	dbg_printf("WrapCurvesDeformer::buildDeformerData_SpaceMode()\n");
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 	std::atomic<size_t> bound_curves = 0;
 	std::atomic<size_t> partially_bound_curves = 0;
 
 	mPointBinds.resize(mpCurvesContainer->getTotalVertexCount());
+
+	// Build kdtree
+	static const bool threaded_kdtree_creation = true;
+	pxr::VtArray<pxr::GfVec3f> trimesh_centroids(mpPhantomTrimesh->getFaceCount());
+	for(uint32_t face_id = 0; face_id < mpPhantomTrimesh->getFaceCount(); ++face_id) {
+		trimesh_centroids[face_id] = mpPhantomTrimesh->getFaceRestCentroid(face_id);
+	}
+	neighbour_search::KDTree<float, 3> kdtree(trimesh_centroids, threaded_kdtree_creation);
+
+
 	mPool.detach_blocks(0, curves_count,
-        [&, &rest_vertex_normals](const std::size_t start, const std::size_t end)
+        [&](const std::size_t start, const std::size_t end)
         {
         	const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
         	dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *thread_index);
@@ -161,6 +235,9 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 
         	std::vector<uint8_t> curve_flags(mpCurvesContainer->getCurvesCount());
         	std::fill(curve_flags.begin(), curve_flags.end(), 0);
+
+        	std::vector<std::pair<uint32_t, float>> tmp_curve_distances; // pairs of <face_id, face_distance
+        	tmp_curve_distances.reserve(128);
 
             for(std::size_t curve_idx = start; curve_idx < end; ++curve_idx) {
 
@@ -189,6 +266,9 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 						pxr::GfVec3f p2 = meshRestPositions[face.indices[2]];
 
             			const float face_distance = distance(face_plane, curr_pt);
+
+						//if(tmp_curve_distances[i].second)
+
             			const bool point_is_in_plane = abs(face_distance) <= kEpsilon;
             			const bool point_is_below_surface = face_distance < 0.f;
 
@@ -266,8 +346,61 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 					bind.face_id = face_id;
 				};
 
+				auto bindCurvePointToPrimForceI = [&] (const uint32_t curve_vtx, const uint32_t face_id, PointBindData& bind) {
+					const auto& face = faces[face_id];
+
+					pxr::GfVec3f p0 = meshRestPositions[face.indices[0]];
+					pxr::GfVec3f p1 = meshRestPositions[face.indices[1]];
+					pxr::GfVec3f p2 = meshRestPositions[face.indices[2]];
+
+					const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + curve_vtx); 
+
+					const auto& face_normal = face.getRestNormal();
+					const Plane face_plane(meshRestPositions[face.indices[0]], face_normal);
+					const float face_distance = distance(face_plane, curr_pt);
+
+					const bool point_is_in_plane = abs(face_distance) <= kEpsilon;
+        			
+        			if(!point_is_in_plane) { 
+						const pxr::GfVec3f point_to_plane_vector = face_normal * face_distance;
+
+						p0 += rest_vertex_normals[face.indices[0]] / pxr::GfDot(point_to_plane_vector, rest_vertex_normals[face.indices[0]]);
+						p1 += rest_vertex_normals[face.indices[1]] / pxr::GfDot(point_to_plane_vector, rest_vertex_normals[face.indices[1]]);
+						p2 += rest_vertex_normals[face.indices[2]] / pxr::GfDot(point_to_plane_vector, rest_vertex_normals[face.indices[2]]);
+
+        			}
+
+					const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
+
+					const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = curr_pt - p0;
+					float d00 = pxr::GfDot(v0, v0);
+					float d01 = pxr::GfDot(v0, v1);
+					float d11 = pxr::GfDot(v1, v1);
+					float d20 = pxr::GfDot(v2, v0);
+					float d21 = pxr::GfDot(v2, v1);
+					float denom = d00 * d11 - d01 * d01;
+
+					bind.u = (d11 * d20 - d01 * d21) / denom;
+					bind.v = (d00 * d21 - d01 * d20) / denom;
+
+					const pxr::GfVec3f projected_point = mpPhantomTrimesh->getInterpolatedRestPosition(face_id, bind.u, bind.v);
+            		bind.dist = point_is_in_plane ? 0.f : distance(projected_point, curr_pt);
+					bind.face_id = face_id;
+				};
+
             	// TODO: Fully unbound curves loop to find best vertex-face candidate for each curve so we can populate remaining vertices
             	// in a subsequent pass
+            	if(bound_curve_vertices_count == 0) {
+            		for(uint32_t curve_vtx = 0; curve_vtx < curve_vertices_count; ++curve_vtx) {
+            			auto& bind = mPointBinds[curve_vertex_offset + curve_vtx];
+            			pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + curve_vtx);
+            			const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = kdtree.findNearestNeighbour(curve_root_pt);
+            			const auto nearest_face_id = nearest_pt.first;
+            			
+            			bindCurvePointToPrimForceI(curve_vtx, nearest_face_id, bind);
+						bound_curve_vertices_count += 1;
+            		}
+            	}
 
             	// Partially unbound curve vertices pass tha loops twice (forward and back) filling the gaps
 				// Forward loop (starting from curve root)
@@ -280,7 +413,7 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 							continue;
 						}
 
-						bindCurvePointToPrimForce(curve_vtx, prev_bind.face_id, bind);
+						bindCurvePointToPrimForceI(curve_vtx, prev_bind.face_id, bind);
 						bound_curve_vertices_count += 1;
 					}
 				} // partially unbound vertices loop
@@ -295,7 +428,7 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 							continue;
 						}
 
-						bindCurvePointToPrimForce(curve_vtx, prev_bind.face_id, bind);
+						bindCurvePointToPrimForceI(curve_vtx, prev_bind.face_id, bind);
 						bound_curve_vertices_count += 1;
 					}
 				} // partially unbound vertices loop
@@ -313,9 +446,6 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
         });
     mPool.wait();
 
-    threads_timer.stop();
-
-    dbg_printf("%zu threads finished in %s\n", mPool.get_thread_count(), threads_timer.toString().c_str());
     dbg_printf("Bound curves count: %zu\n", size_t(bound_curves));
     dbg_printf("Partially bound curves count: %zu\n", size_t(partially_bound_curves));
     dbg_printf("Unbound curves count: %zu\n", curves_count - size_t(bound_curves + partially_bound_curves));
@@ -323,16 +453,11 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	return true; 
 }
 
+void WrapCurvesDeformer::setBindMode(BindMode mode) {
+	if(mBindMode == mode) return;
 
-bool WrapCurvesDeformer::bindCurveVertexToTriface(uint32_t curve_vtx, uint32_t face_id, PointBindData& bind) {
-
-	return false;
-}
-
-bool WrapCurvesDeformer::buildPointsBindingData(pxr::UsdTimeCode rest_time_code) {
-	if(!mpCurvesContainer) return false;
-
-	return true;
+	mBindMode = mode;
+	makeDirty();
 }
 
 WrapCurvesDeformer::~WrapCurvesDeformer() {

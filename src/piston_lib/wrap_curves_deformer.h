@@ -24,6 +24,11 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		using SharedPtr = std::shared_ptr<WrapCurvesDeformer>;
 		using PxrIndexType = int;
 
+		enum class BindMode: uint8_t { 
+			SPACE, 
+			DIST 
+		};
+
 	private:
 		struct PointBindData {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
@@ -41,15 +46,22 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		static SharedPtr create();
 		virtual const std::string& toString() const override;
 
+		void setBindMode(BindMode mode);
+
 	protected:
 		WrapCurvesDeformer();
 		virtual bool deformImpl(pxr::UsdTimeCode time_code);
 
+		bool deformImpl_SpaceMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_DistMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
+
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code) override;
-		bool buildPointsBindingData(pxr::UsdTimeCode rest_time_code);
+		
+		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
+		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
-		bool bindCurveVertexToTriface(uint32_t curve_vtx, uint32_t face_id, PointBindData& bind);
+		BindMode                                            mBindMode = BindMode::SPACE;
 
 		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
 		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
