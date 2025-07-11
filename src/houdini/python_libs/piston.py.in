@@ -16,3 +16,5 @@ def reload(func):
 @reload
 def __getattr__(name):
 	return getattr(_piston, name)
+
+setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__BindMode)

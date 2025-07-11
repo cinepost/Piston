@@ -225,6 +225,8 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
+	mPointBinds.resize(mpCurvesContainer->getTotalVertexCount());
+
 	// Build kdtree
 	neighbour_search::KDTree<float, 3> kdtree = buildTrimeshCentroidsKDTree(mpPhantomTrimesh, true);
 
@@ -237,7 +239,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
         	const auto& meshRestPositions = mpPhantomTrimesh->getRestPositions();
         	const auto& faces = mpPhantomTrimesh->getFaces();
 
-        	for(std::size_t curve_idx = start; curve_idx < end; ++curve_idx) {
+        	for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
         		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx);
             	if(curve_data_ptr.first < 2) continue;
 
@@ -283,10 +285,13 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
 						bind.face_id = face_id;
 					};
 
+					bindCurvePointToPrim(i, face_id, bind);
             	}
         	}
         });
     mPool.wait();
+
+    dbg_printf("WrapCurvesDeformer::buildDeformerData_DistMode() done.\n");
 
 	return true;
 }

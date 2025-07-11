@@ -59,9 +59,10 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &WrapCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
-	enum_<WrapCurvesDeformer::BindMode>("BindMode")
+	enum_<WrapCurvesDeformer::BindMode>("__BindMode")
     	.value("SPACE", WrapCurvesDeformer::BindMode::SPACE)
     	.value("DIST", WrapCurvesDeformer::BindMode::DIST)
+    	.export_values()
     ;
 
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)

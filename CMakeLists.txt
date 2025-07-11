@@ -51,6 +51,11 @@ set(HROOT $ENV{HFS})
 message( "Using Houdini installation path: " ${HROOT}/toolkit/cmake)
 list( APPEND CMAKE_PREFIX_PATH "${HROOT}/toolkit/cmake" )
 
+if(WIN32)
+  set(ENV{LIBPATH} "$ENV{LIBPATH};${HROOT}\\python311\\libs;${HROOT}")
+  set(ENV{LIB} "$ENV{LIB};${HROOT}\\python311\\libs;${HROOT}\\custom\\houdini\\dsolib")
+endif() #WIN32
+
 # Handle superbuild first
 option (USE_SUPERBUILD "Whether or not a superbuild should be invoked" ON)
 

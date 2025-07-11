@@ -34,6 +34,10 @@ houdini_configure_target( piston
 	INSTDIR ${PYTHON_LIBS_INSTALL_DIR}
 )
 
+if(WIN32)
+    set_target_properties(piston PROPERTIES SUFFIX ".pyd")
+endif()
+
 # Make piston.py wrapper script
 configure_file(piston.py.in ${CMAKE_CURRENT_BINARY_DIR}/piston.py.install @ONLY)
 
