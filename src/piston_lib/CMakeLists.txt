@@ -35,21 +35,8 @@ endif()
 # Without this, any build libraries automatically have names "lib{x}.so"
 set(CMAKE_SHARED_MODULE_PREFIX "")
 
-add_library( piston_lib SHARED ${SOURCES} ${HEADERS} )
+add_library( piston_lib STATIC ${SOURCES} ${HEADERS} )
 
 target_link_libraries( piston_lib
     Houdini
 )
-
-houdini_configure_target( piston_lib
-    LIB_PREFIX ${CMAKE_SHARED_MODULE_PREFIX}
-    INSTDIR ${CMAKE_INSTALL_PREFIX}/lib
-)
-
-#if(UNIX OR WIN32)
-#    install(TARGETS piston_lib
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-#    )
-#endif()

@@ -47,6 +47,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		virtual const std::string& toString() const override;
 
 		void setBindMode(BindMode mode);
+		const BindMode& getBindMode() const { return mBindMode; } 
 
 	protected:
 		WrapCurvesDeformer();

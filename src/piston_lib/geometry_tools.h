@@ -51,6 +51,10 @@ inline float distance(const pxr::GfVec3f &p1, const pxr::GfVec3f &p2) {
 	return sqrt(distanceSquared(p1, p2));
 }
 
+inline float lengthSquared(const pxr::GfVec3f &v) {
+	return (v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]);
+}
+
 
 glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2);
 

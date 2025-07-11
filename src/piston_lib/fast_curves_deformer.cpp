@@ -235,9 +235,13 @@ bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_
 	for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first - 1); ++ptr_offset) {
 		const pxr::GfVec3f orig = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
 		const pxr::GfVec3f dir  = *(curve_data_ptr.second + ptr_offset + 1) - *(curve_data_ptr.second + ptr_offset); 
-		if(mpPhantomTrimesh->intersectRay(orig, dir, face_id, bind.u, bind.v)) {
-			bind.face_id = face_id;
-			return true;
+		float isect_dist;
+		if(mpPhantomTrimesh->intersectRay(orig, dir, face_id, bind.u, bind.v, isect_dist)) {
+			// check we've intersected within curve segment
+			if((isect_dist*isect_dist) <= lengthSquared(dir)) {
+				bind.face_id = face_id;
+				return true;
+			}
 		}
 	}
 

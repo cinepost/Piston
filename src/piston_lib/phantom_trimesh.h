@@ -88,6 +88,9 @@ class PhantomTrimesh {
 
 		pxr::GfVec3f getFaceRestCentroid(uint32_t face_id) const;
 
+		const pxr::GfVec3f& getFaceRestNormal(uint32_t face_id) const;
+		pxr::GfVec3f getFaceLiveNormal(uint32_t face_id) const;
+
 		bool isValid() const { return mValid; }
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 

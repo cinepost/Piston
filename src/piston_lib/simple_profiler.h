@@ -21,7 +21,7 @@ namespace ba = boost::accumulators;
 #define PROFILE_PRINT() Piston::SimpleProfiler::printReport()
 #else
 #define PROFILE(NAME) {}
-#define PROFILE_PRINT() S{}
+#define PROFILE_PRINT() {}
 #endif
 
 namespace Piston {

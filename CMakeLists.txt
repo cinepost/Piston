@@ -28,12 +28,23 @@ if( NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES )
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+if(UNIX)
+  set(DEFAULT_HFS_PATH "/opt/hfs20.5")
+  set(DEFAULT_HIH_PATH "$ENV{HOME}/houdini20.5")
+else() # WIN
+  set(USER_DOCUMENTS_PATH "$ENV{USERPROFILE}/Documents")
+  set(DEFAULT_HFS_PATH "C:\\Program Files\\Side Effects Software\\Houdini 20.5.332")
+  set(DEFAULT_HIH_PATH "${USER_DOCUMENTS_PATH}\\houdini20.5")
+endif()
+
 if (NOT DEFINED ENV{HFS})
-  message( FATAL_ERROR "Houdini HFS environment variable not set. Source houdini_setup first!" )
+  message( WARNING "Houdini HFS environment variable not set. Using default path: ${DEFAULT_HFS_PATH}")
+  set(ENV{HFS} ${DEFAULT_HFS_PATH})
 endif()
 
 if (NOT DEFINED ENV{HIH})
-  message( FATAL_ERROR "Houdini HIH environment variable not set. Source houdini_setup first!" )
+  message( WARNING "Houdini HIH environment variable not set. Using defalut path: ${DEFAULT_HIH_PATH}")
+  set(ENV{HIH} ${DEFAULT_HIH_PATH})
 endif()
 
 set(HROOT $ENV{HFS})
@@ -181,7 +192,3 @@ else()
     PATTERN "libpng" EXCLUDE
   )
 endif()
-
-#------------------------------------------
-# Install system collected dependencies
-#---------------------------
