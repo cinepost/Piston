@@ -65,7 +65,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		BindMode                                            mBindMode = BindMode::SPACE;
 
 		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
-		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
+		PhantomTrimesh<PxrIndexType>::UniquePtr 			mpPhantomTrimesh;
 		
 		std::vector<PointBindData>               			mPointBinds;
 

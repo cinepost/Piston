@@ -1,37 +1,48 @@
 #include "adjacency.h"
 
-
 namespace Piston {
+
+static const SerializableDeformerDataBase::DataVersion kAdjacencyDataVersion( 0u, 0u, 0u);
 
 UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mFaceCount(0), mVertexCount(0), mMaxFaceVertexCount(0), mValid(false), mHash(0) {};
 
-UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
+UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create() {
 	auto pResult = UsdGeomMeshFaceAdjacency::SharedPtr(new UsdGeomMeshFaceAdjacency());
-	if(!pResult->init(mesh, rest_time_code)) {
-		return nullptr;
-	}
 	return pResult;
 }
 
 bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
+	invalidate();
 	mFaceCount = mesh.GetFaceCount(rest_time_code);
 	if(mFaceCount == 0) {
 		std::cerr << "Mesh " << mesh.GetPath() << " has no faces !" << std::endl;
 		return false;
 	}
 
-	mSrcFaceVertexCounts.reserve(mFaceCount);
-	if(!mesh.GetFaceVertexCountsAttr().Get(&mSrcFaceVertexCounts, rest_time_code)) {
+	pxr::VtArray<PxrIndexType> _srcFaceVertexCounts;
+	_srcFaceVertexCounts.reserve(mFaceCount);
+
+	if(!mesh.GetFaceVertexCountsAttr().Get(&_srcFaceVertexCounts, rest_time_code)) {
 		std::cerr << "Error getting face vertex counts for mesh " << mesh.GetPath() << " !" << std::endl;
 		return false;
+	}
+	mSrcFaceVertexCounts.resize(_srcFaceVertexCounts.size());
+	for(size_t i = 0; i < _srcFaceVertexCounts.size(); ++i) {
+		mSrcFaceVertexCounts[i] = _srcFaceVertexCounts[i];
 	}
 
 	assert(mSrcFaceVertexCounts.size() == mFaceCount);
 
-	mSrcFaceVertexIndices.reserve(mFaceCount);
-	if(!mesh.GetFaceVertexIndicesAttr().Get(&mSrcFaceVertexIndices, rest_time_code)) {
+	pxr::VtArray<PxrIndexType> _srcFaceVertexIndices;
+	_srcFaceVertexIndices.reserve(mFaceCount);
+
+	if(!mesh.GetFaceVertexIndicesAttr().Get(&_srcFaceVertexIndices, rest_time_code)) {
 		std::cerr << "Error getting face vertex indices for mesh " << mesh.GetPath() << " !" << std::endl;
 		return false;
+	}
+	mSrcFaceVertexIndices.resize(_srcFaceVertexIndices.size());
+	for(size_t i = 0; i < _srcFaceVertexIndices.size(); ++i) {
+		mSrcFaceVertexIndices[i] = _srcFaceVertexIndices[i];
 	}
 
 	{
@@ -152,15 +163,24 @@ uint32_t UsdGeomMeshFaceAdjacency::getVertexFaceId(uint32_t vtx) const {
 
 void UsdGeomMeshFaceAdjacency::invalidate() {
 	mFaceCount = 0;
+	mVertexCount = 0;
 	mMaxFaceVertexCount = 0;
+
 	mCounts.clear();
 	mOffsets.clear();
 	mPrimData.clear();
+	mVtxToFace.clear();
+    mCornerVertexData.clear();
+    mSrcFaceVertexOffsets.clear();
+
+    mSrcFaceVertexIndices.clear();
+	mSrcFaceVertexCounts.clear();
+
 	mValid = false;
 	mHash = 0;
 }
 
-size_t UsdGeomMeshFaceAdjacency::calcHash() {
+size_t UsdGeomMeshFaceAdjacency::calcHash() const {
 	size_t hash = 0;
 
 	for(size_t i = 0; i < mCounts.size(); ++i) hash += mCounts[i]*i;
@@ -236,6 +256,123 @@ std::string UsdGeomMeshFaceAdjacency::toString() const {
 
 	s += "]\n";
 	return s;
+}
+
+SerializableUsdGeomMeshFaceAdjacency::SerializableUsdGeomMeshFaceAdjacency(): SerializableDeformerDataBase() {
+	mpAdjacency = UsdGeomMeshFaceAdjacency::create();
+}
+
+void SerializableUsdGeomMeshFaceAdjacency::clearData() { 
+	setPopulated(false); 
+	if(mpAdjacency) {
+		mpAdjacency->invalidate();
+	}
+}
+
+const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacency() const {
+	if(!isPopulated()) return nullptr;
+
+	return mpAdjacency.get();
+}
+
+bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& prim_handle) {
+	assert(mpAdjacency);
+	assert(prim_handle.isMeshGeoPrim());
+
+	clearData();
+
+	bool result = false;
+
+	if(prim_handle.isMeshGeoPrim()) {
+		pxr::UsdGeomMesh mesh(prim_handle.getPrim());
+		result = mpAdjacency->init(mesh);
+	}
+
+	if(!result) {
+		mpAdjacency->invalidate();
+	}
+
+	setPopulated(result);
+	return result;
+}
+
+static constexpr const char* kJFaceCount = "face_cnt";
+static constexpr const char* kJVertexCount = "vtx_cnt";
+static constexpr const char* kJMaxFaceCount = "max_face_cnt";
+static constexpr const char* kJCounts = "counts";
+static constexpr const char* kJOffsets = "offsets";
+static constexpr const char* kJPrimData = "prm_data";
+static constexpr const char* kJVtxToFace = "vtx2face";
+static constexpr const char* kJCornerVertexData = "crnvtxdata";
+static constexpr const char* kJSrcFaceVertexOffsets = "srcvfacetxoffset";
+
+static constexpr const char* kJSrcFaceVertexIndices = "srcfacevtxindices";
+static constexpr const char* kJSrcFaceVertexCounts = "srcfacevtxcounts";
+
+static constexpr const char* kJDataHash = "data_hash";
+
+bool SerializableUsdGeomMeshFaceAdjacency::dumpToJSON(json& j) const {
+	if(!mpAdjacency || !mpAdjacency->isValid()) return false;
+
+	j[kJFaceCount] = mpAdjacency->mFaceCount;
+	j[kJVertexCount] = mpAdjacency->mVertexCount;
+	j[kJMaxFaceCount] = mpAdjacency->mMaxFaceVertexCount;
+
+	j[kJCounts] = mpAdjacency->mCounts;
+	j[kJOffsets] = mpAdjacency->mOffsets;
+	j[kJPrimData] = mpAdjacency->mPrimData;
+	j[kJVtxToFace] = mpAdjacency->mVtxToFace;
+	j[kJCornerVertexData] = mpAdjacency->mCornerVertexData;
+	
+	j[kJSrcFaceVertexOffsets] = mpAdjacency->mSrcFaceVertexOffsets;
+	j[kJSrcFaceVertexIndices] = mpAdjacency->mSrcFaceVertexIndices;
+	j[kJSrcFaceVertexCounts] = mpAdjacency->mSrcFaceVertexCounts;
+
+	j[kJDataHash] = mpAdjacency->calcHash();
+
+	return true;
+}
+
+bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
+	mpAdjacency->mFaceCount = j[kJFaceCount];
+	mpAdjacency->mVertexCount = j[kJVertexCount];
+	mpAdjacency->mMaxFaceVertexCount = j[kJMaxFaceCount];
+
+	mpAdjacency->mCounts = j[kJCounts].template get<std::vector<unsigned int>>();
+	mpAdjacency->mOffsets = j[kJOffsets].template get<std::vector<unsigned int>>();
+	mpAdjacency->mPrimData = j[kJPrimData].template get<std::vector<unsigned int>>();
+	mpAdjacency->mVtxToFace = j[kJVtxToFace].template get<std::vector<unsigned int>>();
+	mpAdjacency->mCornerVertexData = j[kJCornerVertexData];
+
+	mpAdjacency->mSrcFaceVertexOffsets = j[kJSrcFaceVertexOffsets].template get<std::vector<unsigned int>>();
+	mpAdjacency->mSrcFaceVertexIndices = j[kJSrcFaceVertexIndices].template get<std::vector<UsdGeomMeshFaceAdjacency::PxrIndexType>>();
+	mpAdjacency->mSrcFaceVertexCounts = j[kJSrcFaceVertexCounts].template get<std::vector<UsdGeomMeshFaceAdjacency::PxrIndexType>>();
+
+	const size_t json_adjacency_data_hash = j[kJDataHash];
+	const size_t calc_adjacency_data_hash = mpAdjacency->calcHash();
+
+
+	if(calc_adjacency_data_hash != json_adjacency_data_hash) {
+		return false;
+	}
+
+	mpAdjacency->mHash = calc_adjacency_data_hash;
+	mpAdjacency->mValid = true;
+	return true;
+}
+
+const std::string& SerializableUsdGeomMeshFaceAdjacency::typeName() const { 
+	static const std::string kTypeName = "SerializableUsdGeomMeshFaceAdjacency";
+	return kTypeName;
+}
+
+const std::string& SerializableUsdGeomMeshFaceAdjacency::jsonDataKey() const {
+	static const std::string kDataKey = "_piston_mesh_adjacency_data_";
+	return kDataKey;
+}
+
+const SerializableDeformerDataBase::DataVersion& SerializableUsdGeomMeshFaceAdjacency::jsonDataVersion() const {
+	return kAdjacencyDataVersion;
 }
 
 } // namespace Piston

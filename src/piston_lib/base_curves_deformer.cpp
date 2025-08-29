@@ -42,6 +42,17 @@ void BaseCurvesDeformer::setCurvesGeoPrim(pxr::UsdPrim* pGeoPrim) {
 	dbg_printf("Curves geometry prim is set to: %s\n", mCurvesGeoPrimHandle.getPath().GetText());
 }
 
+void BaseCurvesDeformer::readJsonDeformDataFromPrim(bool state) {
+	if(mReadJsonDeformerData == state) return;
+	mDirty = true;
+	mReadJsonDeformerData = state;
+}
+
+void BaseCurvesDeformer::writeJsonDeformDataToPrim(bool state) {
+	if(mWriteJsonDeformerData == state) return;
+	mWriteJsonDeformerData = state;
+}
+
 bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {
 	if(!mMeshGeoPrimHandle || !mCurvesGeoPrimHandle) {
 		std::cerr << "No mesh or curves UsdPrim is set !" << std::endl;
@@ -51,6 +62,23 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {
 	if(mDirty) {
 		pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default();
 
+		mpAdjacencyData = std::make_unique<SerializableUsdGeomMeshFaceAdjacency>();
+		
+		// Get primitive adjacency json data if present
+		if(!mReadJsonDeformerData || !mMeshGeoPrimHandle.getDataFromBson(mpAdjacencyData.get())) {
+			// Build in place if no json data present or not needed
+			if(!mpAdjacencyData->buildInPlace(mMeshGeoPrimHandle)) {
+				std::cerr << "Error building mesh adjacency data!" << std::endl;
+				return false;
+			}
+
+			if(mWriteJsonDeformerData) {
+				if(!mMeshGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
+					std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !";	
+				}
+			}
+		}
+		
 		mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, rest_time_code);
 		if(!mpCurvesContainer) {
 			std::cerr << "Error creating curves container !" << std::endl;
@@ -61,6 +89,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {
 			std::cerr << "Error building deform data !" << std::endl;
 			return false;
 		}
+
 		mDirty = false;
 	}
 

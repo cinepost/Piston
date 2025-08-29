@@ -53,7 +53,10 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind);
 
 		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
-		PhantomTrimesh<PxrIndexType>::SharedPtr 			mpPhantomTrimesh;
+
+		SerializableUsdGeomMeshFaceAdjacency::UniquePtr     mpAdjacencyData;
+
+		PhantomTrimesh<PxrIndexType>::UniquePtr 			mpPhantomTrimesh;
 		std::vector<CurveBindData>              			mCurveBinds;
 
 		std::vector<pxr::GfVec3f> 							mRestVertexNormals;

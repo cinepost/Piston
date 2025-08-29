@@ -22,6 +22,8 @@ namespace Piston {
 
 FastCurvesDeformer::FastCurvesDeformer(): BaseCurvesDeformer() {
 	dbg_printf("FastCurvesDeformer::FastCurvesDeformer()\n");
+
+	mpAdjacencyData = std::make_unique<SerializableUsdGeomMeshFaceAdjacency>();
 }
 
 FastCurvesDeformer::SharedPtr FastCurvesDeformer::create() {
@@ -101,8 +103,8 @@ bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
 
 	// Create adjacency data
-	mpAdjacency = UsdGeomMeshFaceAdjacency::create(mesh);
-	if(!mpAdjacency) {
+	mpAdjacency = UsdGeomMeshFaceAdjacency::create();
+	if(!mpAdjacency->init(mesh)) {
 		return false;
 	}
 

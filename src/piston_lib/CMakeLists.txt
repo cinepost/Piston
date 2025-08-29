@@ -4,6 +4,7 @@ include_directories(
     ${EXTERNALS_INSTALL_DIR}
     ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/boost/src
     ${CMAKE_THIRD_PARTY_SOURCE_DIR}/bs_thread_pool
+    ${CMAKE_THIRD_PARTY_SOURCE_DIR}/json/single_include
 )
 
 file( GLOB SOURCES
@@ -12,6 +13,7 @@ file( GLOB SOURCES
     ./curves_container.cpp
     ./phantom_trimesh.cpp
     ./geometry_tools.cpp
+    ./serializable_data.cpp
     ./base_curves_deformer.cpp
     ./fast_curves_deformer.cpp
     ./wrap_curves_deformer.cpp

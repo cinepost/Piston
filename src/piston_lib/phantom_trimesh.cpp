@@ -3,11 +3,15 @@
 
 namespace Piston {
 
+static const SerializableDeformerDataBase::DataVersion kTrimeshDataVersion( 0u, 0u, 0u);
+
 template<typename IndexType>
-typename PhantomTrimesh<IndexType>::SharedPtr PhantomTrimesh<IndexType>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
+typename PhantomTrimesh<IndexType>::UniquePtr PhantomTrimesh<IndexType>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
 	assert(prim_handle.isMeshGeoPrim());
 
-	typename PhantomTrimesh<IndexType>::SharedPtr pPhantomTrimesh = PhantomTrimesh<IndexType>::SharedPtr( new PhantomTrimesh<IndexType>());
+	if(!prim_handle.isMeshGeoPrim()) return nullptr;
+
+	typename PhantomTrimesh<IndexType>::UniquePtr pPhantomTrimesh = PhantomTrimesh<IndexType>::UniquePtr( new PhantomTrimesh<IndexType>());
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
@@ -150,8 +154,30 @@ pxr::GfVec3f PhantomTrimesh<IndexType>::getFaceLiveNormal(uint32_t face_id) cons
 	);
 }
 
+template<typename IndexType>
+size_t PhantomTrimesh<IndexType>::calcHash() const {
+	size_t hash = 0;
+
+	for(const auto& pos: mUsdMeshRestPositions) {
+		hash += size_t(pos[0]) + size_t(pos[1]*10.f) + size_t(pos[2]*100.f);
+	}
+	hash += mUsdMeshRestPositions.size();
+
+	for(const auto& face: mFaces) {
+		hash += face.calcHash();
+	}
+	hash += mFaces.size();
+
+	for( const auto& [k, v]: mFaceMap) {
+		hash += k[0] + k[1]*2 + k[2]*3 + v * 1000;
+	}
+	hash += mFaceMap.size();
+
+	return hash;
+}
+
 // Specialisation
-template PhantomTrimesh<int>::SharedPtr PhantomTrimesh<int>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code); 
+template PhantomTrimesh<int>::UniquePtr PhantomTrimesh<int>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code); 
 
 template uint32_t PhantomTrimesh<int>::getOrCreate(int a, int b, int c);
 
@@ -169,4 +195,90 @@ template const pxr::GfVec3f& PhantomTrimesh<int>::getFaceRestNormal(uint32_t fac
 template pxr::GfVec3f PhantomTrimesh<int>::getFaceLiveNormal(uint32_t face_id) const;
 
 template bool PhantomTrimesh<int>::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);
+
+
+static constexpr const char* kJUsdRestPositions = "rest_pos";
+static constexpr const char* kJFaces = "faces";
+static constexpr const char* kJaceMap = "face_map";
+static constexpr const char* kJDataHash = "hash";
+
+template<typename IndexType>
+bool SerializablePhantomTrimesh<IndexType>::buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
+	clearData();
+
+	mpTrimesh = PhantomTrimesh<IndexType>::create(prim_handle, rest_p_name);
+
+	if(!mpTrimesh) {
+		setPopulated(false);
+		return false;
+	}
+
+	setPopulated(true);
+	return true;
+}
+
+template<typename IndexType>
+void SerializablePhantomTrimesh<IndexType>::clearData() {
+	mpTrimesh = nullptr;
+	setPopulated(false);
+}
+
+template<typename IndexType>
+bool SerializablePhantomTrimesh<IndexType>::dumpToJSON(json& j) const {
+	if(!mpTrimesh || !mpTrimesh->isValid()) return false;
+
+	j[kJUsdRestPositions] = mpTrimesh->mUsdMeshRestPositions;
+	j[kJFaces] = mpTrimesh->mFaces;
+	j[kJaceMap] = mpTrimesh->mFaceMap;
+
+	j[kJDataHash] = mpTrimesh->calcHash();
+
+	return true;
+}
+
+template<typename IndexType>
+bool SerializablePhantomTrimesh<IndexType>::readFromJSON(const json& j) {
+	mpTrimesh = std::make_unique<PhantomTrimesh<IndexType>>();
+	mpTrimesh->mValid = false;
+
+	mpTrimesh->mUsdMeshRestPositions = j[kJUsdRestPositions];
+	mpTrimesh->mFaces = j[kJFaces];
+	mpTrimesh->mFaceMap = j[kJaceMap].template get<std::unordered_map<std::array<IndexType, 3>, size_t>>();
+
+	const size_t json_trimesh_data_hash = j[kJDataHash];
+	const size_t calc_trimesh_data_hash = mpTrimesh->calcHash();
+
+	if(calc_trimesh_data_hash != json_trimesh_data_hash) {
+		return false;
+	}
+
+	mpTrimesh->mValid = true;
+	return true;
+}
+
+template<typename IndexType>
+const PhantomTrimesh<IndexType>* SerializablePhantomTrimesh<IndexType>::getTrimesh() const {
+	if(!isPopulated()) return nullptr;
+
+	return mpTrimesh.get();
+}
+
+template<typename IndexType>
+const std::string& SerializablePhantomTrimesh<IndexType>::typeName() const {
+	static const std::string kTypeName = "SerializablePhantomTrimesh";
+	return kTypeName;
+}
+
+template<typename IndexType>
+const std::string& SerializablePhantomTrimesh<IndexType>::jsonDataKey() const {
+	static const std::string kDataKey = "_piston_trimesh_data_";
+	return kDataKey;
+}
+
+template<typename IndexType>
+const SerializableDeformerDataBase::DataVersion& SerializablePhantomTrimesh<IndexType>::jsonDataVersion() const {
+	return kTrimeshDataVersion;
+}
+
+
 } // namespace Piston

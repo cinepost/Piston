@@ -5,6 +5,8 @@
 #include "common.h"
 #include "curves_container.h"
 #include "deformer_stats.h"
+#include "serializable_data.h"
+#include "adjacency.h"
 
 #include "BS_thread_pool.hpp" // BS::multi_future, BS::thread_pool
 
@@ -38,6 +40,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
 		void setCurvesGeoPrim(pxr::UsdPrim* pGeoPrim);
+
+		void readJsonDeformDataFromPrim(bool state);
+		void writeJsonDeformDataToPrim(bool state);
 
 		void setMeshRestPositionAttrName(const std::string& name);
 		const std::string& getMeshRestPositionAttrName() const { return mMeshRestPositionAttrName; }
@@ -75,6 +80,11 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
 
 		pxr::UsdStageRefPtr mpTempStage;
+
+		SerializableUsdGeomMeshFaceAdjacency::UniquePtr mpAdjacencyData;
+
+		bool mReadJsonDeformerData = false;
+		bool mWriteJsonDeformerData = false;
 };
 
 } // namespace Piston

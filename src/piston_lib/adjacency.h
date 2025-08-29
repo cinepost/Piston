@@ -2,6 +2,7 @@
 #define PISTON_LIB_ADJACENCY_H_
 
 #include "framework.h"
+#include "serializable_data.h"
 
 #include <memory>
 #include <string>
@@ -11,17 +12,20 @@
 
 namespace Piston {
 
+class SerializableUsdGeomMeshFaceAdjacency;
+
 class UsdGeomMeshFaceAdjacency {
 	public:
 		using SharedPtr = std::shared_ptr<UsdGeomMeshFaceAdjacency>;
 		using PxrIndexType = int;
 
 		UsdGeomMeshFaceAdjacency();
-		static SharedPtr create(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
+		static SharedPtr create();
 
 		bool init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
 		bool isValid() const;
+
 		void invalidate();
 
 		size_t getHash() const { return isValid() ? mHash : 0; }
@@ -48,10 +52,9 @@ class UsdGeomMeshFaceAdjacency {
 
 		std::string toString() const;
 
-	private:
-		size_t calcHash();
+		size_t calcHash() const;
  
-	private:
+	protected:
 		size_t mFaceCount;
 		size_t mVertexCount;
 		size_t mMaxFaceVertexCount;
@@ -62,14 +65,40 @@ class UsdGeomMeshFaceAdjacency {
     	std::vector<uint32_t> mVtxToFace;   // simple reverse relations vertex to face
     	std::vector<std::pair<PxrIndexType, PxrIndexType>> mCornerVertexData;	// neighbor corner vertex pair indices
 
-    	pxr::VtArray<PxrIndexType> mSrcFaceVertexIndices;
-		pxr::VtArray<PxrIndexType> mSrcFaceVertexCounts;
+    	std::vector<PxrIndexType> mSrcFaceVertexIndices;
+		std::vector<PxrIndexType> mSrcFaceVertexCounts;
 		std::vector<uint32_t> 	   mSrcFaceVertexOffsets;
     
     	bool mValid; // Set by Adjacency data builder!
     
     	mutable size_t mHash;
+
+    	friend class SerializableUsdGeomMeshFaceAdjacency;
 };
+
+class SerializableUsdGeomMeshFaceAdjacency: public SerializableDeformerDataBase {
+	public:
+		using UniquePtr = std::unique_ptr<SerializableUsdGeomMeshFaceAdjacency>;
+
+		SerializableUsdGeomMeshFaceAdjacency();
+
+		bool buildInPlace(const UsdPrimHandle& prim_handle);
+
+		const UsdGeomMeshFaceAdjacency* getAdjacency() const;
+		virtual const std::string& typeName() const override;
+		virtual const std::string& jsonDataKey() const override;
+		virtual const DataVersion& jsonDataVersion() const override;
+		
+	protected:
+		virtual bool dumpToJSON(json& j) const override;
+		virtual bool readFromJSON(const json& j) override;
+
+		virtual void clearData() override;
+
+	private:
+		UsdGeomMeshFaceAdjacency::SharedPtr	mpAdjacency;
+};
+
 
 inline std::string to_string(const UsdGeomMeshFaceAdjacency& a) {
 	return a.toString();
