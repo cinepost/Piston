@@ -17,8 +17,6 @@
 namespace Piston {
 
 class UsdGeomMeshFaceAdjacency;
-
-template<typename IndexType> 
 class PhantomTrimesh;
 
 struct Plane {
@@ -67,8 +65,7 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &u, float &v);
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v);
 
-template<typename IndexType> 
-void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh<IndexType>* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live);
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live);
 
 } // namespace Piston
 

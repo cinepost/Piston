@@ -7,6 +7,7 @@
 #include "deformer_stats.h"
 #include "serializable_data.h"
 #include "adjacency.h"
+#include "phantom_trimesh.h"
 
 #include "BS_thread_pool.hpp" // BS::multi_future, BS::thread_pool
 
@@ -69,6 +70,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		UsdPrimHandle mMeshGeoPrimHandle;
 		UsdPrimHandle mCurvesGeoPrimHandle;
 
+		SerializableUsdGeomMeshFaceAdjacency::UniquePtr 	mpAdjacencyData;
+		SerializablePhantomTrimesh::UniquePtr				mpPhantomTrimeshData;
+
 		std::string   mMeshRestPositionAttrName = kMeshRestPositionAttrName;
 		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
@@ -80,8 +84,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
 
 		pxr::UsdStageRefPtr mpTempStage;
-
-		SerializableUsdGeomMeshFaceAdjacency::UniquePtr mpAdjacencyData;
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;

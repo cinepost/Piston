@@ -71,11 +71,14 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {
 				std::cerr << "Error building mesh adjacency data!" << std::endl;
 				return false;
 			}
+		}
 
-			if(mWriteJsonDeformerData) {
-				if(!mMeshGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
-					std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !";	
-				}
+		mpPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
+
+		if(!mReadJsonDeformerData || !mCurvesGeoPrimHandle.getDataFromBson(mpPhantomTrimeshData.get())) {
+			if(!mpPhantomTrimeshData->buildInPlace(mMeshGeoPrimHandle, getMeshRestPositionAttrName())) {
+				std::cerr << "Error building phantom mesh data!" << std::endl;
+				return false;
 			}
 		}
 		
@@ -88,6 +91,17 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {
 		if(!buildDeformerData(rest_time_code)) {
 			std::cerr << "Error building deform data !" << std::endl;
 			return false;
+		}
+
+		// Write json data if needed
+		if(mWriteJsonDeformerData) {
+			if(!mMeshGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
+				std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !";	
+			}
+
+			if(!mMeshGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
+				std::cerr << "Error writing " << mpPhantomTrimeshData->typeName() << " deformer curves data to json !";	
+			}
 		}
 
 		mDirty = false;

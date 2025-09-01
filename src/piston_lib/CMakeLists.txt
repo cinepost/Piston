@@ -9,6 +9,7 @@ include_directories(
 
 file( GLOB SOURCES
     ./common.cpp
+    ./pxr_json.cpp
     ./adjacency.cpp
     ./curves_container.cpp
     ./phantom_trimesh.cpp

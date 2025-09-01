@@ -199,8 +199,7 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
     return true;
 }
 
-template<typename IndexType>
-void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh<IndexType>* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live) {
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live) {
     assert(pAdjacency);
     assert(pTrimesh);
 
@@ -209,7 +208,7 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
     const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? pTrimesh->getLivePositions() : pTrimesh->getRestPositions();
 
     const auto& faces = pTrimesh->getFaces();
-    std::unordered_set<IndexType> vertices;
+    std::unordered_set<PhantomTrimesh::PxrIndexType> vertices;
     vertices.reserve(pAdjacency->getVertexCount());
 
     for(const auto& face: faces) {
@@ -218,7 +217,7 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
         vertices.insert(face.indices[2]);
     }
 
-    for(IndexType vtx: vertices) {
+    for(PhantomTrimesh::PxrIndexType vtx: vertices) {
         pxr::GfVec3f vn = {0.f, 0.f, 0.f};
 
         const uint32_t edges_count = pAdjacency->getNeighborsCount(vtx);
@@ -232,9 +231,5 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
         vertex_normals[vtx] = pxr::GfGetNormalized(vn);
     }
 }
-
-// Specialisation
-template void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh<int>* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live); 
-
 
 } // namespace Piston

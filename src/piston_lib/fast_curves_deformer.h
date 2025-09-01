@@ -21,7 +21,6 @@ namespace Piston {
 class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, FastCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;
-		using PxrIndexType = int;
 
 	private:
 		struct CurveBindData {
@@ -54,9 +53,7 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
 
-		SerializableUsdGeomMeshFaceAdjacency::UniquePtr     mpAdjacencyData;
-
-		PhantomTrimesh<PxrIndexType>::UniquePtr 			mpPhantomTrimesh;
+		PhantomTrimesh::UniquePtr 							mpPhantomTrimesh;
 		std::vector<CurveBindData>              			mCurveBinds;
 
 		std::vector<pxr::GfVec3f> 							mRestVertexNormals;

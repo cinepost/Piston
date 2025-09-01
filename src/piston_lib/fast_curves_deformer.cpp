@@ -100,19 +100,17 @@ bool FastCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	PROFILE("FastCurvesDeformer::buildDeformerData");
 	dbg_printf("FastCurvesDeformer::buildDeformerData()\n");
 
-	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
-
 	// Create adjacency data
 	mpAdjacency = UsdGeomMeshFaceAdjacency::create();
-	if(!mpAdjacency->init(mesh)) {
+	if(!mpAdjacency->init(mMeshGeoPrimHandle)) {
 		return false;
 	}
 
 	assert(mpAdjacency->getMaxFaceVertexCount() > 0);
 
 	// Create phantom mesh
-	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mMeshRestPositionAttrName);
-	if(!mpPhantomTrimesh) {
+	mpPhantomTrimesh = PhantomTrimesh::create();
+	if(!mpPhantomTrimesh->init(mMeshGeoPrimHandle, mMeshRestPositionAttrName)) {
 		std::cerr << "Error creating phantom trimesh for " << mMeshGeoPrimHandle.getPath() << " !" << std::endl;
 		return false;
 	}
@@ -176,7 +174,7 @@ bool FastCurvesDeformer::calcPerBindTangentsAndBiNormals(bool build_live) {
 	mPerBindTBs.resize(mCurveBinds.size());
 
 	const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? mpPhantomTrimesh->getLivePositions() : mpPhantomTrimesh->getRestPositions();
-	const std::vector<PhantomTrimesh<int>::TriFace>& faces = mpPhantomTrimesh->getFaces(); 
+	const std::vector<PhantomTrimesh::TriFace>& faces = mpPhantomTrimesh->getFaces(); 
 
 	pxr::VtArray<pxr::GfVec3f> face_center_points(faces.size());
 
@@ -410,7 +408,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 
 	}
 
-	dbg_printf("Brute force bounf curves count: %zu\n", bforce_bound_curves_count);
+	dbg_printf("Brute force bound curves count: %zu\n", bforce_bound_curves_count);
 
 	return true;
 }

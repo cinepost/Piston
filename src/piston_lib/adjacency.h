@@ -22,7 +22,7 @@ class UsdGeomMeshFaceAdjacency {
 		UsdGeomMeshFaceAdjacency();
 		static SharedPtr create();
 
-		bool init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
+		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
 		bool isValid() const;
 

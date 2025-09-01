@@ -11,8 +11,15 @@ UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create() {
 	return pResult;
 }
 
-bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
+bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
+	assert(prim_handle.isMeshGeoPrim());
+
 	invalidate();
+
+	if(!prim_handle.isMeshGeoPrim()) return false;
+
+	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
+
 	mFaceCount = mesh.GetFaceCount(rest_time_code);
 	if(mFaceCount == 0) {
 		std::cerr << "Mesh " << mesh.GetPath() << " has no faces !" << std::endl;
@@ -276,17 +283,14 @@ const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacen
 }
 
 bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& prim_handle) {
-	assert(mpAdjacency);
 	assert(prim_handle.isMeshGeoPrim());
-
 	clearData();
 
-	bool result = false;
-
-	if(prim_handle.isMeshGeoPrim()) {
-		pxr::UsdGeomMesh mesh(prim_handle.getPrim());
-		result = mpAdjacency->init(mesh);
+	if(!mpAdjacency) {
+		mpAdjacency = UsdGeomMeshFaceAdjacency::create();
 	}
+
+	bool result = mpAdjacency->init(prim_handle);
 
 	if(!result) {
 		mpAdjacency->invalidate();

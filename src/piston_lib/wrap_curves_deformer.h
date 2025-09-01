@@ -22,7 +22,6 @@ namespace Piston {
 class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, WrapCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<WrapCurvesDeformer>;
-		using PxrIndexType = int;
 
 		enum class BindMode: uint8_t { 
 			SPACE, 
@@ -62,14 +61,14 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
-		BindMode                                            mBindMode = BindMode::SPACE;
+		BindMode                                mBindMode = BindMode::SPACE;
 
-		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
-		PhantomTrimesh<PxrIndexType>::UniquePtr 			mpPhantomTrimesh;
+		UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
+		PhantomTrimesh::UniquePtr 				mpPhantomTrimesh;
 		
-		std::vector<PointBindData>               			mPointBinds;
+		std::vector<PointBindData>              mPointBinds;
 
-		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
+		std::vector<pxr::GfVec3f> 				mLiveVertexNormals;
 };
 
 } // namespace Piston

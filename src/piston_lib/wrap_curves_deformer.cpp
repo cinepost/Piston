@@ -85,12 +85,7 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(std::vector<pxr::GfVec3f>& points,
 
         		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
 				
-				//float u = saturate(bind.u);
-				//float v = saturate(bind.v); 
-				//float w = saturate(1.f - u - v);
-        		//pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(u * mLiveVertexNormals[face.indices[1]] + v * mLiveVertexNormals[face.indices[2]] + w * mLiveVertexNormals[face.indices[0]]);
-        		
-        		pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(
+				pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(
         			bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]
         		);
 
@@ -125,19 +120,19 @@ bool WrapCurvesDeformer::deformImpl_DistMode(std::vector<pxr::GfVec3f>& points, 
 }
 
 bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
-	pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
+	//pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
 
 	// Create adjacency data
 	mpAdjacency = UsdGeomMeshFaceAdjacency::create();
-	if(!mpAdjacency->init(mesh)) {
+	if(!mpAdjacency->init(mMeshGeoPrimHandle)) {
 		return false;
 	}
 
 	assert(mpAdjacency->getMaxFaceVertexCount() > 0);
 
 	// Create phantom mesh
-	mpPhantomTrimesh = PhantomTrimesh<PxrIndexType>::create(mMeshGeoPrimHandle, mMeshRestPositionAttrName);
-	if(!mpPhantomTrimesh) {
+	mpPhantomTrimesh = PhantomTrimesh::create();
+	if(!mpPhantomTrimesh->init(mMeshGeoPrimHandle, mMeshRestPositionAttrName)) {
 		std::cerr << "Error creating phantom trimesh for " << mMeshGeoPrimHandle.getPath() << " !" << std::endl;
 		return false;
 	}
@@ -209,7 +204,7 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	return result;
 }
 
-static neighbour_search::KDTree<float, 3> buildTrimeshCentroidsKDTree(PhantomTrimesh<WrapCurvesDeformer::PxrIndexType>* pTrimesh, bool threaded_kdtree_creation) {
+static neighbour_search::KDTree<float, 3> buildTrimeshCentroidsKDTree(PhantomTrimesh* pTrimesh, bool threaded_kdtree_creation) {
 	
 	pxr::VtArray<pxr::GfVec3f> trimesh_centroids(pTrimesh->getFaceCount());
 	for(uint32_t face_id = 0; face_id < pTrimesh->getFaceCount(); ++face_id) {

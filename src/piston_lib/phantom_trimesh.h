@@ -32,26 +32,24 @@ struct IndicesArrayHasher {
 	}   
 };
 
-template<typename> 
 class SerializablePhantomTrimesh;
 
 // PhantomTrimesh is a special kind of structure that holds virtual triangles that references existing UsdGeomMesh vertices.
 // We use this structure to bind hair curves to mesh regions that influences control points.
 
-template<typename IndexType> 
 class PhantomTrimesh {
 	public:
 		static constexpr size_t kInvalidTriFaceID = std::numeric_limits<size_t>::max();
-
+		using PxrIndexType = int;
 		using UniquePtr = std::unique_ptr<PhantomTrimesh>;
 
 		struct TriFace {
-			using IndicesList = std::array<IndexType, 3>;
-			static constexpr IndexType kInvalidVertexID = std::numeric_limits<IndexType>::max();
+			using IndicesList = std::array<PxrIndexType, 3>;
+			static constexpr PxrIndexType kInvalidVertexID = std::numeric_limits<PxrIndexType>::max();
 
 			TriFace(): indices{kInvalidVertexID} { }
-			TriFace(IndexType a, IndexType b, IndexType c): indices{a, b, c} { }
-			TriFace(const std::array<IndexType, 3>& d): indices{d} { }
+			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c): indices{a, b, c} { }
+			TriFace(const std::array<PxrIndexType, 3>& d): indices{d} { }
 
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
 
@@ -59,7 +57,7 @@ class PhantomTrimesh {
 
 			const IndicesList&  getIndices() const { return indices; }
 
-			const IndexType& operator[](size_t index) const { return indices[index]; }
+			const PxrIndexType& operator[](size_t index) const { return indices[index]; }
 
 			size_t calcHash() const {
 				size_t hash = 0;
@@ -70,22 +68,21 @@ class PhantomTrimesh {
 				return hash;
 			}
 
-			IndicesList indices;
-
+			IndicesList 	indices;
 			pxr::GfVec3f 	restNormal;
 		};
 
-	protected:
 		PhantomTrimesh() : mValid(false) {};
 
 	public:
-		static PhantomTrimesh::UniquePtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		static PhantomTrimesh::UniquePtr create();
+
+		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
 		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
 
-
-		uint32_t getOrCreate(IndexType a, IndexType b, IndexType c);
+		uint32_t getOrCreate(PxrIndexType a, PxrIndexType b, PxrIndexType c);
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
@@ -105,6 +102,8 @@ class PhantomTrimesh {
 		pxr::GfVec3f getFaceLiveNormal(uint32_t face_id) const;
 
 		bool isValid() const { return mValid; }
+		void invalidate();
+		
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		size_t calcHash() const;
@@ -113,15 +112,18 @@ class PhantomTrimesh {
 		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
 		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshLivePositions;
 
-		std::unordered_map<std::array<IndexType, 3>, size_t, IndicesArrayHasher<IndexType, 3>> mFaceMap;
+		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
 		std::vector<TriFace> 									mFaces;
 
 		bool                                        			mValid;
 
-		friend class SerializablePhantomTrimesh<IndexType>;
+		friend class SerializablePhantomTrimesh;
 };
 
-template<typename IndexType> 
+void to_json(json& j, const PhantomTrimesh::TriFace& face);
+void from_json(const json& j, PhantomTrimesh::TriFace& face);
+
+
 class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 	public:
 		using UniquePtr = std::unique_ptr<SerializablePhantomTrimesh>;
@@ -130,7 +132,7 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 
 		bool buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		const PhantomTrimesh<IndexType>* getTrimesh() const;
+		const PhantomTrimesh* getTrimesh() const;
 
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
@@ -143,7 +145,7 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 		virtual void clearData() override;
 
 	private:
-		typename PhantomTrimesh<IndexType>::UniquePtr	mpTrimesh;
+		typename PhantomTrimesh::UniquePtr	mpTrimesh;
 };
 
 
