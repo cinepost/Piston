@@ -58,7 +58,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 	private:
 		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
-		
+
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
 		virtual void writeJsonDataToPrimImpl()const override;
 		
@@ -67,7 +67,6 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 		BindMode                                mBindMode = BindMode::SPACE;
 
-		//UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
 		PhantomTrimesh::UniquePtr 				mpPhantomTrimesh;
 		
 		std::vector<PointBindData>              mPointBinds;
