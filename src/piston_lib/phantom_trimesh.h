@@ -82,7 +82,7 @@ class PhantomTrimesh {
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
 		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
 
-		uint32_t getOrCreate(PxrIndexType a, PxrIndexType b, PxrIndexType c);
+		uint32_t getOrCreate(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
@@ -103,17 +103,17 @@ class PhantomTrimesh {
 
 		bool isValid() const { return mValid; }
 		void invalidate();
-		
-		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+
+		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default()) const;
 
 		size_t calcHash() const;
 
 	private:
-		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
-		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshLivePositions;
+		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshRestPositions;
+		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
 
-		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
-		std::vector<TriFace> 									mFaces;
+		mutable std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
+		mutable std::vector<TriFace> 							mFaces;
 
 		bool                                        			mValid;
 

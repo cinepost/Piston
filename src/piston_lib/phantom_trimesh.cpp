@@ -48,7 +48,7 @@ void PhantomTrimesh::invalidate() {
 	mFaces.clear();
 }
 
-uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrimesh::PxrIndexType b, PhantomTrimesh::PxrIndexType c) {	
+uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrimesh::PxrIndexType b, PhantomTrimesh::PxrIndexType c) const {	
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
 
@@ -124,7 +124,7 @@ pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(uint32_t face_id) const {
 	return (mUsdMeshRestPositions[face.indices[0]] + mUsdMeshRestPositions[face.indices[1]] + mUsdMeshRestPositions[face.indices[2]]) * kInvThree;
 }
 
-bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
+bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const {
 	assert(prim_handle.isMeshGeoPrim());
 
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());

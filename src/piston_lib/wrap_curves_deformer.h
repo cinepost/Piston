@@ -50,20 +50,24 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 	protected:
 		WrapCurvesDeformer();
-		virtual bool deformImpl(pxr::UsdTimeCode time_code);
+		virtual bool deformImpl(pxr::UsdTimeCode time_code) override;
+		virtual bool deformMtImpl(pxr::UsdTimeCode time_code) override;
 
-		bool deformImpl_SpaceMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
-		bool deformImpl_DistMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_SpaceMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_DistMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
 
 	private:
-		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code) override;
+		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
+		
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
+		virtual void writeJsonDataToPrimImpl()const override;
 		
 		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
 		BindMode                                mBindMode = BindMode::SPACE;
 
-		UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
+		//UsdGeomMeshFaceAdjacency::SharedPtr		mpAdjacency;
 		PhantomTrimesh::UniquePtr 				mpPhantomTrimesh;
 		
 		std::vector<PointBindData>              mPointBinds;

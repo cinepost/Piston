@@ -23,6 +23,9 @@ char const* greet() {
 }
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_mt_overloads, Piston::BaseCurvesDeformer::deform_mt, 0, 1)
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_overloads, Piston::BaseCurvesDeformer::writeJsonDataToPrim, 0, 1)
+
 
 BOOST_PYTHON_MODULE(_piston) {
   using namespace boost::python;
@@ -42,6 +45,11 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setСurvesSkinPrimAttrName", &BaseCurvesDeformer::setСurvesSkinPrimAttrName)
 		.def("getСurvesSkinPrimAttrName", &BaseCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
 		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
+		.def("deform_mt", &BaseCurvesDeformer::deform_mt, BaseCurvesDeformer_deform_mt_overloads(args("time_code")))
+
+		.def("setReadJsonDataFromPrim", &BaseCurvesDeformer::setReadJsonDataFromPrim)
+		.def("writeJsonDataToPrim", &BaseCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
+
 		.def("toString", &BaseCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 

@@ -38,12 +38,16 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 	protected:
 		FastCurvesDeformer();
-		virtual bool deformImpl(pxr::UsdTimeCode time_code);
+		virtual bool deformImpl(pxr::UsdTimeCode time_code) override;
+		virtual bool deformMtImpl(pxr::UsdTimeCode time_code) override;
 
 	private:
-		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code) override;
-		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
+		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
 
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
+		virtual void writeJsonDataToPrimImpl() const override;
+
+		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
 		bool calcPerBindNormals(bool build_live);
 		bool calcPerBindTangentsAndBiNormals(bool build_live);
 
@@ -51,9 +55,9 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind);
 
-		UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
+		//UsdGeomMeshFaceAdjacency::SharedPtr					mpAdjacency;
 
-		PhantomTrimesh::UniquePtr 							mpPhantomTrimesh;
+		//PhantomTrimesh::UniquePtr 							mpPhantomTrimesh;
 		std::vector<CurveBindData>              			mCurveBinds;
 
 		std::vector<pxr::GfVec3f> 							mRestVertexNormals;

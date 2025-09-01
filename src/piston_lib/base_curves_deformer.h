@@ -39,11 +39,11 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	public:
 		virtual ~BaseCurvesDeformer() {}
 
-		void setMeshGeoPrim(pxr::UsdPrim* pGeoPrim);
-		void setCurvesGeoPrim(pxr::UsdPrim* pGeoPrim);
+		void setMeshGeoPrim(const pxr::UsdPrim& pGeoPrim);
+		void setCurvesGeoPrim(const pxr::UsdPrim& pGeoPrim);
 
-		void readJsonDeformDataFromPrim(bool state);
-		void writeJsonDeformDataToPrim(bool state);
+		void setReadJsonDataFromPrim(bool state);
+		void writeJsonDataToPrim(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		void setMeshRestPositionAttrName(const std::string& name);
 		const std::string& getMeshRestPositionAttrName() const { return mMeshRestPositionAttrName; }
@@ -52,7 +52,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		const std::string& getСurvesSkinPrimAttrName() const { return mСurvesSkinPrimAttrName; }
 
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
-		bool deform_mp(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool deform_mt(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		virtual const std::string& toString() const;
 
@@ -62,6 +62,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		BaseCurvesDeformer();
 
 		virtual bool deformImpl(pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformMtImpl(pxr::UsdTimeCode time_code) = 0;
 		void makeDirty();
 		
 	protected:
@@ -81,7 +82,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		BS::thread_pool<BS::tp::none> mPool;
 		DeformerStats mStats;
 	private:
-		virtual bool buildDeformerData(pxr::UsdTimeCode reference_time_code) = 0;
+		bool buildDeformerData(pxr::UsdTimeCode reference_time_code);
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code) = 0;
+		virtual void writeJsonDataToPrimImpl() const = 0;
 
 		pxr::UsdStageRefPtr mpTempStage;
 

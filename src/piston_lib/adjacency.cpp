@@ -6,9 +6,8 @@ static const SerializableDeformerDataBase::DataVersion kAdjacencyDataVersion( 0u
 
 UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mFaceCount(0), mVertexCount(0), mMaxFaceVertexCount(0), mValid(false), mHash(0) {};
 
-UsdGeomMeshFaceAdjacency::SharedPtr UsdGeomMeshFaceAdjacency::create() {
-	auto pResult = UsdGeomMeshFaceAdjacency::SharedPtr(new UsdGeomMeshFaceAdjacency());
-	return pResult;
+UsdGeomMeshFaceAdjacency::UniquePtr UsdGeomMeshFaceAdjacency::create() {
+	return std::make_unique<UsdGeomMeshFaceAdjacency>();
 }
 
 bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {

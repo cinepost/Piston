@@ -16,11 +16,12 @@ class SerializableUsdGeomMeshFaceAdjacency;
 
 class UsdGeomMeshFaceAdjacency {
 	public:
-		using SharedPtr = std::shared_ptr<UsdGeomMeshFaceAdjacency>;
+		using UniquePtr = std::unique_ptr<UsdGeomMeshFaceAdjacency>;
 		using PxrIndexType = int;
 
 		UsdGeomMeshFaceAdjacency();
-		static SharedPtr create();
+
+		static UniquePtr create();
 
 		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
@@ -96,7 +97,7 @@ class SerializableUsdGeomMeshFaceAdjacency: public SerializableDeformerDataBase 
 		virtual void clearData() override;
 
 	private:
-		UsdGeomMeshFaceAdjacency::SharedPtr	mpAdjacency;
+		UsdGeomMeshFaceAdjacency::UniquePtr	mpAdjacency;
 };
 
 

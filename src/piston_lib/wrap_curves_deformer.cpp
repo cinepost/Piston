@@ -32,6 +32,14 @@ const std::string& WrapCurvesDeformer::toString() const {
 }
 
 bool WrapCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
+	return __deform__(false, time_code);
+}
+
+bool WrapCurvesDeformer::deformMtImpl(pxr::UsdTimeCode time_code) {
+	return __deform__(true, time_code);
+}
+
+bool WrapCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_code) {
 	PROFILE("WrapCurvesDeformer::deformImpl");
 	dbg_printf("WrapCurvesDeformer::deformImpl()\n");
 	if(!mpPhantomTrimesh) return false;
@@ -49,16 +57,17 @@ bool WrapCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
 	std::vector<pxr::GfVec3f>& points = mpCurvesContainer->getPointsCache();
 
 	assert(points.size() == mPointBinds.size());
+	assert(mpAdjacencyData);
 
-	buildVertexNormals(mpAdjacency.get(), mpPhantomTrimesh.get(), mLiveVertexNormals, true);
+	buildVertexNormals(mpAdjacencyData->getAdjacency(), mpPhantomTrimesh.get(), mLiveVertexNormals, true);
 
 	bool result = false;
 	switch(mBindMode) {
 		case BindMode::SPACE:
-			result = deformImpl_SpaceMode(points, time_code);
+			result = deformImpl_SpaceMode(multi_threaded, points, time_code);
 			break;
 		default:
-			result = deformImpl_DistMode(points, time_code);
+			result = deformImpl_DistMode(multi_threaded, points, time_code);
 			break;
 	}
 
@@ -75,60 +84,70 @@ static inline bool saturate(bool a) {
 	return a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
 }
 
-bool WrapCurvesDeformer::deformImpl_SpaceMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
-	mPool.detach_blocks(0, mPointBinds.size(),
-        [&](const std::size_t start, const std::size_t end)
-        {
-        	for(size_t i = start; i < end; ++i) {
-        		const auto& bind = mPointBinds[i];
-        		if(bind.face_id == PointBindData::kInvalidFaceID) continue;
+bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = mPointBinds[i];
+			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
 
-        		const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
-				
-				pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(
-        			bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]
-        		);
+			const auto& face = mpPhantomTrimesh->getFace(bind.face_id);
+			
+			pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(
+				bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]
+			);
 
-        		points[i] = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (interpolated_normal * bind.dist);
-        	}
+			points[i] = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (interpolated_normal * bind.dist);
+		}
+	};
 
-        }
-    );
-    mPool.wait();
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, mPointBinds.size(), func);
+		mPool.wait();
+	} else {
+		func(0u, mPointBinds.size());
+	}
 
     return true;
 }
 
-bool WrapCurvesDeformer::deformImpl_DistMode(std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
-	mPool.detach_blocks(0, mPointBinds.size(),
-        [&](const std::size_t start, const std::size_t end)
-        {
-        	for(size_t i = start; i < end; ++i) {
-        		const auto& bind = mPointBinds[i];
-        		if(bind.face_id == PointBindData::kInvalidFaceID) continue;
+bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = mPointBinds[i];
+			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
 
-        		pxr::GfVec3f face_normal = mpPhantomTrimesh->getFaceLiveNormal(bind.face_id);
+			pxr::GfVec3f face_normal = mpPhantomTrimesh->getFaceLiveNormal(bind.face_id);
 
-        		points[i] = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (face_normal * bind.dist);
-        	}
+			points[i] = mpPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (face_normal * bind.dist);
+		}
+	};
 
-        }
-    );
-    mPool.wait();
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, mPointBinds.size(), func);
+		mPool.wait();
+	} else {
+		func(0u, mPointBinds.size());
+	}
 
 	return true;
 }
 
-bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
-	//pxr::UsdGeomMesh mesh(mMeshGeoPrimHandle.getPrim());
+void WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 
-	// Create adjacency data
-	mpAdjacency = UsdGeomMeshFaceAdjacency::create();
-	if(!mpAdjacency->init(mMeshGeoPrimHandle)) {
+}
+
+bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) {
+	assert(mpAdjacencyData);
+
+	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	assert(pAdjacency);
+
+	if(!pAdjacency->isValid()) {
+		std::cerr << "No mesh adjacency data !" << std::endl;
 		return false;
 	}
 
-	assert(mpAdjacency->getMaxFaceVertexCount() > 0);
+	assert(pAdjacency->getMaxFaceVertexCount() > 0);
 
 	// Create phantom mesh
 	mpPhantomTrimesh = PhantomTrimesh::create();
@@ -138,32 +157,32 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	}
 
 	// First triangulate using simple "fan" triangulation
-	const size_t src_mesh_face_count = mpAdjacency->getFaceCount();
+	const size_t src_mesh_face_count = pAdjacency->getFaceCount();
 
 	for(size_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
-		const uint32_t face_vertex_count = mpAdjacency->getFaceVertexCount(face_id);
+		const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
 		
 		if(face_vertex_count < 3 ) {
 			std::cerr << "Source mesh polygon " << face_id << " is invalid !!!" << std::endl;
 			continue;
 		}
 		
-		const uint32_t face_vertex_offset = mpAdjacency->getFaceVertexOffset(face_id);
+		const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
 
 		switch(face_vertex_count) {
 			case 3:
 				mpPhantomTrimesh->getOrCreate(
-					mpAdjacency->getFaceVertex(face_id, 0), 
-					mpAdjacency->getFaceVertex(face_id, 1),
-					mpAdjacency->getFaceVertex(face_id, 2)
+					pAdjacency->getFaceVertex(face_id, 0), 
+					pAdjacency->getFaceVertex(face_id, 1),
+					pAdjacency->getFaceVertex(face_id, 2)
 				);
 				break;
 			default:
 				for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
 					mpPhantomTrimesh->getOrCreate(
-						mpAdjacency->getFaceVertex(face_id, 0), 
-						mpAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
-						mpAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
+						pAdjacency->getFaceVertex(face_id, 0), 
+						pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
+						pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
 					);
 				}
 				break;
@@ -175,7 +194,7 @@ bool WrapCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code) {
 	dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", src_mesh_face_count, tri_face_count);
 
 	std::vector<pxr::GfVec3f> rest_vertex_normals;
-	buildVertexNormals(mpAdjacency.get(), mpPhantomTrimesh.get(), rest_vertex_normals, false);
+	buildVertexNormals(pAdjacency, mpPhantomTrimesh.get(), rest_vertex_normals, false);
 	mLiveVertexNormals.resize(rest_vertex_normals.size());
 
 	// Bind curve points

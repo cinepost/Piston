@@ -7,35 +7,28 @@
 
 namespace Piston {
 
-bool isMeshGeoPrim(pxr::UsdPrim* pGeoPrim) {
-	if(pGeoPrim->GetTypeName() != "Mesh") return false;
+bool isMeshGeoPrim(const pxr::UsdPrim& geoPrim) {
+	if(geoPrim.GetTypeName() != "Mesh") return false;
 	return true;
 }
 
-bool isCurvesGeoPrim(pxr::UsdPrim* pGeoPrim) {
-	if(pGeoPrim->GetTypeName() != "BasisCurves") return false;
+bool isCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
+	if(geoPrim.GetTypeName() != "BasisCurves") return false;
 	return true;
 }
 
-UsdPrimHandle::UsdPrimHandle(): mpStage(nullptr) {}
+UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()) {}
 
-UsdPrimHandle::UsdPrimHandle(pxr::UsdStageWeakPtr pStage, const pxr::SdfPath& path): mpStage(pStage), mPath(path) {
-	assert(mpStage);
-}
-
-UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim* pPrim) {
-	assert(pPrim);
-
-	mpStage = pPrim->GetStage();
-	mPath = pPrim->GetPath();
+UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim) {
+	mPrim = prim;
 }
 
 pxr::UsdPrim UsdPrimHandle::getPrim() const {
-	return mpStage ? mpStage->GetPrimAtPath(mPath) : pxr::UsdPrim();
+	return mPrim.IsValid() ? mPrim : pxr::UsdPrim();
 }
 
 void UsdPrimHandle::clear() {
-	mpStage = nullptr;
+	mPrim = pxr::UsdPrim();
 }
 
 void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
@@ -102,9 +95,17 @@ bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const std::vect
 	return true;
 }
 
-bool UsdPrimHandle::operator==(const pxr::UsdPrim* pPrim) const {
-	if(!pPrim) return false;
-	return mpStage == pPrim->GetStage() && mPath == pPrim->GetPath();
+bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
+	if(mPrim.IsValid() != prim.IsValid()) {
+		return false;
+	}
+
+	if(mPrim.GetPath() != prim.GetPath()) {
+		dbg_printf("Prim paths are different !!!\n");
+		return false;
+	}
+
+	return true;
 }
 
 } // namespace Piston
