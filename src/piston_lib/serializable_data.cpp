@@ -24,8 +24,7 @@ bool SerializableDeformerDataBase::serialize(std::vector<std::uint8_t>& v_bson) 
 		return false;
 	}
 
-	v_bson = json::to_bson(j);
-
+	v_bson = json::to_bson(j);    
 	return true;
 }
 

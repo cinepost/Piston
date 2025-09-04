@@ -4,6 +4,12 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/value.h>
 
+static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
+	pxr::Vt_ArrayForeignDataSource fd(nullptr, 1);
+	static const bool addRef = 1;
+	return {&fd, (uint8_t*)vec.data(), vec.size(), addRef};
+}
+	
 
 namespace Piston {
 
@@ -79,7 +85,17 @@ bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, std::vector<s
 		return false;
 	}
 
-	return mPrim.GetMetadataByDictKey<std::vector<std::uint8_t>>(key, key_path, &v_bson);
+	pxr::VtArray<uint8_t> v;
+	if(!mPrim.GetMetadataByDictKey(key, key_path, &v)) {
+		return false;
+	}
+
+	if(v.empty()) return false;
+
+	v_bson.resize(v.size());
+	for(size_t i = 0; i < v.size(); ++i) v_bson[i] = v[i];
+
+	return true;
 }
 
 bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const std::vector<std::uint8_t>& v_bson) const {
@@ -104,10 +120,13 @@ bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const std::vect
 		}
 	}
 
-	//const std::string hex_string = bson_to_hex_string(v_bson);
-	//return mPrim.SetMetadataByDictKey<std::string>(key, key_path, hex_string);
-	const std::string hex_string = bson_to_hex_string(v_bson);
-	return mPrim.SetMetadataByDictKey<std::vector<std::uint8_t>>(key, key_path, v_bson);
+
+	// TODO: serialize directly to VtArray!
+	pxr::VtArray<uint8_t> v(v_bson.size());
+	for(size_t i = 0; i < v_bson.size(); ++i) v[i] = v_bson[i];
+
+	const bool result = mPrim.SetMetadataByDictKey<pxr::VtArray<uint8_t>>(key, key_path, v);
+	return result;
 }
 
 bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {

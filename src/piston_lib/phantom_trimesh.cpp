@@ -240,7 +240,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	mpTrimesh = std::make_unique<PhantomTrimesh>();
 	mpTrimesh->mValid = false;
 
-	//mpTrimesh->mUsdMeshRestPositions = j[kJUsdRestPositions].template get<pxr::VtArray<pxr::GfVec3f>>();
+	from_json(j[kJUsdRestPositions], mpTrimesh->mUsdMeshRestPositions);
 	mpTrimesh->mFaces = j[kJFaces].template get<std::vector<PhantomTrimesh::TriFace>>();
 	mpTrimesh->mFaceMap = j[kJaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
 
