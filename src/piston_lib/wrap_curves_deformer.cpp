@@ -132,8 +132,8 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, std::vector<px
 	return true;
 }
 
-void WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
-
+bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
+	return true;
 }
 
 bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) {

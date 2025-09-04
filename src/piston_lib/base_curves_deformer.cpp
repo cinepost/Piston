@@ -48,22 +48,24 @@ void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
 	mReadJsonDeformerData = state;
 }
 
-void BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
+bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 	// Write json data if needed
 	if(!buildDeformerData(time_code)) {
 		std::cerr << "Error building deformer data !" << std::endl;
-		return;
+		return false;
 	}
 
 	if(!mMeshGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
-		std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !";	
+		std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !" << std::endl;
+		return false;
 	}
 
-	if(!mMeshGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
-		std::cerr << "Error writing " << mpPhantomTrimeshData->typeName() << " deformer curves data to json !";	
+	if(!mCurvesGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
+		std::cerr << "Error writing " << mpPhantomTrimeshData->typeName() << " deformer curves data to json !" << std::endl;
+		return false;
 	}
 
-	writeJsonDataToPrimImpl();
+	return writeJsonDataToPrimImpl();
 }
 
 bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {

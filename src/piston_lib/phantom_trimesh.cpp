@@ -226,7 +226,6 @@ void SerializablePhantomTrimesh::clearData() {
 bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 	if(!mpTrimesh || !mpTrimesh->isValid()) return false;
 
-	//j[kJUsdRestPositions] = json::parse(mpTrimesh->mUsdMeshRestPositions);
 	to_json(j[kJUsdRestPositions], mpTrimesh->mUsdMeshRestPositions);
 
 	j[kJFaces] = mpTrimesh->mFaces;
@@ -253,6 +252,9 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	}
 
 	mpTrimesh->mValid = true;
+
+	dbg_printf("PhantomTrimesh data read from json payload !\n");
+
 	return true;
 }
 
@@ -268,7 +270,7 @@ const std::string& SerializablePhantomTrimesh::typeName() const {
 }
 
 const std::string& SerializablePhantomTrimesh::jsonDataKey() const {
-	static const std::string kDataKey = "_piston_trimesh_data_";
+	static const std::string kDataKey = "piston_trimesh_data";
 	return kDataKey;
 }
 

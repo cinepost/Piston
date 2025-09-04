@@ -17,6 +17,7 @@ file( GLOB SOURCES
     ./serializable_data.cpp
     ./base_curves_deformer.cpp
     ./fast_curves_deformer.cpp
+    ./fast_curves_deformer_data.cpp
     ./wrap_curves_deformer.cpp
     ./curves_deformer_factory.cpp
     ./simple_profiler.cpp

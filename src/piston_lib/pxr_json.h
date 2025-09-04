@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/array.h>
@@ -15,6 +16,12 @@
 using json = nlohmann::json;
 
 namespace Piston {
+
+void to_json(json& j, const std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& vec);
+void from_json(const json& j, std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& vec);
+
+void to_json(json& j, const std::vector<pxr::GfVec3f>& vec);
+void from_json(const json& j, std::vector<pxr::GfVec3f>& vec);
 
 void to_json(json& j, const pxr::VtArray<pxr::GfVec3f>& vec);
 void from_json(const json& j, pxr::VtArray<pxr::GfVec3f>& vec);

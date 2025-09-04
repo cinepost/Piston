@@ -41,7 +41,7 @@ class SerializableDeformerDataBase {
 		bool deserialize(const std::vector<std::uint8_t>& v_bson);
 		void clear();
 
-		bool isPopulated() const { return mIsPopulated; }
+		virtual bool isPopulated() const { return mIsPopulated; }
 
 		virtual const std::string& typeName() const = 0;
 		virtual const std::string& jsonDataKey() const = 0;

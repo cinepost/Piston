@@ -60,7 +60,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
-		virtual void writeJsonDataToPrimImpl()const override;
+		virtual bool writeJsonDataToPrimImpl()const override;
 		
 		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);

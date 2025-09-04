@@ -6,6 +6,7 @@
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 #include "curves_container.h"
+#include "fast_curves_deformer_data.h"
 
 #include <memory>
 #include <limits>
@@ -21,14 +22,7 @@ namespace Piston {
 class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, FastCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;
-
-	private:
-		struct CurveBindData {
-			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
-			uint32_t face_id;
-			float u, v;
-			CurveBindData(): face_id(kInvalidFaceID) {};
-		};
+		using CurveBindData = FastCurvesDeformerData::CurveBindData;
 
 	public:
 		~FastCurvesDeformer();
@@ -45,7 +39,7 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
-		virtual void writeJsonDataToPrimImpl() const override;
+		virtual bool writeJsonDataToPrimImpl() const override;
 
 		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
 		bool calcPerBindNormals(bool build_live);
@@ -55,15 +49,10 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind);
 
-		std::vector<CurveBindData>              			mCurveBinds;
+		std::unique_ptr<FastCurvesDeformerData>             mpFastCurvesDeformerData;
 
-		std::vector<pxr::GfVec3f> 							mRestVertexNormals;
 		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
-
-		std::vector<pxr::GfVec3f>               			mPerBindRestNormals;
 		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memeory to save on per-frame reallocations
-
-		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindRestTBs; // per curve-bind binormal and bangent vector pairs
 		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindLiveTBs; // we keep memeory to save on per-frame reallocations
 };
 

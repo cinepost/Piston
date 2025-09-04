@@ -18,9 +18,20 @@ namespace boost = hboost;
 #include "../../piston_lib/deformer_stats.h"
 #include "../../piston_lib/tests.h"
 
+#include <vector>
+
+
 char const* greet() {
 	return "Parovoz Piston python library!";
 }
+
+using BSON = std::vector<uint8_t>;
+
+struct BSON_to_hex_string {
+    static PyObject *convert(BSON const& bson) {
+    	return boost::python::incref(boost::python::object(Piston::bson_to_hex_string(bson)).ptr());
+    }
+};
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_mt_overloads, Piston::BaseCurvesDeformer::deform_mt, 0, 1)
@@ -76,6 +87,8 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)
 		.def("toString", &DeformerStats::toString)
 	;
+
+	to_python_converter<BSON , BSON_to_hex_string>();
 
 	def("runTests", &Tests::runTests);
 	

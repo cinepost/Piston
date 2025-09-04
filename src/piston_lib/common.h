@@ -5,16 +5,23 @@
 
 #include <nlohmann/json.hpp>
 
-#include <memory>
-#include <string>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
+
+#include <memory>
+#include <string>
+#include <sstream>
+#include <vector>
+
 
 using json = nlohmann::json;
 
 
 namespace Piston {
+
+std::string bson_to_hex_string(const std::vector<uint8_t>& vec);
+std::vector<uint8_t> hex_string_to_bson(const std::string& str);
 
 bool isMeshGeoPrim(const pxr::UsdPrim& pGeoPrim);
 bool isCurvesGeoPrim(const pxr::UsdPrim& getPrim);
@@ -26,7 +33,9 @@ class UsdPrimHandle {
 		UsdPrimHandle();
 		UsdPrimHandle(const pxr::UsdPrim& pPrim);
 
-		pxr::UsdPrim getPrim() const;
+		const pxr::UsdPrim& getPrim() const;
+
+		bool isValid() const { return mPrim.IsValid(); }
 
 		bool isMeshGeoPrim() const { return mPrim.GetTypeName() == "Mesh"; }
 		bool isHairGeoPrim() const { return mPrim.GetTypeName() == "BasisCurves"; }

@@ -361,6 +361,9 @@ bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
 
 	mpAdjacency->mHash = calc_adjacency_data_hash;
 	mpAdjacency->mValid = true;
+
+	dbg_printf("Adjacency data read from json payload !\n");
+
 	return true;
 }
 
@@ -370,7 +373,7 @@ const std::string& SerializableUsdGeomMeshFaceAdjacency::typeName() const {
 }
 
 const std::string& SerializableUsdGeomMeshFaceAdjacency::jsonDataKey() const {
-	static const std::string kDataKey = "_piston_mesh_adjacency_data_";
+	static const std::string kDataKey = "piston_mesh_adjacency_data";
 	return kDataKey;
 }
 

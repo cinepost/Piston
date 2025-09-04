@@ -2,6 +2,45 @@
 
 namespace Piston {
 
+void to_json(json& j, const std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& vec) {
+	for(const auto& [a, b]: vec) {
+    	j.push_back({(float)a[0], (float)a[1], (float)a[2], (float)b[0], (float)b[1], (float)b[2]});
+    }
+}
+
+void from_json(const json& j, std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& vec) {
+	for (auto& e : j) {
+ 		vec.emplace_back(std::make_pair(
+ 			pxr::GfVec3f(
+ 				e.at(0).template get<float>(),
+ 				e.at(1).template get<float>(),
+ 				e.at(2).template get<float>()
+ 			),
+ 			pxr::GfVec3f(
+ 				e.at(3).template get<float>(),
+ 				e.at(4).template get<float>(),
+ 				e.at(5).template get<float>()
+ 			)
+ 		));
+	}
+}
+
+void to_json(json& j, const std::vector<pxr::GfVec3f>& vec) {
+	for(const auto& v: vec) {
+    	j.push_back({(float)v[0], (float)v[1], (float)v[2]});
+    }
+}
+
+void from_json(const json& j, std::vector<pxr::GfVec3f>& vec) {
+	for (auto& e : j) {
+ 		vec.emplace_back(pxr::GfVec3f(
+ 			e.at(0).template get<float>(),
+ 			e.at(1).template get<float>(),
+ 			e.at(2).template get<float>()
+ 		));
+	}
+}
+
 void to_json(json& j, const pxr::VtArray<pxr::GfVec3f>& vec) {
 	j = json::array();
 	
