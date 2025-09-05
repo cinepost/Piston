@@ -22,6 +22,7 @@ namespace Piston {
 
 FastCurvesDeformer::FastCurvesDeformer(): BaseCurvesDeformer() {
 	dbg_printf("FastCurvesDeformer::FastCurvesDeformer()\n");
+	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
 }
 
 FastCurvesDeformer::SharedPtr FastCurvesDeformer::create() {
@@ -48,9 +49,7 @@ bool FastCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_c
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
-	if(!pPhantomTrimesh) return false;
-
-	if(!pPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
+	if(!pPhantomTrimesh || !pPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
 		return false;
 	}
 

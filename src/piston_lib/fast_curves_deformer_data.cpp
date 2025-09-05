@@ -91,7 +91,6 @@ const SerializableDeformerDataBase::DataVersion& FastCurvesDeformerData::jsonDat
 
 void to_json(json& j, const FastCurvesDeformerData::CurveBindData& bind) {
 	j = {bind.face_id, bind.u, bind.v};
-	//to_json(j["normal"], face.restNormal);
 }
 
 void from_json(const json& j, FastCurvesDeformerData::CurveBindData& bind) {

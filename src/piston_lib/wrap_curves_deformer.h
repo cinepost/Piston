@@ -7,6 +7,7 @@
 #include "phantom_trimesh.h"
 #include "curves_container.h"
 #include "geometry_tools.h"
+#include "wrap_curves_deformer_data.h"
 
 #include <memory>
 #include <limits>
@@ -23,21 +24,8 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 	public:
 		using SharedPtr = std::shared_ptr<WrapCurvesDeformer>;
 
-		enum class BindMode: uint8_t { 
-			SPACE, 
-			DIST 
-		};
-
-	private:
-		struct PointBindData {
-			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
-			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
-			uint32_t face_id;
-			float u, v, dist;
-			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
-
-			bool isValid() const { return face_id != kInvalidFaceID; }
-		};
+		using BindMode = WrapCurvesDeformerData::BindMode;
+		using PointBindData = WrapCurvesDeformerData::PointBindData;
 
 	public:
 		~WrapCurvesDeformer();
@@ -46,7 +34,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		virtual const std::string& toString() const override;
 
 		void setBindMode(BindMode mode);
-		const BindMode& getBindMode() const { return mBindMode; } 
+		const BindMode& getBindMode() const;
 
 	protected:
 		WrapCurvesDeformer();
@@ -65,11 +53,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
-		BindMode                                mBindMode = BindMode::SPACE;
-
-		PhantomTrimesh::UniquePtr 				mpPhantomTrimesh;
-		
-		std::vector<PointBindData>              mPointBinds;
+		std::unique_ptr<WrapCurvesDeformerData> mpWrapCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 				mLiveVertexNormals;
 };

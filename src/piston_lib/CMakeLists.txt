@@ -19,6 +19,7 @@ file( GLOB SOURCES
     ./fast_curves_deformer.cpp
     ./fast_curves_deformer_data.cpp
     ./wrap_curves_deformer.cpp
+    ./wrap_curves_deformer_data.cpp
     ./curves_deformer_factory.cpp
     ./simple_profiler.cpp
     ./deformer_stats.cpp
