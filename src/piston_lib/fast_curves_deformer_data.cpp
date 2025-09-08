@@ -65,7 +65,7 @@ bool FastCurvesDeformerData::readFromJSON(const json& j) {
 	from_json(j[kPerBindRestNormals], mPerBindRestNormals);
 	from_json(j[kPerBindrBindRestTBs], mPerBindRestTBs);
 
-	if(j[kJDataHash] != calcHash()) {
+	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		std::cerr << typeName() << " json data hash mismatch !";
 		return false;
 	}

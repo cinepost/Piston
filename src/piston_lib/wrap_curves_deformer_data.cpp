@@ -49,7 +49,7 @@ bool WrapCurvesDeformerData::readFromJSON(const json& j) {
 		return false;
 	}
 
-	if(j[kJDataHash] != calcHash()) {
+	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		std::cerr << typeName() << " json data hash mismatch !";
 		return false;
 	}

@@ -44,7 +44,6 @@ bool FastCurvesDeformer::deformMtImpl(pxr::UsdTimeCode time_code) {
 
 bool FastCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_code) {
 	PROFILE("FastCurvesDeformer::__deform__");
-	dbg_printf("FastCurvesDeformer::__deform__()\n");
 
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
@@ -165,9 +164,9 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 			std::cerr << "Error building per curve " << (build_live_per_bind_data ? "\"live\"" : "\"rest\"") << " tangents and binormals !" << std::endl;
 			return false;
 		}
+	
+		mpFastCurvesDeformerData->setPopulated(true);
 	}
-
-	mpFastCurvesDeformerData->setPopulated(true);
 
 	mLiveVertexNormals.resize(mpFastCurvesDeformerData->getRestVertexNormals().size());
 	mPerBindLiveNormals.resize(mpFastCurvesDeformerData->getPerBindRestNormals().size());

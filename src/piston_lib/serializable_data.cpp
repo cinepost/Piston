@@ -50,6 +50,7 @@ bool SerializableDeformerDataBase::deserialize(const std::vector<std::uint8_t>& 
 	}
 
 	mIsPopulated = true;
+	return true;
 }
 
 void SerializableDeformerDataBase::clear() {

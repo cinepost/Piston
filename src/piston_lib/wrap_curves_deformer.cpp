@@ -185,69 +185,75 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 	// Clear deformer data
 	mpWrapCurvesDeformerData->clear();
 
-	// First triangulate using simple "fan" triangulation
-	const size_t src_mesh_face_count = pAdjacency->getFaceCount();
+	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpWrapCurvesDeformerData.get())) {
+		// Build deformer data in place if no json data present or not needed
 
-	for(size_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
-		const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
-		
-		if(face_vertex_count < 3 ) {
-			std::cerr << "Source mesh polygon " << face_id << " is invalid !!!" << std::endl;
-			continue;
-		}
-		
-		const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
+		// First triangulate using simple "fan" triangulation
+		const size_t src_mesh_face_count = pAdjacency->getFaceCount();
 
-		switch(face_vertex_count) {
-			case 3:
-				pPhantomTrimesh->getOrCreate(
-					pAdjacency->getFaceVertex(face_id, 0), 
-					pAdjacency->getFaceVertex(face_id, 1),
-					pAdjacency->getFaceVertex(face_id, 2)
-				);
-				break;
-			default:
-				for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
+		for(size_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
+			const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
+			
+			if(face_vertex_count < 3 ) {
+				std::cerr << "Source mesh polygon " << face_id << " is invalid !!!" << std::endl;
+				continue;
+			}
+			
+			const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
+
+			switch(face_vertex_count) {
+				case 3:
 					pPhantomTrimesh->getOrCreate(
 						pAdjacency->getFaceVertex(face_id, 0), 
-						pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
-						pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
+						pAdjacency->getFaceVertex(face_id, 1),
+						pAdjacency->getFaceVertex(face_id, 2)
 					);
-				}
-				break;
+					break;
+				default:
+					for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
+						pPhantomTrimesh->getOrCreate(
+							pAdjacency->getFaceVertex(face_id, 0), 
+							pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
+							pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
+						);
+					}
+					break;
+			}
 		}
+
+		const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
+
+		dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", src_mesh_face_count, tri_face_count);
+
+		std::vector<pxr::GfVec3f> rest_vertex_normals;
+		buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, false);
+		mLiveVertexNormals.resize(rest_vertex_normals.size());
+
+		// Bind curve points
+		dbg_printf("Binding %zu curves (%zu total vertices) using thread pool.\n", mpCurvesContainer->getCurvesCount(), mpCurvesContainer->getTotalVertexCount());	
+		dbg_printf("Using %s search method.\n", to_string(mpWrapCurvesDeformerData->getBindMode()).c_str());
+
+		bool result = false;
+		auto threads_timer = Timer();
+		threads_timer.start();
+
+		// Build bind data
+		switch(mpWrapCurvesDeformerData->getBindMode()) {
+			case BindMode::SPACE:
+				result = buildDeformerData_SpaceMode(rest_vertex_normals, rest_time_code);
+				break;
+			default:
+				result = buildDeformerData_DistMode(rest_vertex_normals, rest_time_code);
+				break;
+		} 
+
+		threads_timer.stop();
+		dbg_printf("%zu threads finished in %s\n", mPool.get_thread_count(), threads_timer.toString().c_str());
+	
+		mpWrapCurvesDeformerData->setPopulated(result);
 	}
 
-	const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
-
-	dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", src_mesh_face_count, tri_face_count);
-
-	std::vector<pxr::GfVec3f> rest_vertex_normals;
-	buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, false);
-	mLiveVertexNormals.resize(rest_vertex_normals.size());
-
-	// Bind curve points
-	dbg_printf("Binding %zu curves (%zu total vertices) using thread pool.\n", mpCurvesContainer->getCurvesCount(), mpCurvesContainer->getTotalVertexCount());	
-	dbg_printf("Using %s search method.\n", to_string(mpWrapCurvesDeformerData->getBindMode()).c_str());
-
-	bool result = false;
-	auto threads_timer = Timer();
-	threads_timer.start();
-
-	// Build bind data
-	switch(mpWrapCurvesDeformerData->getBindMode()) {
-		case BindMode::SPACE:
-			result = buildDeformerData_SpaceMode(rest_vertex_normals, rest_time_code);
-			break;
-		default:
-			result = buildDeformerData_DistMode(rest_vertex_normals, rest_time_code);
-			break;
-	} 
-
-	threads_timer.stop();
-	dbg_printf("%zu threads finished in %s\n", mPool.get_thread_count(), threads_timer.toString().c_str());
-
-	return result;
+	return mpWrapCurvesDeformerData->isPopulated();
 }
 
 static neighbour_search::KDTree<float, 3> buildTrimeshCentroidsKDTree(const PhantomTrimesh* pTrimesh, bool threaded_kdtree_creation) {
@@ -267,8 +273,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
 	auto& pointBinds = mpWrapCurvesDeformerData->mPointBinds;
-
-	assert(pointBinds.size() == mpCurvesContainer->getTotalVertexCount());
+	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
 	const PhantomTrimesh* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
@@ -351,7 +356,7 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVe
 	std::atomic<size_t> partially_bound_curves = 0;
 
 	auto& pointBinds = mpWrapCurvesDeformerData->mPointBinds;
-	assert(pointBinds.size() == mpCurvesContainer->getTotalVertexCount());
+	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
 	const PhantomTrimesh* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
