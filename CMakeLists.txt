@@ -57,7 +57,7 @@ if(WIN32)
 endif() #WIN32
 
 # Handle superbuild first
-option (USE_SUPERBUILD "Whether or not a superbuild should be invoked" ON)
+option (USE_SUPERBUILD "Whether or not a superbuild should be invoked" OFF)
 
 if(USE_SUPERBUILD)
   project (SUPERBUILD NONE)
@@ -102,7 +102,7 @@ if(UNIX)
 elseif(WIN32)
   if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "D:/work/piston" CACHE PATH "Piston install prefix" FORCE)
-  endif()
+  endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 message("CMAKE_INSTALL_PREFIX: " ${CMAKE_INSTALL_PREFIX})
 
@@ -113,13 +113,6 @@ set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/lib 
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bin )
 
 add_definitions(-DPISTON_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}")
-
-if (WIN32)
-  if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    # We don't want to install in default system location, install is really for the SDK, so call it that
-    set(CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/sdk" CACHE PATH "Piston install prefix" FORCE )
-  endif (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-endif(WIN32)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-D_DEBUG)
@@ -170,6 +163,12 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 # Our stuff
 #------------------------------------------
 find_package( Houdini REQUIRED )
+message("Houdini python version: ${_houdini_python_version}")
+
+if(WIN32)
+  set(ENV{LIBPATH} "$ENV{LIBPATH};${HROOT}\\python${_houdini_python_dotless_version}\\libs;${HROOT}")
+  set(ENV{LIB} "$ENV{LIB};${HROOT}\\python${_houdini_python_dotless_version}\\libs;${HROOT}\\custom\\houdini\\dsolib")
+endif() #WIN32
 
 add_subdirectory( src )
 #add_subdirectory( contrib )
