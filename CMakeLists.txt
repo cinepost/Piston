@@ -56,6 +56,28 @@ if(WIN32)
   set(ENV{LIB} "$ENV{LIB};${HROOT}\\python311\\libs;${HROOT}\\custom\\houdini\\dsolib")
 endif() #WIN32
 
+# Install path
+if(CMAKE_INSTALL_PREFIX)
+  set(linuxDefault ${CMAKE_INSTALL_PREFIX} STREQUAL "/usr/local")
+  set(windowsDefault ${CMAKE_INSTALL_PREFIX} STREQUAL "C:\\Program Files (x86)")
+else()
+  set(linuxDefault TRUE)
+  set(windowsDefault TRUE)
+endif()
+
+if(WIN32)
+  set( DEFAULT_CMAKE_INSTALL_PREFIX "D:/work/piston")
+else()
+  set( DEFAULT_CMAKE_INSTALL_PREFIX "/opt/piston" )
+endif()
+
+# Override default install path
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR ${linuxDefault} OR ${windowsDefault})
+  set( CMAKE_INSTALL_PREFIX ${DEFAULT_CMAKE_INSTALL_PREFIX} CACHE PATH "Piston install prefix" FORCE)
+endif()
+
+message("Install path: ${CMAKE_INSTALL_PREFIX}")
+
 # Handle superbuild first
 option (USE_SUPERBUILD "Whether or not a superbuild should be invoked" ON)
 
@@ -95,16 +117,6 @@ set( IDENTIFIER "com.parovoz" )
 if(UNIX)
 set( PYTHON_EXECUTABLE "python3.11")
 endif()
-
-
-if(UNIX)
-  set( CMAKE_INSTALL_PREFIX "/opt/piston" )
-elseif(WIN32)
-  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX "D:/work/piston" CACHE PATH "Piston install prefix" FORCE)
-  endif()
-endif()
-message("CMAKE_INSTALL_PREFIX: " ${CMAKE_INSTALL_PREFIX})
 
 # Specify build paths
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bin)
