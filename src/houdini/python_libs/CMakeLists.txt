@@ -30,6 +30,12 @@ target_link_libraries( piston
 	piston_lib
 )
 
+if(WIN32)
+target_link_libraries( piston 
+   ${HROOT}/python${_houdini_python_dotless_version}/libs/python${_houdini_python_dotless_version}.lib
+)
+endif()
+
 houdini_configure_target( piston
 	LIB_PREFIX ${CMAKE_SHARED_MODULE_PREFIX}
 	INSTDIR ${PYTHON_LIBS_INSTALL_DIR}

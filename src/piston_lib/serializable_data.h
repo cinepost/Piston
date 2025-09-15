@@ -29,10 +29,10 @@ class SerializableDeformerDataBase {
 			DataVersion(size_t _maj, size_t _min, size_t _bld): major(_maj), minor(_min), build(_bld) {};
 		};
 
-		enum class ErrorCode {
-			NO_ERROR,
-			JSON_EMPTY,
-			PARSE_ERROR
+		enum class ErrorCode: uint8_t {
+			EC_NO_ERROR		= 0,
+			EC_JSON_EMPTY 	= 1,
+			EC_PARSE_ERROR	= 2
 		};
 
 		SerializableDeformerDataBase();
@@ -61,9 +61,9 @@ class SerializableDeformerDataBase {
 
 inline std::string to_string(const SerializableDeformerDataBase::ErrorCode& err) {
 	switch(err) {
-		case SerializableDeformerDataBase::ErrorCode::JSON_EMPTY :
+		case SerializableDeformerDataBase::ErrorCode::EC_JSON_EMPTY :
 			return "Empty json/bson";
-		case SerializableDeformerDataBase::ErrorCode::PARSE_ERROR :
+		case SerializableDeformerDataBase::ErrorCode::EC_PARSE_ERROR :
 			return "Json parse error";
 		default:
 			return ""; 

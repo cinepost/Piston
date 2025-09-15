@@ -54,7 +54,7 @@ uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrim
 
 	auto it = mFaceMap.find(indices);
 	if(it != mFaceMap.end()) {
-		return it->second;
+		return static_cast<uint32_t>(it->second);
 	}
 
 	const uint32_t idx = static_cast<uint32_t>(mFaces.size());
