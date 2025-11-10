@@ -43,30 +43,6 @@ set(CMAKE_SHARED_MODULE_PREFIX "")
 add_library( piston_lib STATIC ${SOURCES} ${HEADERS} )
 
 if(WIN32)
-#    set(USD_LIBS
-#        hboost_python${HOUDINI_PYTHON_VERSION_STRIP}-mt-x64.lib
-#        libgusd.lib
-#        libpxr_hf.lib
-#        libpxr_usdLux.lib
-#        libpxr_hd.lib
-#        libpxr_ar.lib
-#        libpxr_arch.lib
-#        libpxr_gf.lib
-#        libpxr_js.lib
-#        libpxr_kind.lib
-#        libpxr_pcp.lib
-#        libpxr_plug.lib
-#        libpxr_sdf.lib
-#        libpxr_tf.lib
-#        libpxr_usd.lib
-#        libpxr_usdGeom.lib
-#        libpxr_usdRi.lib
-#        libpxr_usdShade.lib
-#        libpxr_usdUtils.lib
-#        libpxr_vt.lib
-#        libpxr_work.lib
-#        libpxr_trace.lib
-#    )
 
     set(_HOU_DSOLIB_ ${HROOT}/custom/houdini/dsolib)
 

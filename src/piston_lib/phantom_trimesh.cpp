@@ -29,10 +29,28 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 
 	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
+#if PIXAR_POINTS_SYNAMIC_ARRAY_USE_PXR
+	// Using pixar VtArray machinery
+
 	if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
 		std::cerr << "Error getting mesh " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
 		return false;
 	}
+#else
+	// Using std::vector 
+
+	// we need this wizardry only to get mesh points count. USD is dumb shit
+	pxr::VtArray<pxr::GfVec3f> usdMeshRestPositions;
+	if(!restPosAttr.Get(&usdMeshRestPositions, time_code)) {
+		std::cerr << "Error getting mesh " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
+		return false;
+	}
+
+	mUsdMeshRestPositions.resize(usdMeshRestPositions.size());
+	mUsdMeshLivePositions.resize(usdMeshRestPositions.size());
+
+	mUsdMeshRestPositions.assign(usdMeshRestPositions.begin(), usdMeshRestPositions.end());
+#endif
 
 	mValid = true;
 	return mValid;
@@ -129,10 +147,25 @@ bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode t
 
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
 
+#if PIXAR_POINTS_SYNAMIC_ARRAY_USE_PXR
+	// Using pixar VtArray machinery
+
 	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
 		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
 		return false;
 	}
+#else
+	// Using std::vector
+
+	pxr::VtArray<pxr::GfVec3f> usdMeshLivePositions;
+
+	if(!mesh.GetPointsAttr().Get(&usdMeshLivePositions, time_code)) {
+		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
+		return false;
+	}
+
+	mUsdMeshLivePositions.assign(usdMeshLivePositions.begin(), usdMeshLivePositions.end());
+#endif
 
 	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
 		std::cerr << prim_handle.getPath() << " \"rest\" and live mesh point positions count mismatch!" << std::endl;

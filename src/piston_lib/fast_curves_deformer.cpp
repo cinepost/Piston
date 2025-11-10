@@ -225,7 +225,7 @@ bool FastCurvesDeformer::calcPerBindTangentsAndBiNormals(bool build_live) {
 	auto& mPerBindTBs = build_live ? mPerBindLiveTBs : mpFastCurvesDeformerData->mPerBindRestTBs;
 	assert(mPerBindTBs.size() == curveBinds.size());
 
-	const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? pPhantomTrimesh->getLivePositions() : pPhantomTrimesh->getRestPositions();
+	const std::vector<pxr::GfVec3f>& pt_positions = build_live ? pPhantomTrimesh->getLivePositions() : pPhantomTrimesh->getRestPositions();
 	const std::vector<PhantomTrimesh::TriFace>& faces = pPhantomTrimesh->getFaces(); 
 
 	pxr::VtArray<pxr::GfVec3f> face_center_points(faces.size());

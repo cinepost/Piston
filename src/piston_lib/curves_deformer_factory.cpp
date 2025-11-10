@@ -44,6 +44,10 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 	}
 }
 
+CurvesDeformerFactory::~CurvesDeformerFactory() {
+	SimpleProfiler::printReport();
+}
+
 } // namespace Piston
 
 // Initialize static members

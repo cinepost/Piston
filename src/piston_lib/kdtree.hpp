@@ -7,6 +7,8 @@
 #ifndef KDTREE_HPP
 #define KDTREE_HPP
 
+#include "framework.h"
+
 #include <algorithm>   // std::sort, std::nth_element
 #include <array>       // std::array
 #include <cmath>       // std::floor
@@ -29,6 +31,12 @@
 
 
 namespace neighbour_search {
+
+#if REST_LINE_POINTS_PXR
+    using PixarPointsVector
+#else
+
+#endif
 
 const static auto DEFAULT_RECURSION_DEPTH = static_cast<std::uint32_t>(std::floor(std::log2(std::thread::hardware_concurrency())));
 
@@ -72,7 +80,7 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         }
     }
 
-    explicit KDTree(const pxr::VtArray<pxr::GfVec3f>& points, bool threaded = false) : root_(nullptr) {
+    explicit KDTree(const Piston::PixarPointsDynamicArray& points, bool threaded = false) : root_(nullptr) {
         static_assert(number_of_dimensions == 3);
         static_assert(std::is_same<CoordinateType, float>::value);
 

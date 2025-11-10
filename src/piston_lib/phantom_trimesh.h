@@ -79,8 +79,8 @@ class PhantomTrimesh {
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
-		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
+		const PixarPointsDynamicArray& getRestPositions() const { return mUsdMeshRestPositions; }
+		const PixarPointsDynamicArray& getLivePositions() const { return mUsdMeshLivePositions; }
 
 		uint32_t getOrCreate(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
 
@@ -109,8 +109,8 @@ class PhantomTrimesh {
 		size_t calcHash() const;
 
 	private:
-		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshRestPositions;
-		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
+		mutable PixarPointsDynamicArray 						mUsdMeshRestPositions;
+		mutable PixarPointsDynamicArray 						mUsdMeshLivePositions;
 
 		mutable std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
 		mutable std::vector<TriFace> 							mFaces;

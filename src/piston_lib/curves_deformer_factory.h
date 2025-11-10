@@ -4,6 +4,7 @@
 #include "base_curves_deformer.h"
 #include "fast_curves_deformer.h"
 #include "wrap_curves_deformer.h"
+#include "simple_profiler.h"
 
 #include <string>
 #include <vector>
@@ -28,6 +29,8 @@ class CurvesDeformerFactory {
 		};
 
 	public:
+		~CurvesDeformerFactory();
+		
     	// Deleting the copy constructor to prevent copies
     	CurvesDeformerFactory(const CurvesDeformerFactory& obj) = delete;
 

@@ -39,8 +39,8 @@ BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_ov
 
 
 BOOST_PYTHON_MODULE(_piston) {
-  using namespace boost::python;
-  using namespace Piston;
+ 	using namespace boost::python;
+	using namespace Piston;
 
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>())
@@ -82,7 +82,7 @@ BOOST_PYTHON_MODULE(_piston) {
     	.value("SPACE", WrapCurvesDeformer::BindMode::SPACE)
     	.value("DIST", WrapCurvesDeformer::BindMode::DIST)
     	.export_values()
-    ;
+  ;
 
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)
 		.def("toString", &DeformerStats::toString)
@@ -90,7 +90,6 @@ BOOST_PYTHON_MODULE(_piston) {
 
 	to_python_converter<BSON , BSON_to_hex_string>();
 
-	def("runTests", &Tests::runTests);
-	
+	def("runTests", &Tests::runTests);	
 	def("greet", greet);
 }

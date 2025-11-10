@@ -4,6 +4,8 @@
 #include <memory>
 #include <iostream>
 
+#include <pxr/base/gf/matrix3f.h>
+
 #ifndef should_not_get_here
 #define should_not_get_here() assert(false)
 #endif
@@ -14,8 +16,16 @@
 #define dbg_printf(...) {}
 #endif
 
+#define PIXAR_POINTS_SYNAMIC_ARRAY_USE_PXR false
 
 namespace Piston {
+
+#if PIXAR_POINTS_SYNAMIC_ARRAY_USE_PXR
+    using PixarPointsDynamicArray = pxr::VtArray<pxr::GfVec3f>;
+#else
+    using PixarPointsDynamicArray = std::vector<pxr::GfVec3f>;
+#endif
+
 
 // This is a helper class which should be used in case a class derives from a base class which derives from enable_shared_from_this
 // If Derived will also inherit enable_shared_from_this, it will cause multiple inheritance from enable_shared_from_this, which results in a runtime errors because we have 2 copies of the WeakPtr inside shared_ptr

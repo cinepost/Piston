@@ -40,21 +40,21 @@ class UsdPrimHandle {
 		bool isMeshGeoPrim() const { return mPrim.GetTypeName() == "Mesh"; }
 		bool isHairGeoPrim() const { return mPrim.GetTypeName() == "BasisCurves"; }
 
-		std::string  	getName() const { return getPath().GetName(); }
-		pxr::SdfPath 	getPath() const { return mPrim.GetPath(); }
-		pxr::UsdStageWeakPtr 	getStage() const { return mPrim.GetStage(); }
+		std::string  getName() const { return getPath().GetName(); }
+		pxr::SdfPath getPath() const { return mPrim.GetPath(); }
+		pxr::UsdStageWeakPtr getStage() const { return mPrim.GetStage(); }
 
-		bool 					getDataFromBson(SerializableDeformerDataBase* pDeformerData) const;
-		bool                    writeDataToBson(SerializableDeformerDataBase* pDeformerData) const;
+		bool getDataFromBson(SerializableDeformerDataBase* pDeformerData) const;
+		bool writeDataToBson(SerializableDeformerDataBase* pDeformerData) const;
 
-		bool 					getBsonFromPrim(const std::string& identifier, std::vector<std::uint8_t>& v_bson) const;
-		bool					setBsonToPrim(const std::string& identifier, const std::vector<std::uint8_t>& v_bson) const;
-		void                    clearPrimBson(const std::string& identifier) const;
+		bool getBsonFromPrim(const std::string& identifier, std::vector<std::uint8_t>& v_bson) const;
+		bool setBsonToPrim(const std::string& identifier, const std::vector<std::uint8_t>& v_bson) const;
+		void clearPrimBson(const std::string& identifier) const;
 
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
 
 		/* Invalidate handle */
-		void                    clear();
+		void clear();
 
 		bool operator==(const pxr::UsdPrim& prim) const;
 		explicit operator bool() const { return mPrim.IsValid(); };

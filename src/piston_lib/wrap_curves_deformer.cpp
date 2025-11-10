@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <optional>
 
+BS::synced_stream sync_out;
 
 namespace Piston {
 
@@ -43,8 +44,7 @@ bool WrapCurvesDeformer::deformMtImpl(pxr::UsdTimeCode time_code) {
 }
 
 bool WrapCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_code) {
-	PROFILE("WrapCurvesDeformer::deformImpl");
-	dbg_printf("WrapCurvesDeformer::deformImpl()\n");
+	PROFILE(multi_threaded ? "WrapCurvesDeformer::deformImplMT" : "WrapCurvesDeformer::deformImpl");
 	
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
@@ -132,13 +132,12 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, std::vector<px
 
 	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
 
-	auto func = [&](const std::size_t start, const std::size_t end) {
+	auto func = [&](const std::size_t start, const std::size_t end) {	
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
 
 			pxr::GfVec3f face_normal = pPhantomTrimesh->getFaceLiveNormal(bind.face_id);
-
 			points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (face_normal * bind.dist);
 		}
 	};
@@ -258,7 +257,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 
 static neighbour_search::KDTree<float, 3> buildTrimeshCentroidsKDTree(const PhantomTrimesh* pTrimesh, bool threaded_kdtree_creation) {
 	
-	pxr::VtArray<pxr::GfVec3f> trimesh_centroids(pTrimesh->getFaceCount());
+	std::vector<pxr::GfVec3f> trimesh_centroids(pTrimesh->getFaceCount());
 	for(uint32_t face_id = 0; face_id < pTrimesh->getFaceCount(); ++face_id) {
 		trimesh_centroids[face_id] = pTrimesh->getFaceRestCentroid(face_id);
 	}

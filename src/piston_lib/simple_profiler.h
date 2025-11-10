@@ -9,12 +9,8 @@
 #include <chrono>
 #include <atomic>
 
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics.hpp>
-
 #include "framework.h"
 
-namespace ba = boost::accumulators;
 
 #ifdef _DEBUG
 #define PROFILE(NAME) Piston::SimpleProfiler(NAME)
@@ -28,6 +24,8 @@ namespace Piston {
 
 class SimpleProfiler {
 	public:
+		typedef std::vector<uint64_t> acc_t;
+		
 		using Clock = std::chrono::high_resolution_clock;
 		using TimePoint = std::chrono::time_point<Clock>;
 		using TimeDuration = std::chrono::duration<double, std::milli>;
@@ -40,7 +38,6 @@ class SimpleProfiler {
 
 
 	private:
-		typedef ba::accumulator_set<uint64_t, ba::stats<ba::tag::variance(ba::lazy)> > acc_t;
 		static std::map <std::string, acc_t> mMap;
 		std::string mName;
 		TimePoint mTimeStart;
