@@ -14,6 +14,7 @@
 #include <array>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 
 
 namespace Piston {
@@ -79,27 +80,27 @@ class PhantomTrimesh {
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		const PixarPointsDynamicArray& getRestPositions() const { return mUsdMeshRestPositions; }
-		const PixarPointsDynamicArray& getLivePositions() const { return mUsdMeshLivePositions; }
+		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
+		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
 
 		uint32_t getOrCreate(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
-		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
+		const TriFace& getFace(const uint32_t id) const { return mFaces[id]; }
 		size_t getFaceCount() const { return mFaces.size(); }
 
-		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v) const;
-		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
+		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const;
+		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v, float& dist) const;
 		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v) const;
 		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v, float& dist) const;
 
-		pxr::GfVec3f getInterpolatedRestPosition(uint32_t face_id, float u, float v) const;
-		pxr::GfVec3f getInterpolatedLivePosition(uint32_t face_id, float u, float v) const;
+		pxr::GfVec3f getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const;
+		pxr::GfVec3f getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const;
 
-		pxr::GfVec3f getFaceRestCentroid(uint32_t face_id) const;
+		pxr::GfVec3f getFaceRestCentroid(const uint32_t face_id) const;
 
-		const pxr::GfVec3f& getFaceRestNormal(uint32_t face_id) const;
-		pxr::GfVec3f getFaceLiveNormal(uint32_t face_id) const;
+		const pxr::GfVec3f& getFaceRestNormal(const uint32_t face_id) const;
+		pxr::GfVec3f getFaceLiveNormal(const uint32_t face_id) const;
 
 		bool isValid() const { return mValid; }
 		void invalidate();
@@ -109,8 +110,8 @@ class PhantomTrimesh {
 		size_t calcHash() const;
 
 	private:
-		mutable PixarPointsDynamicArray 						mUsdMeshRestPositions;
-		mutable PixarPointsDynamicArray 						mUsdMeshLivePositions;
+		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshRestPositions;
+		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
 
 		mutable std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
 		mutable std::vector<TriFace> 							mFaces;

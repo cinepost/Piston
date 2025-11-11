@@ -8,6 +8,7 @@
 #include "serializable_data.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
+#include "simple_profiler.h"
 
 #include "BS_thread_pool.hpp" // BS::multi_future, BS::thread_pool
 

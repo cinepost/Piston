@@ -1,6 +1,8 @@
 #include "pxr_json.h"
 #include "phantom_trimesh.h"
 #include "geometry_tools.h"
+#include "simple_profiler.h"
+
 
 namespace Piston {
 
@@ -29,28 +31,10 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 
 	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
-#if PIXAR_POINTS_SYNAMIC_ARRAY_USE_PXR
-	// Using pixar VtArray machinery
-
 	if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
 		std::cerr << "Error getting mesh " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
 		return false;
 	}
-#else
-	// Using std::vector 
-
-	// we need this wizardry only to get mesh points count. USD is dumb shit
-	pxr::VtArray<pxr::GfVec3f> usdMeshRestPositions;
-	if(!restPosAttr.Get(&usdMeshRestPositions, time_code)) {
-		std::cerr << "Error getting mesh " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
-		return false;
-	}
-
-	mUsdMeshRestPositions.resize(usdMeshRestPositions.size());
-	mUsdMeshLivePositions.resize(usdMeshRestPositions.size());
-
-	mUsdMeshRestPositions.assign(usdMeshRestPositions.begin(), usdMeshRestPositions.end());
-#endif
 
 	mValid = true;
 	return mValid;
@@ -78,8 +62,11 @@ uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrim
 	const uint32_t idx = static_cast<uint32_t>(mFaces.size());
 
 	mFaces.emplace_back(indices);
+
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+
 	mFaces.back().restNormal = pxr::GfGetNormalized(
-		pxr::GfCross(mUsdMeshRestPositions[indices[1]] - mUsdMeshRestPositions[indices[0]], mUsdMeshRestPositions[indices[2]] - mUsdMeshRestPositions[indices[0]])
+		pxr::GfCross(usdMeshRestPositions[indices[1]] - usdMeshRestPositions[indices[0]], usdMeshRestPositions[indices[2]] - usdMeshRestPositions[indices[0]])
 	);
 
 	mFaceMap[indices] = idx;
@@ -87,59 +74,70 @@ uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrim
 	return idx;
 }
 
-bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v) const {
+bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 	if(face_id == kInvalidTriFaceID) return false;
 	
 	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	return rayTriangleIntersect(pt, -face.getRestNormal(), mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], u, v);
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+	return rayTriangleIntersect(pt, -face.getRestNormal(), usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], u, v);
 }
 
-bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const {
+bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v, float& dist) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 	if(face_id == kInvalidTriFaceID) return false;
 	
 	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	return rayTriangleIntersect(pt, -face.getRestNormal(), mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], dist, u, v);
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+	return rayTriangleIntersect(pt, -face.getRestNormal(), usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], dist, u, v);
 }
 
-bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v) const {
+bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const uint32_t face_id, float& u, float& v) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 	if(face_id == kInvalidTriFaceID) return false;
 
 	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	return rayTriangleIntersect(orig, dir, mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], u, v);
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+	return rayTriangleIntersect(orig, dir, usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], u, v);
 }
 
-bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v, float& dist) const {
+bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const uint32_t face_id, float& u, float& v, float& dist) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 	if(face_id == kInvalidTriFaceID) return false;
 
 	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	return rayTriangleIntersect(orig, dir, mUsdMeshRestPositions[face.indices[0]], mUsdMeshRestPositions[face.indices[1]], mUsdMeshRestPositions[face.indices[2]], dist, u, v);
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+	return rayTriangleIntersect(orig, dir, usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], dist, u, v);
 }
 
-pxr::GfVec3f PhantomTrimesh::getInterpolatedRestPosition(uint32_t face_id, float u, float v) const {
+pxr::GfVec3f PhantomTrimesh::getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& face = mFaces[face_id];
-	return u * mUsdMeshRestPositions[face.indices[1]] + v * mUsdMeshRestPositions[face.indices[2]] + (1.f - u - v) * mUsdMeshRestPositions[face.indices[0]];
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+
+	return u * usdMeshRestPositions[face.indices[1]] + v * usdMeshRestPositions[face.indices[2]] + (1.f - u - v) * usdMeshRestPositions[face.indices[0]];
 };
 
 
-pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(uint32_t face_id, float u, float v) const {
+pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& face = mFaces[face_id];
-	return u * mUsdMeshLivePositions[face.indices[1]] + v * mUsdMeshLivePositions[face.indices[2]] + (1.f - u - v) * mUsdMeshLivePositions[face.indices[0]];
+	auto const& usdMeshLivePositions = mUsdMeshLivePositions.AsConst();
+
+	return u * usdMeshLivePositions[face.indices[1]] + v * usdMeshLivePositions[face.indices[2]] + (1.f - u - v) * usdMeshLivePositions[face.indices[0]];
 };
 
-pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(uint32_t face_id) const {
+pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(const uint32_t face_id) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& face = mFaces[face_id];
 	static constexpr float kInvThree = 1.f / 3.f;
-	return (mUsdMeshRestPositions[face.indices[0]] + mUsdMeshRestPositions[face.indices[1]] + mUsdMeshRestPositions[face.indices[2]]) * kInvThree;
+
+	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
+
+	return (usdMeshRestPositions[face.indices[0]] + usdMeshRestPositions[face.indices[1]] + usdMeshRestPositions[face.indices[2]]) * kInvThree;
 }
 
 bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const {
@@ -147,25 +145,10 @@ bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode t
 
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
 
-#if PIXAR_POINTS_SYNAMIC_ARRAY_USE_PXR
-	// Using pixar VtArray machinery
-
 	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
 		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
 		return false;
 	}
-#else
-	// Using std::vector
-
-	pxr::VtArray<pxr::GfVec3f> usdMeshLivePositions;
-
-	if(!mesh.GetPointsAttr().Get(&usdMeshLivePositions, time_code)) {
-		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
-		return false;
-	}
-
-	mUsdMeshLivePositions.assign(usdMeshLivePositions.begin(), usdMeshLivePositions.end());
-#endif
 
 	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
 		std::cerr << prim_handle.getPath() << " \"rest\" and live mesh point positions count mismatch!" << std::endl;
@@ -175,18 +158,20 @@ bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode t
 	return true;
 }
 
-const pxr::GfVec3f& PhantomTrimesh::getFaceRestNormal(uint32_t face_id) const {
+const pxr::GfVec3f& PhantomTrimesh::getFaceRestNormal(const uint32_t face_id) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	return mFaces[face_id].getRestNormal();
 }
 
-pxr::GfVec3f PhantomTrimesh::getFaceLiveNormal(uint32_t face_id) const {
+pxr::GfVec3f PhantomTrimesh::getFaceLiveNormal(const uint32_t face_id) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& indices = mFaces[face_id].indices;
+	auto const& usdMeshLivePositions = mUsdMeshLivePositions.AsConst();
+
 	return pxr::GfGetNormalized(
-		pxr::GfCross(mUsdMeshLivePositions[indices[1]] - mUsdMeshLivePositions[indices[0]], mUsdMeshLivePositions[indices[2]] - mUsdMeshLivePositions[indices[0]])
+		pxr::GfCross(usdMeshLivePositions[indices[1]] - usdMeshLivePositions[indices[0]], usdMeshLivePositions[indices[2]] - usdMeshLivePositions[indices[0]])
 	);
 }
 

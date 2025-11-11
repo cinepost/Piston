@@ -80,7 +80,7 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         }
     }
 
-    explicit KDTree(const Piston::PixarPointsDynamicArray& points, bool threaded = false) : root_(nullptr) {
+    explicit KDTree(const pxr::VtArray<pxr::GfVec3f>& points, bool threaded = false) : root_(nullptr) {
         static_assert(number_of_dimensions == 3);
         static_assert(std::is_same<CoordinateType, float>::value);
 

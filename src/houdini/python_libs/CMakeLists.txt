@@ -15,7 +15,7 @@ if(NOT Houdini_FOUND)
     message( FATAL_ERROR "Houdini installation not found !" )
 endif()
 
-set(PYTHON_LIBS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/houdini_${Houdini_VERSION}/python${_houdini_python_version}libs)
+set(HOUDINI_PYTHON_LIBS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/houdini_${Houdini_VERSION}/python${_houdini_python_version}libs)
 
 # Without this, any build libraries automatically have names "lib{x}.so"
 set(CMAKE_SHARED_MODULE_PREFIX "_")
@@ -38,7 +38,7 @@ endif()
 
 houdini_configure_target( piston
 	LIB_PREFIX ${CMAKE_SHARED_MODULE_PREFIX}
-	INSTDIR ${PYTHON_LIBS_INSTALL_DIR}
+	INSTDIR ${HOUDINI_PYTHON_LIBS_INSTALL_DIR}
 )
 
 if(WIN32)
@@ -54,9 +54,11 @@ install(
     RENAME
     	piston.py
     DESTINATION
-    	${PYTHON_LIBS_INSTALL_DIR}
+    	${HOUDINI_PYTHON_LIBS_INSTALL_DIR}
     PERMISSIONS 
     	OWNER_WRITE OWNER_READ
     	GROUP_READ OWNER_READ
         WORLD_READ
 )
+
+install(FILES pythonrc.py DESTINATION ${HOUDINI_PYTHON_LIBS_INSTALL_DIR})

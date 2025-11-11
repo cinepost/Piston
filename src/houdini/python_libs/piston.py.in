@@ -1,4 +1,5 @@
 import importlib
+import atexit
 import _piston
 
 #####################################################
@@ -18,3 +19,15 @@ def __getattr__(name):
 	return getattr(_piston, name)
 
 setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__BindMode)
+
+#
+# Debug stuff
+#
+
+def printProfilerMessage():
+	_piston.Profiler.printReport()
+
+def clearProfiler():
+	_piston.Profiler.clear()
+
+atexit.register(printProfilerMessage)
