@@ -20,7 +20,7 @@ using json = nlohmann::json;
 
 namespace Piston {
 
-std::string bson_to_hex_string(const std::vector<uint8_t>& vec);
+std::string bson_to_hex_string(const std::vector<uint8_t>& vec, bool truncate = false);
 std::vector<uint8_t> hex_string_to_bson(const std::string& str);
 
 bool isMeshGeoPrim(const pxr::UsdPrim& pGeoPrim);
@@ -52,6 +52,8 @@ class UsdPrimHandle {
 		void clearPrimBson(const std::string& identifier) const;
 
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
+
+		double getStageFPS() const;
 
 		/* Invalidate handle */
 		void clear();

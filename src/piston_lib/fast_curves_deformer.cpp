@@ -20,13 +20,13 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 
 namespace Piston {
 
-FastCurvesDeformer::FastCurvesDeformer(): BaseCurvesDeformer() {
-	dbg_printf("FastCurvesDeformer::FastCurvesDeformer()\n");
+FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
+	dbg_printf("FastCurvesDeformer::FastCurvesDeformer(%s)\n", name.c_str());
 	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
 }
 
-FastCurvesDeformer::SharedPtr FastCurvesDeformer::create() {
-	return SharedPtr(new FastCurvesDeformer());
+FastCurvesDeformer::SharedPtr FastCurvesDeformer::create(const std::string& name) {
+	return SharedPtr(new FastCurvesDeformer(name));
 }
 
 const std::string& FastCurvesDeformer::toString() const {
@@ -34,15 +34,15 @@ const std::string& FastCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
-bool FastCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
-	return __deform__(false, time_code);
+bool FastCurvesDeformer::deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+	return __deform__(pCurves, false, time_code);
 }
 
-bool FastCurvesDeformer::deformMtImpl(pxr::UsdTimeCode time_code) {
-	return __deform__(true, time_code);
+bool FastCurvesDeformer::deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+	return __deform__(pCurves, true, time_code);
 }
 
-bool FastCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_code) {
+bool FastCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	PROFILE("FastCurvesDeformer::__deform__");
 
 	assert(mpPhantomTrimeshData);
@@ -51,9 +51,6 @@ bool FastCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_c
 	if(!pPhantomTrimesh || !pPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
 		return false;
 	}
-
-	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	PxrCurvesContainer* pCurves = mpCurvesContainer.get();
 
 	if(!pCurves || pCurves->empty()) {
 		return false;
@@ -103,10 +100,6 @@ bool FastCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_c
 		mPool.wait();
 	} else {
 		func(0u, curveBinds.size());
-	}
-
-	if(!curves.GetPointsAttr().Set(pCurves->getPointsCacheVtArray(), time_code)) {
-		return false;
 	}
 
 	return true;
@@ -346,7 +339,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 	assert(pAdjacency);
 
 	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
 	std::vector<float> tmp_squared_distances(pAdjacency->getMaxFaceVertexCount());
@@ -365,7 +358,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 		std::vector<float>::iterator it = std::min_element(tmp_squared_distances.begin(), tmp_squared_distances.begin() + prim_vertex_count);
 		uint32_t local_index = std::distance(std::begin(tmp_squared_distances), it);
 
-		const uint32_t face_id = pPhantomTrimesh->getOrCreate(
+		const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
 			pAdjacency->getFaceVertex(prim_id, (local_index + prim_vertex_count - 1) % prim_vertex_count),
 			pAdjacency->getFaceVertex(prim_id, local_index), 
 			pAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
@@ -376,7 +369,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 		} else if ( prim_vertex_count > 3u){
 			// Try to bind using face "fan" triangulation
 			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
-				const uint32_t face_id = pPhantomTrimesh->getOrCreate(
+				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
 					pAdjacency->getFaceVertex(prim_id, local_index), 
 					pAdjacency->getFaceVertex(prim_id, (local_index + i) % prim_vertex_count),
 					pAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)

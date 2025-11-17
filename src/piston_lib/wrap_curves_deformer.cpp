@@ -19,15 +19,15 @@ namespace Piston {
 static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
-WrapCurvesDeformer::WrapCurvesDeformer(): BaseCurvesDeformer() {
-	dbg_printf("WrapCurvesDeformer::WrapCurvesDeformer()\n");
+WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
+	dbg_printf("WrapCurvesDeformer::WrapCurvesDeformer(%s)\n", name.c_str());
 
 	mpWrapCurvesDeformerData = std::make_unique<WrapCurvesDeformerData>();
 	mpWrapCurvesDeformerData->setBindMode(BindMode::SPACE);
 }
 
-WrapCurvesDeformer::SharedPtr WrapCurvesDeformer::create() {
-	return SharedPtr(new WrapCurvesDeformer());
+WrapCurvesDeformer::SharedPtr WrapCurvesDeformer::create(const std::string& name) {
+	return SharedPtr(new WrapCurvesDeformer(name));
 }
 
 const std::string& WrapCurvesDeformer::toString() const {
@@ -35,17 +35,17 @@ const std::string& WrapCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
-bool WrapCurvesDeformer::deformImpl(pxr::UsdTimeCode time_code) {
-	return __deform__(false, time_code);
+bool WrapCurvesDeformer::deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+	return __deform__(pCurves, false, time_code);
 }
 
-bool WrapCurvesDeformer::deformMtImpl(pxr::UsdTimeCode time_code) {
-	return __deform__(true, time_code);
+bool WrapCurvesDeformer::deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+	return __deform__(pCurves, true, time_code);
 }
 
-bool WrapCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_code) {
+bool WrapCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	PROFILE(multi_threaded ? "WrapCurvesDeformer::deformMtImpl" : "WrapCurvesDeformer::deformImpl");
-	
+
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
@@ -53,13 +53,12 @@ bool WrapCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_c
 		return false;
 	}
 
-	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	
-	if(!mpCurvesContainer || mpCurvesContainer->empty()) {
+	assert(pCurves);	
+	if(!pCurves || pCurves->empty()) {
 		return false;
 	}
 
-	std::vector<pxr::GfVec3f>& points = mpCurvesContainer->getPointsCache();
+	std::vector<pxr::GfVec3f>& points = pCurves->getPointsCache();
 
 	assert(points.size() == mpWrapCurvesDeformerData->getPointBinds().size());
 	assert(mpAdjacencyData);
@@ -75,14 +74,8 @@ bool WrapCurvesDeformer::__deform__(bool multi_threaded, pxr::UsdTimeCode time_c
 			result = deformImpl_DistMode(multi_threaded, points, time_code);
 			break;
 	}
-
-	if(!result) return false;
-
-	if(!curves.GetPointsAttr().Set(mpCurvesContainer->getPointsCacheVtArray(), time_code)) {
-		return false;
-	}
-
-	return true;
+	
+	return result;
 }
 
 static inline bool saturate(bool a) {
@@ -132,20 +125,34 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, std::vector<px
 
 	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
 
+	mLiveTriFaceNormals.resize(pPhantomTrimesh->getFaceCount());
+
+	auto face_normal_func = [&](const std::size_t start, const std::size_t end) {
+		const auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
+		for(uint32_t face_id = static_cast<uint32_t>(start); face_id < static_cast<uint32_t>(end); ++face_id) {
+			if(is_set(face_flags[face_id], PhantomTrimesh::TriFace::Flags::Bound)) {
+				mLiveTriFaceNormals[face_id] = pPhantomTrimesh->getFaceLiveNormal(face_id);
+			}
+		}
+	};
+
 	auto func = [&](const std::size_t start, const std::size_t end) {	
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
 
-			pxr::GfVec3f face_normal = pPhantomTrimesh->getFaceLiveNormal(bind.face_id);
+			const pxr::GfVec3f& face_normal = mLiveTriFaceNormals[bind.face_id];
 			points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + (face_normal * bind.dist);
 		}
 	};
 
 	if(multi_threaded) {
+		mPool.detach_blocks(0u, pPhantomTrimesh->getFaceCount(), face_normal_func);
+		mPool.wait();
 		mPool.detach_blocks(0u, pointBinds.size(), func);
 		mPool.wait();
 	} else {
+		face_normal_func(0u, pPhantomTrimesh->getFaceCount());
 		func(0u, pointBinds.size());
 	}
 
@@ -176,7 +183,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 
 	// Get phantom mesh
 	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
 	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid()) return false;
@@ -202,7 +209,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 
 			switch(face_vertex_count) {
 				case 3:
-					pPhantomTrimesh->getOrCreate(
+					pPhantomTrimesh->getOrCreateFaceID(
 						pAdjacency->getFaceVertex(face_id, 0), 
 						pAdjacency->getFaceVertex(face_id, 1),
 						pAdjacency->getFaceVertex(face_id, 2)
@@ -210,7 +217,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 					break;
 				default:
 					for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
-						pPhantomTrimesh->getOrCreate(
+						pPhantomTrimesh->getOrCreateFaceID(
 							pAdjacency->getFaceVertex(face_id, 0), 
 							pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
 							pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
@@ -244,7 +251,14 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 			default:
 				result = buildDeformerData_DistMode(rest_vertex_normals, rest_time_code);
 				break;
-		} 
+		}
+
+		auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
+		assert(face_flags.size() == pPhantomTrimesh->getFaceCount());
+
+		for(const auto& bind: mpWrapCurvesDeformerData->getPointBinds()) {
+			if(bind.isValid()) face_flags[bind.face_id] = PhantomTrimesh::TriFace::Flags::Bound;
+		}
 
 		threads_timer.stop();
 		dbg_printf("%zu threads finished in %s\n", mPool.get_thread_count(), threads_timer.toString().c_str());

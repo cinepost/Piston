@@ -92,7 +92,6 @@ const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t curve_idx) cons
 }
 
 pxr::VtArray<pxr::GfVec3f> PxrCurvesContainer::getPointsCacheVtArray() const {
-	pxr::Vt_ArrayForeignDataSource fd(nullptr, 1);
 	const bool addRef = true;
 	return {&mForeignDataSource, (pxr::GfVec3f*)mPointsCache.data(), mPointsCache.size(), addRef};
 }

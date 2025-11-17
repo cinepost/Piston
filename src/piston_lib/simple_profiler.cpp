@@ -21,7 +21,7 @@ void updateMaximum(std::atomic<T>& maximum_value, T const& value) noexcept {
 
 namespace sa {
 
-double mean(std::vector<uint64_t> const& v){
+double mean(const SimpleProfiler::acc_t& v){
 	if(v.empty()){
         return 0;
     }
@@ -29,11 +29,11 @@ double mean(std::vector<uint64_t> const& v){
     return static_cast<double>(std::reduce(v.begin(), v.end())) / static_cast<double>(v.size());
 }
 
-size_t summ(std::vector<uint64_t> const& v) {
+size_t summ(const SimpleProfiler::acc_t& v) {
 	return std::accumulate(v.begin(), v.end(), 0);
 }
 
-double stdv(std::vector<uint64_t> const& v, const double& mean) {
+double stdv(const SimpleProfiler::acc_t& v, const double& mean) {
 	double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
 	return std::sqrt((sq_sum / static_cast<double>(v.size())) - (mean * mean));
 }

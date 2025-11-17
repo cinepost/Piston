@@ -29,13 +29,18 @@ char const* greet() {
 using BSON = std::vector<uint8_t>;
 
 struct BSON_to_hex_string {
-    static PyObject *convert(BSON const& bson) {
-    	return boost::python::incref(boost::python::object(Piston::bson_to_hex_string(bson)).ptr());
-    }
+	static PyObject *convert(BSON const& bson) {
+#ifdef _DEBUG
+		bool truncate = false;
+#else
+		bool truncate = true;
+#endif
+		return boost::python::incref(boost::python::object(Piston::bson_to_hex_string(bson, truncate)).ptr());
+	}
 };
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_mt_overloads, Piston::BaseCurvesDeformer::deform_mt, 0, 1)
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_dbg_overloads, Piston::BaseCurvesDeformer::deform_dbg, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_overloads, Piston::BaseCurvesDeformer::writeJsonDataToPrim, 0, 1)
 
 
@@ -63,8 +68,11 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getMeshRestPositionAttrName", &BaseCurvesDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
 		.def("setСurvesSkinPrimAttrName", &BaseCurvesDeformer::setСurvesSkinPrimAttrName)
 		.def("getСurvesSkinPrimAttrName", &BaseCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
-		.def("deform_single_thread", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
-		.def("deform", &BaseCurvesDeformer::deform_mt, BaseCurvesDeformer_deform_mt_overloads(args("time_code")))
+		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
+		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
+
+		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
+		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_overloads(args("time_code")))
 
 		.def("setReadJsonDataFromPrim", &BaseCurvesDeformer::setReadJsonDataFromPrim)
 		.def("writeJsonDataToPrim", &BaseCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))

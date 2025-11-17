@@ -12,6 +12,14 @@ PhantomTrimesh::UniquePtr PhantomTrimesh::create() {
 	return std::make_unique<PhantomTrimesh>();
 }
 
+PhantomTrimesh::PhantomTrimesh() : mValid(false) {
+	static const size_t reserve_size = 1024;
+
+	mFaceMap.reserve(reserve_size);
+	mFaces.reserve(reserve_size);
+	mFaceFlags.reserve(reserve_size);
+}
+
 bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
 	mValid = false;
 
@@ -48,9 +56,22 @@ void PhantomTrimesh::invalidate() {
 
 	mFaceMap.clear();
 	mFaces.clear();
+	mFaceFlags.clear();
 }
 
-uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrimesh::PxrIndexType b, PhantomTrimesh::PxrIndexType c) const {	
+uint32_t PhantomTrimesh::getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const {
+	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
+	std::sort(indices.begin(), indices.end());
+
+	auto it = mFaceMap.find(indices);
+	if(it != mFaceMap.end()) {
+		return static_cast<uint32_t>(it->second);
+	}
+
+	return kInvalidTriFaceID;
+}
+
+uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, PhantomTrimesh::PxrIndexType b, PhantomTrimesh::PxrIndexType c) {	
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
 
@@ -62,6 +83,7 @@ uint32_t PhantomTrimesh::getOrCreate(PhantomTrimesh::PxrIndexType a, PhantomTrim
 	const uint32_t idx = static_cast<uint32_t>(mFaces.size());
 
 	mFaces.emplace_back(indices);
+	mFaceFlags.emplace_back(TriFace::Flags::None);
 
 	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
 
@@ -132,9 +154,8 @@ pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id,
 pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(const uint32_t face_id) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
-	auto const& face = mFaces[face_id];
 	static constexpr float kInvThree = 1.f / 3.f;
-
+	auto const& face = mFaces[face_id];
 	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
 
 	return (usdMeshRestPositions[face.indices[0]] + usdMeshRestPositions[face.indices[1]] + usdMeshRestPositions[face.indices[2]]) * kInvThree;
@@ -181,17 +202,22 @@ size_t PhantomTrimesh::calcHash() const {
 	for(const auto& pos: mUsdMeshRestPositions) {
 		hash += size_t(pos[0]) + size_t(pos[1]*10.f) + size_t(pos[2]*100.f);
 	}
-	hash += mUsdMeshRestPositions.size();
+	hash += mUsdMeshRestPositions.size() * 100;
 
 	for(const auto& face: mFaces) {
 		hash += face.calcHash();
 	}
-	hash += mFaces.size();
+	hash += mFaces.size() * 1000;
+
+	for(const TriFace::Flags flag: mFaceFlags) {
+		hash += static_cast<size_t>(flag);
+	}
+	hash += mFaceFlags.size() * 10000;
 
 	for( const auto& [k, v]: mFaceMap) {
 		hash += k[0] + k[1]*2 + k[2]*3 + v * 1000;
 	}
-	hash += mFaceMap.size();
+	hash += mFaceMap.size() * 100000;
 
 	return hash;
 }
@@ -209,7 +235,8 @@ void from_json(const json& j, PhantomTrimesh::TriFace& face) {
 
 static constexpr const char* kJUsdRestPositions = "rest_pos";
 static constexpr const char* kJFaces = "faces";
-static constexpr const char* kJaceMap = "face_map";
+static constexpr const char* kJFaceMap = "face_map";
+static constexpr const char* kJFaceFlags = "face_flags";
 static constexpr const char* kJDataHash = "hash";
 
 SerializablePhantomTrimesh::SerializablePhantomTrimesh() {
@@ -247,7 +274,8 @@ bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 	to_json(j[kJUsdRestPositions], mpTrimesh->mUsdMeshRestPositions);
 
 	j[kJFaces] = mpTrimesh->mFaces;
-	j[kJaceMap] = mpTrimesh->mFaceMap;
+	j[kJFaceMap] = mpTrimesh->mFaceMap;
+	j[kJFaceFlags] = mpTrimesh->mFaceFlags;
 
 	j[kJDataHash] = mpTrimesh->calcHash();
 
@@ -260,12 +288,18 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 
 	from_json(j[kJUsdRestPositions], mpTrimesh->mUsdMeshRestPositions);
 	mpTrimesh->mFaces = j[kJFaces].template get<std::vector<PhantomTrimesh::TriFace>>();
-	mpTrimesh->mFaceMap = j[kJaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
+	mpTrimesh->mFaceMap = j[kJFaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
+	mpTrimesh->mFaceFlags = j[kJFaceFlags].template get<std::vector<PhantomTrimesh::TriFace::Flags>>();
 
 	const size_t json_trimesh_data_hash = j[kJDataHash];
 	const size_t calc_trimesh_data_hash = mpTrimesh->calcHash();
 
 	if(calc_trimesh_data_hash != json_trimesh_data_hash) {
+		return false;
+	}
+
+	if(mpTrimesh->mFaces.size() != mpTrimesh->mFaceFlags.size()) {
+		std::cerr << "Trimesh face and face_flags array sizes mismatch!" << std::endl;
 		return false;
 	}
 
@@ -276,10 +310,14 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	return true;
 }
 
-const PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() const {
+PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {
 	if(!isPopulated()) return nullptr;
 
 	return mpTrimesh.get();
+}
+
+const PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() const {
+	return this->getTrimesh();
 }
 
 const std::string& SerializablePhantomTrimesh::typeName() const {

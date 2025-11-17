@@ -38,6 +38,14 @@ void UsdPrimHandle::clear() {
 	mPrim = pxr::UsdPrim();
 }
 
+double UsdPrimHandle::getStageFPS() const {
+	if(!isValid()) {
+		return 0.0;
+	}
+
+	return getStage()->GetFramesPerSecond();
+}
+
 void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 	pxr::UsdPrim prim = getPrim();
 	const pxr::TfToken token(identifier);
@@ -142,14 +150,19 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	return true;
 }
 
-std::string bson_to_hex_string(const std::vector<uint8_t>& vec) {
+std::string bson_to_hex_string(const std::vector<uint8_t>& vec, bool truncate) {
   std::stringstream ss;
 
   ss << std::hex << std::setfill('0');
 
+  static const size_t truncated_string_max_size = 64;
+  const size_t _size = truncate ? std::min(truncated_string_max_size, vec.size()) : vec.size(); 
+
   for (size_t i = 0; i < vec.size(); ++i) {
     ss << std::hex << std::setw(2) << static_cast<int>(vec[i]);
   }
+
+  if(truncate) ss << "...";
 
   return ss.str();
 }

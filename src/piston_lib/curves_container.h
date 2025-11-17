@@ -38,7 +38,10 @@ class PxrCurvesContainer {
 		int 		getCurveVertexCount(size_t curve_idx) const { return mCurveVertexCounts[curve_idx]; }
 
 		std::vector<pxr::GfVec3f>& getPointsCache() { return mPointsCache; }
+		std::vector<pxr::GfVec3f>* getPointsCachePtr() { return &mPointsCache; }
+
 		const std::vector<pxr::GfVec3f>& getPointsCache() const { return mPointsCache; }
+		const std::vector<pxr::GfVec3f>* getPointsCachePtr() const { return &mPointsCache; }
 
 		pxr::VtArray<pxr::GfVec3f> getPointsCacheVtArray() const;
 

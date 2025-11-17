@@ -1,12 +1,14 @@
+#include "curves_deformer_factory.h"
 #include "base_curves_deformer.h"
 #include "geometry_tools.h"
+#include "pxr_points_lru_cache.h"
 
 #include <thread>
 
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer(): mPool(std::thread::hardware_concurrency() - 1) {
+BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): mPool(std::thread::hardware_concurrency() - 1), mType(t), mName(name) {
 	dbg_printf("BaseCurvesDeformer::BaseCurvesDeformer()\n");
 
 	makeDirty();
@@ -71,6 +73,8 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {
 	if(!mDirty) return true;
 
+	SimpleProfiler::clear();
+
 	if(!mMeshGeoPrimHandle || !mCurvesGeoPrimHandle) {
 		std::cerr << "No mesh or curves UsdPrim is set !" << std::endl;
 		return false;
@@ -117,20 +121,82 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code)
 	return true;
 }
 
-bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code) {	
-	if(!buildDeformerData(time_code)) {
-		return false;
-	}
-
-	return deformImpl(time_code);
+bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code) {	
+	return deform(time_code);
 }
 
-bool BaseCurvesDeformer::deform_mt(pxr::UsdTimeCode time_code) {	
+bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {	
 	if(!buildDeformerData(time_code)) {
 		return false;
 	}
 
-	return deformMtImpl(time_code);
+	auto func = [this](bool multi_threaded, PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+		switch(multi_threaded) {
+			case true:
+				return deformMtImpl(pCurves, time_code);
+			default:
+				return deformImpl(pCurves, time_code);
+		}
+	};
+
+	const PxrPointsLRUCache::CompositeKey curr_key = {mName, time_code};
+	PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
+	const std::vector<pxr::GfVec3f>* deformed_points_list_ptr = pPointsLRUCache->get(curr_key);
+	if(!deformed_points_list_ptr) {
+		if (!func(multi_threaded, mpCurvesContainer.get(), time_code)) {
+			return false;
+		}
+		//deformed_points_list_ptr = pPointsLRUCache->put(curr_key, mpCurvesContainer->getPointsCache());
+		deformed_points_list_ptr = mpCurvesContainer->getPointsCachePtr();
+	}
+
+	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
+	//if(!curves.GetPointsAttr().Set(mpCurvesContainer->getPointsCacheVtArray(), time_code)) {
+	//	return false;
+	//}
+
+	pxr::VtArray<pxr::GfVec3f> _points_tmp_vt_array = {&mForeignDataSource, (pxr::GfVec3f*)deformed_points_list_ptr->data(), deformed_points_list_ptr->size(), false};
+	if(!curves.GetPointsAttr().Set(_points_tmp_vt_array, time_code)) {
+		return false;
+	}
+
+/*
+	if(mCalcMotionVectors) {
+
+		std::cout << "TimeCode: " << std::to_string(time_code.GetValue()) << std::endl;
+		std::cout << "Mesh prim stage FPS: " << std::to_string(mMeshGeoPrimHandle.getStageFPS()) << std::endl;
+
+		Points* pPointsFrom = isCenteredMotionBlur() ? nullptr : ;
+		Points* pPointsTo = isCenteredMotionBlur() ? nullptr : ;
+
+		PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
+
+		if(pPointsLRUCache) {
+			Points* pPointsFrom = isCenteredMotionBlur() ? ;
+			Points* pPointsTo = isCenteredMotionBlur() ? ;
+
+			pxr::UsdTimeCode t_from = time_code - 1.0;
+			copnst PxrPointsLRUCache::CompositeKey key_from = {mName, t_from}
+			Points* pPoints = pPointsLRUCache->get(key_from);
+			if(!pPoints) {
+				// There is no cached points data. Cache current values and calculate one needed
+
+				pPointsLRUCache->put(curr_key, mpCurvesContainer->getPointsCache());
+
+				if(!func(multi_threaded, mpCurvesContainer.get(), t_from)) {
+					std::cerr << "Error computing deformation for motion vectors at " << std::to_string(t_from.GetValue()); << std::endl;
+					return false;
+				}
+			} else {
+				dbg_printf("We ve got cached points data !!!\n");
+			}
+		}
+
+		mVelocities.resize(mpCurvesContainer->getPointsCache().size());
+	}
+*/
+
+	return true;
 }
 
 void BaseCurvesDeformer::setMeshRestPositionAttrName(const std::string& name) {
@@ -142,6 +208,12 @@ void BaseCurvesDeformer::setMeshRestPositionAttrName(const std::string& name) {
 void BaseCurvesDeformer::setСurvesSkinPrimAttrName(const std::string& name) {
 	if(mСurvesSkinPrimAttrName == name) return;
 	mСurvesSkinPrimAttrName = name;
+	makeDirty();
+}
+
+void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
+	if(mVelocityAttrName == name) return;
+	mVelocityAttrName = name;
 	makeDirty();
 }
 

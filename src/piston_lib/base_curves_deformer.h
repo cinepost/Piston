@@ -25,6 +25,7 @@ namespace Piston {
 namespace {
 	const std::string kMeshRestPositionAttrName = "rest_p";
 	const std::string kСurvesSkinPrimAttrName = "skinprim";
+	const std::string kVelocitiAttrName = "velocities";
 }
 
 class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeformer> {
@@ -35,6 +36,12 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 			FAST, 
 			WRAP, 
 			UNKNOWN 
+		};
+
+		enum class MotionBlurDirection {
+			TRAILING,
+			CENTERED,
+			LEADING
 		};
 		
 	public:
@@ -53,19 +60,24 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		void setСurvesSkinPrimAttrName(const std::string& name);
 		const std::string& getСurvesSkinPrimAttrName() const { return mСurvesSkinPrimAttrName; }
 
-		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
-		bool deform_mt(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		void setVelocityAttrName(const std::string& name);
+		const std::string& getVelocityAttrName() const { return mVelocityAttrName; }
+
+		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
+		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		virtual const std::string& toString() const;
 
 		const DeformerStats& getStats() const { return mStats; }
 
 	protected:
-		BaseCurvesDeformer();
+		BaseCurvesDeformer(const Type type, const std::string& name);
 
-		virtual bool deformImpl(pxr::UsdTimeCode time_code) = 0;
-		virtual bool deformMtImpl(pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) = 0;
 		void makeDirty();
+
+		bool isCenteredMotionBlur() const { return mMotionBlurDirection == MotionBlurDirection::CENTERED; }
 		
 	protected:
 		bool mDirty = true;
@@ -78,6 +90,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		std::string   mMeshRestPositionAttrName = kMeshRestPositionAttrName;
 		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
+		std::string   mVelocityAttrName = kVelocitiAttrName;
 		
 		PxrCurvesContainer::UniquePtr mpCurvesContainer;
 
@@ -88,10 +101,20 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
+		Type mType;
+		std::string mName;
+
 		pxr::UsdStageRefPtr mpTempStage;
+
+		bool mCalcMotionVectors = true;
+		MotionBlurDirection mMotionBlurDirection = MotionBlurDirection::TRAILING;
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;
+
+		std::vector<pxr::GfVec3f> mVelocities;
+
+		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
 };
 
 } // namespace Piston

@@ -27,16 +27,16 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 	public:
 		~FastCurvesDeformer();
 
-		static SharedPtr create();
+		static SharedPtr create(const std::string& name);
 		virtual const std::string& toString() const override;
 
 	protected:
-		FastCurvesDeformer();
-		virtual bool deformImpl(pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(pxr::UsdTimeCode time_code) override;
+		FastCurvesDeformer(const std::string& name);
+		virtual bool deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) override;
+		virtual bool deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) override;
 
 	private:
-		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
+		bool __deform__(PxrCurvesContainer* pCurves, bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
 		virtual bool writeJsonDataToPrimImpl() const override;
