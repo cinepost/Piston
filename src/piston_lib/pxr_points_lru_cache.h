@@ -7,6 +7,7 @@
 #include <pxr/usd/usd/timeCode.h>
 #include <pxr/base/gf/matrix3f.h>
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
 #include <list>
@@ -14,6 +15,8 @@
 
 
 namespace Piston {
+
+class CPxrPointsLRUCacheShrinkLock;
 
 class PxrPointsLRUCache {
 	public:
@@ -58,7 +61,12 @@ class PxrPointsLRUCache {
 
 		size_t size() const { return mCacheItemsMap.size(); }
 
+		std::string getCacheUtilizationString() const;
+
 	private:
+		static constexpr size_t kInvalidUsedMemSize = std::numeric_limits<size_t>::max();
+
+
 		PxrPointsLRUCache(const size_t max_mem_size_bytes);
 	
 		void reduceMemUsage(const size_t mem_size_bytes);
@@ -66,8 +74,38 @@ class PxrPointsLRUCache {
 	private:
 		mutable std::list<key_value_pair_t> mCacheItemsList;
 		std::unordered_map<CompositeKey, list_iterator_t, CompositeKey::Hasher> mCacheItemsMap;
-		size_t mMaxMemSizeBytes;
 		
+		size_t mMaxMemSizeBytes;
+		mutable size_t mCurrentMemSizeBytes;
+
+		void shrink_lock() { mShrinkLock = true; }
+		void shrink_unlock() { mShrinkLock = false; reduceMemUsage(mMaxMemSizeBytes); }
+
+		std::atomic<bool> mShrinkLock;
+
+		friend class PxrPointsLRUCacheShrinkLock;
+};
+
+class PxrPointsLRUCacheShrinkLock{
+public:
+    PxrPointsLRUCacheShrinkLock(PxrPointsLRUCache* m) : mValid(false), mMtx(*m) {
+    	if(m) {
+    		mValid = true;
+    		mMtx.shrink_lock();
+    	}
+    }
+
+    PxrPointsLRUCacheShrinkLock(PxrPointsLRUCache & m) : mValid(true), mMtx(m){
+        mMtx.shrink_lock();
+    }
+    ~PxrPointsLRUCacheShrinkLock(){
+        if(mValid){
+        	mMtx.shrink_unlock();
+    	}
+    }
+private:
+	bool mValid;
+    PxrPointsLRUCache & mMtx;
 };
 
 } // namespace Piston

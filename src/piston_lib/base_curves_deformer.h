@@ -16,6 +16,7 @@
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
 
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -96,13 +97,20 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		BS::thread_pool<BS::tp::none> mPool;
 		DeformerStats mStats;
+
 	private:
 		bool buildDeformerData(pxr::UsdTimeCode reference_time_code);
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
+		const std::string& uniqueName() const { return mUniqueName; }
+
+		static std::atomic_uint32_t current_id;
+
 		Type mType;
 		std::string mName;
+		uint32_t mID;
+		std::string mUniqueName;
 
 		pxr::UsdStageRefPtr mpTempStage;
 
@@ -115,6 +123,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		std::vector<pxr::GfVec3f> mVelocities;
 
 		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
+		pxr::Vt_ArrayForeignDataSource 	mVelocitiesForeignDataSource;
 };
 
 } // namespace Piston

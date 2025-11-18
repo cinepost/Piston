@@ -46,6 +46,14 @@ double UsdPrimHandle::getStageFPS() const {
 	return getStage()->GetFramesPerSecond();
 }
 
+double UsdPrimHandle::getStageTimeCodesPerSecond() const {
+	if(!isValid()) {
+		return 1.0;
+	}
+
+	return getStage()->GetTimeCodesPerSecond();
+}
+
 void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 	pxr::UsdPrim prim = getPrim();
 	const pxr::TfToken token(identifier);

@@ -8,8 +8,10 @@
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): mPool(std::thread::hardware_concurrency() - 1), mType(t), mName(name) {
+BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): mPool(std::thread::hardware_concurrency() - 1), mType(t), mName(name), mID(current_id++) {
 	dbg_printf("BaseCurvesDeformer::BaseCurvesDeformer()\n");
+
+	mUniqueName = toString() + mName + std::to_string(mID);
 
 	makeDirty();
 	mpTempStage = pxr::UsdStage::CreateInMemory();
@@ -130,7 +132,8 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		return false;
 	}
 
-	auto func = [this](bool multi_threaded, PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+	auto deformPoints = [this](bool multi_threaded, PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+		printf("lambda deformPoints\n");
 		switch(multi_threaded) {
 			case true:
 				return deformMtImpl(pCurves, time_code);
@@ -139,62 +142,67 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		}
 	};
 
-	const PxrPointsLRUCache::CompositeKey curr_key = {mName, time_code};
-	PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
-	const std::vector<pxr::GfVec3f>* deformed_points_list_ptr = pPointsLRUCache->get(curr_key);
-	if(!deformed_points_list_ptr) {
-		if (!func(multi_threaded, mpCurvesContainer.get(), time_code)) {
-			return false;
+	auto getDeformedPoints = [&deformPoints](bool multi_threaded, PxrCurvesContainer* pCurves, PxrPointsLRUCache* pPointsLRUCache, const PxrPointsLRUCache::CompositeKey& key) {
+		printf("lambda getDeformedPoints\n");
+		static const std::vector<pxr::GfVec3f>* sNull = nullptr;
+		const std::vector<pxr::GfVec3f>* _points_list_ptr = pPointsLRUCache ? pPointsLRUCache->get(key) : nullptr;
+		if(!_points_list_ptr) {
+			if (!deformPoints(multi_threaded, pCurves, key.time)) {
+				return sNull;
+			}
+			_points_list_ptr = pPointsLRUCache ? pPointsLRUCache->put(key, pCurves->getPointsCache()) : pCurves->getPointsCachePtr();
 		}
-		//deformed_points_list_ptr = pPointsLRUCache->put(curr_key, mpCurvesContainer->getPointsCache());
-		deformed_points_list_ptr = mpCurvesContainer->getPointsCachePtr();
-	}
+		return _points_list_ptr;
+	};
+
+	const PxrPointsLRUCache::CompositeKey curr_key = {uniqueName(), time_code};
+	PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
+
+	PxrPointsLRUCacheShrinkLock cache_shrink_lock(pPointsLRUCache); // avoid cache shrinking during deformation stage
+	printf("pPointsLRUCache locked\n");
+
+	const std::vector<pxr::GfVec3f>* deformed_points_list_ptr = getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key);
 
 	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	//if(!curves.GetPointsAttr().Set(mpCurvesContainer->getPointsCacheVtArray(), time_code)) {
-	//	return false;
-	//}
-
 	pxr::VtArray<pxr::GfVec3f> _points_tmp_vt_array = {&mForeignDataSource, (pxr::GfVec3f*)deformed_points_list_ptr->data(), deformed_points_list_ptr->size(), false};
 	if(!curves.GetPointsAttr().Set(_points_tmp_vt_array, time_code)) {
 		return false;
 	}
 
-/*
 	if(mCalcMotionVectors) {
+		const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::LEADING) ? (time_code.GetValue() - 1.0) : time_code};
+		const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::TRAILING) ? (time_code.GetValue() + 1.0) : time_code};
 
-		std::cout << "TimeCode: " << std::to_string(time_code.GetValue()) << std::endl;
-		std::cout << "Mesh prim stage FPS: " << std::to_string(mMeshGeoPrimHandle.getStageFPS()) << std::endl;
+		dbg_printf("MBlur: %s to %s\n", std::to_string(key_from.time.GetValue()).c_str(), std::to_string(key_to.time.GetValue()).c_str());
 
-		Points* pPointsFrom = isCenteredMotionBlur() ? nullptr : ;
-		Points* pPointsTo = isCenteredMotionBlur() ? nullptr : ;
-
-		PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
-
-		if(pPointsLRUCache) {
-			Points* pPointsFrom = isCenteredMotionBlur() ? ;
-			Points* pPointsTo = isCenteredMotionBlur() ? ;
-
-			pxr::UsdTimeCode t_from = time_code - 1.0;
-			copnst PxrPointsLRUCache::CompositeKey key_from = {mName, t_from}
-			Points* pPoints = pPointsLRUCache->get(key_from);
-			if(!pPoints) {
-				// There is no cached points data. Cache current values and calculate one needed
-
-				pPointsLRUCache->put(curr_key, mpCurvesContainer->getPointsCache());
-
-				if(!func(multi_threaded, mpCurvesContainer.get(), t_from)) {
-					std::cerr << "Error computing deformation for motion vectors at " << std::to_string(t_from.GetValue()); << std::endl;
-					return false;
-				}
-			} else {
-				dbg_printf("We ve got cached points data !!!\n");
-			}
-		}
+		const std::vector<pxr::GfVec3f>* pPointsFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from);
+		const std::vector<pxr::GfVec3f>* pPointsTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to);
 
 		mVelocities.resize(mpCurvesContainer->getPointsCache().size());
+
+		const pxr::GfVec3f* p_pts_from_ptr = pPointsFrom->data();
+		const pxr::GfVec3f* p_pts_to_ptr = pPointsTo->data();
+
+		const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) / static_cast<float>(mMeshGeoPrimHandle.getStageTimeCodesPerSecond());
+
+		for(size_t i = 0; i < mVelocities.size(); ++i) {
+			mVelocities[i] = (p_pts_to_ptr[i] - p_pts_from_ptr[i]) * k;
+		}
+
+		if(pxr::UsdAttribute attr_v = curves.GetVelocitiesAttr()) {
+			pxr::VtArray<pxr::GfVec3f> _velocities_tmp_vt_array = {&mVelocitiesForeignDataSource, (pxr::GfVec3f*)mVelocities.data(), mVelocities.size(), false};
+			if(!attr_v.Set(_velocities_tmp_vt_array, time_code)) {
+				std::cerr << "Error setting velocities attribute !\n";
+				return false;
+			}
+		} else {
+			std::cerr << mCurvesGeoPrimHandle.getName() << " has no velocities attribute !\n";
+		}
 	}
-*/
+
+	if(pPointsLRUCache) {
+		dbg_printf("Cache utilization %s%\n", pPointsLRUCache->getCacheUtilizationString().c_str());
+	}
 
 	return true;
 }
@@ -228,3 +236,5 @@ const std::string& BaseCurvesDeformer::toString() const {
 }
 
 } // namespace Piston
+
+std::atomic_uint32_t Piston::BaseCurvesDeformer::current_id = 0;

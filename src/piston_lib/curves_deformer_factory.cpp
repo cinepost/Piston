@@ -51,11 +51,20 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 }
 
 PxrPointsLRUCache* CurvesDeformerFactory::getPxrPointsLRUCachePtr() {
-	if(!mpPxrPointsLRUCache) {
+	if(!mpPxrPointsLRUCache && mCacheEnabled) {
 		mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
 	}
 
 	return mpPxrPointsLRUCache.get();
+}
+
+void CurvesDeformerFactory::setCacheState(bool state) {
+	if(mCacheEnabled == state) return;
+
+	mCacheEnabled = state;
+	if(!mCacheEnabled) {
+		mpPxrPointsLRUCache = nullptr;
+	}
 }
 
 } // namespace Piston

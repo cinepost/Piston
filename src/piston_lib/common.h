@@ -54,6 +54,7 @@ class UsdPrimHandle {
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
 
 		double getStageFPS() const;
+		double getStageTimeCodesPerSecond() const;
 
 		/* Invalidate handle */
 		void clear();
