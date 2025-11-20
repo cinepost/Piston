@@ -44,10 +44,7 @@ class CurvesDeformerFactory {
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 
-		void setCacheState(bool state);
-		bool getCacheState() const { return mCacheEnabled; }
-
-	    PxrPointsLRUCache* getPxrPointsLRUCachePtr();
+	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
 
 	private:
 		BaseCurvesDeformer::SharedPtr getDeformer(BaseCurvesDeformer::Type type, const std::string& name);
@@ -55,7 +52,6 @@ class CurvesDeformerFactory {
 	private:
 		std::map<Key, BaseCurvesDeformer::SharedPtr> mDeformers;
 		PxrPointsLRUCache::UniquePtr mpPxrPointsLRUCache;
-		bool mCacheEnabled;
 
 		// Mutex to ensure thread safety
     	static std::mutex mMutex;
@@ -63,7 +59,7 @@ class CurvesDeformerFactory {
     	// Static pointer to the CurvesDeformerFactory instance
     	static CurvesDeformerFactory* mInstancePtr;
 
-    	CurvesDeformerFactory(): mCacheEnabled(kDefaultCacheState) {}
+    	CurvesDeformerFactory();
 };
 
 } // namespace Piston

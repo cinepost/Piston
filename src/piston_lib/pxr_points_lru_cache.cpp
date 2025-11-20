@@ -1,12 +1,11 @@
 #include "pxr_points_lru_cache.h"
 
-static inline size_t pointsArrayMemUsageRequirements(const std::vector<pxr::GfVec3f>& points) {
-	return points.size() * sizeof(pxr::GfVec3f);
-}
 
 namespace Piston {
 
-PxrPointsLRUCache::PxrPointsLRUCache(const size_t max_mem_size_bytes): mMaxMemSizeBytes(max_mem_size_bytes), mCurrentMemSizeBytes(0), mShrinkLock(false) {
+static const size_t kMinEntries = 4; // 1 frame ofo current deformed curve points, 2 more frames for worst case motoin blur and 1 frame for velocities.
+
+PxrPointsLRUCache::PxrPointsLRUCache(const size_t max_mem_size_bytes): mMaxMemSizeBytes(max_mem_size_bytes), mCurrentMemSizeBytes(0), mShrinkLock(false), mMinEntries(kMinEntries) {
 
 }
 
@@ -22,18 +21,28 @@ size_t PxrPointsLRUCache::getMemSize() const {
 	mCurrentMemSizeBytes = 0;
 
 	for(const auto& pair: mCacheItemsList) {
-		mCurrentMemSizeBytes += pointsArrayMemUsageRequirements(pair.second);
+		mCurrentMemSizeBytes += pair.second.sizeInBytes();
 	}
 
 	return mCurrentMemSizeBytes;
 }
 
-const PxrPointsLRUCache::PointsList* PxrPointsLRUCache::put(const PxrPointsLRUCache::CompositeKey& key, const PxrPointsLRUCache::PointsList& points) {
-	const size_t new_points_mem_reqs = pointsArrayMemUsageRequirements(points);
+PointsList* PxrPointsLRUCache::put(const CompositeKey& key, size_t points_count, bool init_to_zero) {
+	assert(points_count > 0);
+
+	PointsList points(points_count);
+
+	if(init_to_zero) points.fillWithZero();
+
+	return put(key, std::move(points));
+}
+
+PointsList* PxrPointsLRUCache::put(const PxrPointsLRUCache::CompositeKey& key, PointsList&& points) {
+	const size_t new_points_mem_reqs = points.sizeInBytes();
 	reduceMemUsage(mMaxMemSizeBytes - new_points_mem_reqs);
 
 	auto it = mCacheItemsMap.find(key);
-	mCacheItemsList.push_front(key_value_pair_t(key, points));
+	mCacheItemsList.push_front(key_value_pair_t(key, std::move(points)));
 	if (it != mCacheItemsMap.end()) {
 		mCacheItemsList.erase(it->second);
 		mCacheItemsMap.erase(it);
@@ -46,7 +55,7 @@ const PxrPointsLRUCache::PointsList* PxrPointsLRUCache::put(const PxrPointsLRUCa
 	return &mCacheItemsList.begin()->second;
 }
 
-const PxrPointsLRUCache::PointsList* PxrPointsLRUCache::get(const PxrPointsLRUCache::CompositeKey& key) const {
+const PointsList* PxrPointsLRUCache::get(const PxrPointsLRUCache::CompositeKey& key) const {
 	auto it = mCacheItemsMap.find(key);
 	if (it == mCacheItemsMap.end()) {
 		dbg_printf("There is no such key (%s) in PxrPointsLRUCache.\n", key.name.c_str());
@@ -70,7 +79,7 @@ void PxrPointsLRUCache::setMaxMemSize(size_t max_mem_size_bytes) {
 void PxrPointsLRUCache::reduceMemUsage(const size_t mem_size_bytes) {
 	if(mShrinkLock) return;
 
-	while (getMemSize() > mem_size_bytes) {
+	while ((getMemSize() > mem_size_bytes) && (mCacheItemsList.size() > mMinEntries)) {
 		auto last = mCacheItemsList.end();
 		last--;
 		mCacheItemsMap.erase(last->first);

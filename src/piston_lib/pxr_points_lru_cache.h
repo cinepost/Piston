@@ -37,8 +37,6 @@ class PxrPointsLRUCache {
 			};
 		};
 
-		using PointsList = std::vector<pxr::GfVec3f>;
-
 		typedef typename std::pair<CompositeKey, PointsList> key_value_pair_t;
 		typedef typename std::list<key_value_pair_t>::iterator list_iterator_t;
 
@@ -47,7 +45,8 @@ class PxrPointsLRUCache {
 
 	public:
 
-		const PointsList* put(const CompositeKey& key, const PointsList& points);
+		PointsList* put(const CompositeKey& key, size_t points_count, bool init_to_zero = false);
+		PointsList* put(const CompositeKey& key, PointsList&& points);
 		const PointsList* get(const CompositeKey& key) const;
 
 		bool exists(const CompositeKey& key) const {
@@ -77,6 +76,8 @@ class PxrPointsLRUCache {
 		
 		size_t mMaxMemSizeBytes;
 		mutable size_t mCurrentMemSizeBytes;
+
+		size_t mMinEntries;
 
 		void shrink_lock() { mShrinkLock = true; }
 		void shrink_unlock() { mShrinkLock = false; reduceMemUsage(mMaxMemSizeBytes); }
@@ -108,12 +109,10 @@ private:
     PxrPointsLRUCache & mMtx;
 };
 
-} // namespace Piston
-
-using Key = Piston::PxrPointsLRUCache::CompositeKey;
-
-inline std::string to_string(const Key& key) {
+inline std::string to_string(const Piston::PxrPointsLRUCache::CompositeKey& key) {
 	return key.name + ":" + std::to_string(key.time.GetValue());
 }
+
+} // namespace Piston
 
 #endif // PISTON_LIB_PXR_POINTS_LRU_CACHE_H_

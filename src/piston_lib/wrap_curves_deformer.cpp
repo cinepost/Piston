@@ -35,15 +35,15 @@ const std::string& WrapCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
-bool WrapCurvesDeformer::deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
-	return __deform__(pCurves, false, time_code);
+bool WrapCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	return __deform__(points, false, time_code);
 }
 
-bool WrapCurvesDeformer::deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
-	return __deform__(pCurves, true, time_code);
+bool WrapCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	return __deform__(points, true, time_code);
 }
 
-bool WrapCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_threaded, pxr::UsdTimeCode time_code) {
+bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	PROFILE(multi_threaded ? "WrapCurvesDeformer::deformMtImpl" : "WrapCurvesDeformer::deformImpl");
 
 	assert(mpPhantomTrimeshData);
@@ -52,13 +52,6 @@ bool WrapCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_thre
 	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid() || !pPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
 		return false;
 	}
-
-	assert(pCurves);	
-	if(!pCurves || pCurves->empty()) {
-		return false;
-	}
-
-	std::vector<pxr::GfVec3f>& points = pCurves->getPointsCache();
 
 	assert(points.size() == mpWrapCurvesDeformerData->getPointBinds().size());
 	assert(mpAdjacencyData);
@@ -82,7 +75,7 @@ static inline bool saturate(bool a) {
 	return a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
 }
 
-bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
+bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
@@ -116,7 +109,7 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, std::vector<p
     return true;
 }
 
-bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code) {
+bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);

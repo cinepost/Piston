@@ -2,7 +2,7 @@
 
 namespace Piston {
 
-static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256; 
+static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
 
 CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
     if (mInstancePtr == nullptr) {
@@ -50,22 +50,10 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 	SimpleProfiler::printReport();
 }
 
-PxrPointsLRUCache* CurvesDeformerFactory::getPxrPointsLRUCachePtr() {
-	if(!mpPxrPointsLRUCache && mCacheEnabled) {
-		mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
-	}
-
-	return mpPxrPointsLRUCache.get();
+CurvesDeformerFactory::CurvesDeformerFactory() {
+	mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
 }
 
-void CurvesDeformerFactory::setCacheState(bool state) {
-	if(mCacheEnabled == state) return;
-
-	mCacheEnabled = state;
-	if(!mCacheEnabled) {
-		mpPxrPointsLRUCache = nullptr;
-	}
-}
 
 } // namespace Piston
 

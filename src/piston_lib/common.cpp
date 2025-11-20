@@ -158,6 +158,29 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	return true;
 }
 
+PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), false) {
+	assert(size > 0);
+	calcSizeInBytes();
+}
+
+PointsList::PointsList(Piston::PointsList&& other): mPoints(std::move(other.mPoints)), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), false), mSizeInBytes(other.mSizeInBytes) {
+}
+
+void PointsList::resize(size_t size) {
+	mPoints.resize(size);
+	mVtArray.resize(size);
+	calcSizeInBytes();
+}
+
+void PointsList::fillWithZero() {
+	static const pxr::GfVec3f zero = {0.0, 0.0, 0.0};
+	std::fill(mPoints.begin(), mPoints.end(), zero);
+}
+
+void PointsList::calcSizeInBytes() const {
+	mSizeInBytes = mPoints.size() * sizeof(pxr::GfVec3f);
+}
+
 std::string bson_to_hex_string(const std::vector<uint8_t>& vec, bool truncate) {
   std::stringstream ss;
 

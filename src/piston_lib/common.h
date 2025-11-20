@@ -67,6 +67,41 @@ class UsdPrimHandle {
 
 };
 
+class PointsList {
+	public:
+		PointsList(size_t size);
+
+		PointsList(Piston::PointsList&& other);
+
+		size_t size() const { return mPoints.size(); }
+
+		pxr::GfVec3f& operator [](size_t idx) { return mPoints[idx]; }
+		const pxr::GfVec3f& operator [](size_t idx) const { return mPoints[idx]; }
+
+		pxr::GfVec3f* data() { return mPoints.data(); }
+		const pxr::GfVec3f* data() const { return mPoints.data(); }
+
+		std::vector<pxr::GfVec3f>& getVector() { return mPoints; }
+		const std::vector<pxr::GfVec3f>& getVector() const { return mPoints; }
+
+		const pxr::VtArray<pxr::GfVec3f>& getVtArray() const { return mVtArray; }
+
+		void resize(size_t size);
+
+		void fillWithZero();
+
+		size_t sizeInBytes() const { return mSizeInBytes; }
+
+	private:
+		std::vector<pxr::GfVec3f> 	mPoints;
+		pxr::VtArray<pxr::GfVec3f> 	mVtArray;
+		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
+
+		void calcSizeInBytes() const;
+
+		mutable size_t mSizeInBytes;
+};
+
 } // namespace Piston
 
 #endif // PISTON_LIB_COMMON_H_

@@ -34,25 +34,21 @@ const std::string& FastCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
-bool FastCurvesDeformer::deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
-	return __deform__(pCurves, false, time_code);
+bool FastCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	return __deform__(points, false, time_code);
 }
 
-bool FastCurvesDeformer::deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
-	return __deform__(pCurves, true, time_code);
+bool FastCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	return __deform__(points, true, time_code);
 }
 
-bool FastCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_threaded, pxr::UsdTimeCode time_code) {
+bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	PROFILE("FastCurvesDeformer::__deform__");
 
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
 	if(!pPhantomTrimesh || !pPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
-		return false;
-	}
-
-	if(!pCurves || pCurves->empty()) {
 		return false;
 	}
 
@@ -64,11 +60,9 @@ bool FastCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_thre
 
 	calcPerBindTangentsAndBiNormals(build_live);
 
-	std::vector<pxr::GfVec3f>& points = pCurves->getPointsCache();
-
 	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
 
-	assert(curveBinds.size() == pCurves->getCurvesCount());
+	assert(curveBinds.size() == mpCurvesContainer->getCurvesCount());
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
 		for(size_t i = start; i < end; ++i) {
@@ -86,8 +80,8 @@ bool FastCurvesDeformer::__deform__(PxrCurvesContainer* pCurves, bool multi_thre
 			};
 
 			auto curve_bind_pos = pPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v);
-			uint32_t vertex_offset = pCurves->getCurveVertexOffset(i);
-			PxrCurvesContainer::CurveDataPtr curve_data_ptr = pCurves->getCurveDataPtr(i);
+			uint32_t vertex_offset = mpCurvesContainer->getCurveVertexOffset(i);
+			PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(i);
 
 			for(size_t j = 0; j < curve_data_ptr.first; ++j) {
 				points[vertex_offset++] = curve_bind_pos + m * (*(curve_data_ptr.second + j));

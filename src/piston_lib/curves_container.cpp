@@ -61,12 +61,12 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 
 	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
 
-	mPointsCache.resize(curveRestPoints.size());
-	for(size_t i = 0; i < curveRestPoints.size(); ++i) {
-		mPointsCache[i] = curveRestPoints[i];
-	}
+//	mPointsCache.resize(curveRestPoints.size());
+//	for(size_t i = 0; i < curveRestPoints.size(); ++i) {
+//		mPointsCache[i] = curveRestPoints[i];
+//	}
 
-	assert(mPointsCache.size() == curveRestPoints.size());
+//	assert(mPointsCache.size() == curveRestPoints.size());
 
 	return true;
 }
@@ -91,10 +91,10 @@ const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t curve_idx) cons
 	return mCurveRestRootPositions[curve_idx];
 }
 
-pxr::VtArray<pxr::GfVec3f> PxrCurvesContainer::getPointsCacheVtArray() const {
-	const bool addRef = true;
-	return {&mForeignDataSource, (pxr::GfVec3f*)mPointsCache.data(), mPointsCache.size(), addRef};
-}
+//pxr::VtArray<pxr::GfVec3f> PxrCurvesContainer::getPointsCacheVtArray() const {
+//	const bool addRef = true;
+//	return {&mForeignDataSource, (pxr::GfVec3f*)mPointsCache.data(), mPointsCache.size(), addRef};
+//}
 	
 
 } // namespace Piston

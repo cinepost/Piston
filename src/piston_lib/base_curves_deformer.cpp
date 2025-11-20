@@ -132,36 +132,47 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		return false;
 	}
 
-	auto deformPoints = [this](bool multi_threaded, PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
-		printf("lambda deformPoints\n");
+	assert(mpCurvesContainer);	
+	if(!mpCurvesContainer || mpCurvesContainer->empty()) {
+		return false;
+	}
+
+	auto deformPoints = [this](bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+		dbg_printf("lambda deformPoints\n");
 		switch(multi_threaded) {
 			case true:
-				return deformMtImpl(pCurves, time_code);
+				return deformMtImpl(points, time_code);
 			default:
-				return deformImpl(pCurves, time_code);
+				return deformImpl(points, time_code);
 		}
 	};
 
 	auto getDeformedPoints = [&deformPoints](bool multi_threaded, PxrCurvesContainer* pCurves, PxrPointsLRUCache* pPointsLRUCache, const PxrPointsLRUCache::CompositeKey& key) {
-		printf("lambda getDeformedPoints\n");
-		static const std::vector<pxr::GfVec3f>* sNull = nullptr;
-		const std::vector<pxr::GfVec3f>* _points_list_ptr = pPointsLRUCache ? pPointsLRUCache->get(key) : nullptr;
-		if(!_points_list_ptr) {
-			if (!deformPoints(multi_threaded, pCurves, key.time)) {
-				return sNull;
-			}
-			_points_list_ptr = pPointsLRUCache ? pPointsLRUCache->put(key, pCurves->getPointsCache()) : pCurves->getPointsCachePtr();
+		dbg_printf("lambda getDeformedPoints\n");
+		
+		static const PointsList* sNull = nullptr;
+
+		const PointsList* _points_list_ptr = pPointsLRUCache->get(key);
+		if(_points_list_ptr) {
+			dbg_printf("Cache has emtry with key %s\n", to_string(key).c_str());
+			return _points_list_ptr;
 		}
-		return _points_list_ptr;
+
+		PointsList* _new_points_ptr = pPointsLRUCache->put(key, pCurves->getTotalVertexCount());
+		if (deformPoints(multi_threaded, *_new_points_ptr, key.time)) {
+			return (const PointsList*)_new_points_ptr;
+		}
+
+		return sNull;
 	};
 
 	const PxrPointsLRUCache::CompositeKey curr_key = {uniqueName(), time_code};
 	PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
 
 	PxrPointsLRUCacheShrinkLock cache_shrink_lock(pPointsLRUCache); // avoid cache shrinking during deformation stage
-	printf("pPointsLRUCache locked\n");
+	dbg_printf("pPointsLRUCache locked\n");
 
-	const std::vector<pxr::GfVec3f>* deformed_points_list_ptr = getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key);
+	const PointsList* deformed_points_list_ptr = getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key);
 
 	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
 	pxr::VtArray<pxr::GfVec3f> _points_tmp_vt_array = {&mForeignDataSource, (pxr::GfVec3f*)deformed_points_list_ptr->data(), deformed_points_list_ptr->size(), false};
@@ -169,16 +180,16 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		return false;
 	}
 
-	if(mCalcMotionVectors) {
+	if(mCalcMotionVectors && (1 == 2)) {
 		const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::LEADING) ? (time_code.GetValue() - 1.0) : time_code};
 		const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::TRAILING) ? (time_code.GetValue() + 1.0) : time_code};
 
 		dbg_printf("MBlur: %s to %s\n", std::to_string(key_from.time.GetValue()).c_str(), std::to_string(key_to.time.GetValue()).c_str());
 
-		const std::vector<pxr::GfVec3f>* pPointsFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from);
-		const std::vector<pxr::GfVec3f>* pPointsTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to);
+		const PointsList* pPointsFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from);
+		const PointsList* pPointsTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to);
 
-		mVelocities.resize(mpCurvesContainer->getPointsCache().size());
+		mVelocities.resize(mpCurvesContainer->getTotalVertexCount());
 
 		const pxr::GfVec3f* p_pts_from_ptr = pPointsFrom->data();
 		const pxr::GfVec3f* p_pts_to_ptr = pPointsTo->data();
@@ -201,7 +212,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 	}
 
 	if(pPointsLRUCache) {
-		dbg_printf("Cache utilization %s%\n", pPointsLRUCache->getCacheUtilizationString().c_str());
+		dbg_printf("Cache utilization %s%%\n", pPointsLRUCache->getCacheUtilizationString().c_str());
 	}
 
 	return true;

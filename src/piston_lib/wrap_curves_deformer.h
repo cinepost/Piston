@@ -38,14 +38,14 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 
 	protected:
 		WrapCurvesDeformer(const std::string& name);
-		virtual bool deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) override;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 
-		bool deformImpl_SpaceMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
-		bool deformImpl_DistMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_DistMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
 	private:
-		bool __deform__(PxrCurvesContainer* pCurves, bool multi_threaded, pxr::UsdTimeCode time_code);
+		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
 		virtual bool writeJsonDataToPrimImpl()const override;

@@ -74,8 +74,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
-		virtual bool deformImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) = 0;
-		virtual bool deformMtImpl(PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		void makeDirty();
 
 		bool isCenteredMotionBlur() const { return mMotionBlurDirection == MotionBlurDirection::CENTERED; }
