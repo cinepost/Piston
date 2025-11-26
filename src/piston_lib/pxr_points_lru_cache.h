@@ -53,6 +53,8 @@ class PxrPointsLRUCache {
 			return mCacheItemsMap.find(key) != mCacheItemsMap.end();
 		}
 
+		size_t removeByName(const std::string& name);
+
 		// Used memory ignoring keys and iterators mem usage. PointsList mem usage only
 		size_t getMemSize() const;
 
@@ -61,6 +63,9 @@ class PxrPointsLRUCache {
 		size_t size() const { return mCacheItemsMap.size(); }
 
 		std::string getCacheUtilizationString() const;
+		std::string getMemUsageString() const;
+
+		size_t itemsCount() const { return mCacheItemsList.size(); }
 
 	private:
 		static constexpr size_t kInvalidUsedMemSize = std::numeric_limits<size_t>::max();

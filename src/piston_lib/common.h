@@ -20,6 +20,8 @@ using json = nlohmann::json;
 
 namespace Piston {
 
+const char *stringifyMemSize(size_t bytes);
+
 std::string bson_to_hex_string(const std::vector<uint8_t>& vec, bool truncate = false);
 std::vector<uint8_t> hex_string_to_bson(const std::string& str);
 

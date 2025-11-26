@@ -1,4 +1,5 @@
 #include "pxr_points_lru_cache.h"
+#include "common.h"
 
 
 namespace Piston {
@@ -88,6 +89,19 @@ void PxrPointsLRUCache::reduceMemUsage(const size_t mem_size_bytes) {
 	}
 }
 
+size_t PxrPointsLRUCache::removeByName(const std::string& name) {
+	size_t removed_count = 0;
+	for(auto& item: mCacheItemsList) {
+		if(item->first.name != name) continue;
+		item--;
+		mCacheItemsMap.erase(item->first);
+		mCacheItemsList.pop_back();
+		mCurrentMemSizeBytes = kInvalidUsedMemSize;
+	}
+
+	return removed_count;
+}
+
 std::string PxrPointsLRUCache::getCacheUtilizationString() const {
 	static char _buffer[50];
 
@@ -95,6 +109,10 @@ std::string PxrPointsLRUCache::getCacheUtilizationString() const {
 
     sprintf(_buffer, "%.2f", utilization);
     return std::string(_buffer);
+}
+
+std::string PxrPointsLRUCache::getMemUsageString() const {
+	return std::string(stringifyMemSize(getMemSize()));
 }
 	
 } // namespace Piston

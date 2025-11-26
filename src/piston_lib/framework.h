@@ -14,6 +14,7 @@
 #ifdef _DEBUG
 #define dbg_printf(...) printf(__VA_ARGS__)
 #else
+asdfsdf
 #define dbg_printf(...) {}
 #endif
 

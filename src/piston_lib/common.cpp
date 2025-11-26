@@ -4,14 +4,33 @@
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/value.h>
 
+
 static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
 	pxr::Vt_ArrayForeignDataSource fd(nullptr, 1);
 	static const bool addRef = 1;
 	return {&fd, (uint8_t*)vec.data(), vec.size(), addRef};
 }
 	
-
+	
 namespace Piston {
+
+const char *stringifyMemSize(size_t bytes) {
+	static const char *suffix[] = {"B", "KB", "MB", "GB", "TB"};
+	static constexpr const char length = sizeof(suffix) / sizeof(suffix[0]);
+
+	int i = 0;
+	double dblBytes = bytes;
+
+	if (bytes > 1024) {
+		for (i = 0; (bytes / 1024) > 0 && i<length-1; i++, bytes /= 1024) {
+			dblBytes = bytes / 1024.0;
+		}
+	}
+
+	static char output[200];
+	sprintf(output, "%.02lf %s", dblBytes, suffix[i]);
+	return output;
+}
 
 bool isMeshGeoPrim(const pxr::UsdPrim& geoPrim) {
 	if(geoPrim.GetTypeName() != "Mesh") return false;
@@ -158,7 +177,7 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	return true;
 }
 
-PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), false) {
+PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), true) {
 	assert(size > 0);
 	calcSizeInBytes();
 }

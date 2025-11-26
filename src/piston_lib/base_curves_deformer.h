@@ -71,14 +71,16 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		const DeformerStats& getStats() const { return mStats; }
 
+		void setMotionBlurState(bool state);
+
+		bool getMotionBlurState() const { return mCalcMotionVectors; }
+
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		void makeDirty();
-
-		bool isCenteredMotionBlur() const { return mMotionBlurDirection == MotionBlurDirection::CENTERED; }
 		
 	protected:
 		bool mDirty = true;
@@ -104,6 +106,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
 		const std::string& uniqueName() const { return mUniqueName; }
+		std::string velocityKeyName() const { return uniqueName() + "_vel"; }
 
 		static std::atomic_uint32_t current_id;
 
@@ -119,11 +122,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;
-
-		std::vector<pxr::GfVec3f> mVelocities;
-
-		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
-		pxr::Vt_ArrayForeignDataSource 	mVelocitiesForeignDataSource;
 };
 
 } // namespace Piston

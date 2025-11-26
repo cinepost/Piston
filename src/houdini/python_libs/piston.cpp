@@ -71,6 +71,9 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
 		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
 
+		.def("setMotionBlurState", &BaseCurvesDeformer::setMotionBlurState)
+		.def("getMotionBlurState", &BaseCurvesDeformer::getMotionBlurState)
+
 		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
 		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_overloads(args("time_code")))
 
