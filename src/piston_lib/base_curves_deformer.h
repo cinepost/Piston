@@ -132,7 +132,7 @@ inline std::string to_string(Piston::BaseCurvesDeformer::Type mt) {
         t2s(FAST);
         t2s(WRAP);
         default:
-            should_not_get_here();
+            assert(false);
             return "UNKNOWN";
     }
 #undef t2s

@@ -7,14 +7,9 @@
 #include <pxr/base/vt/array.h>
 #include <pxr/base/gf/matrix3f.h>
 
-#ifndef should_not_get_here
-#define should_not_get_here() assert(false)
-#endif
-
 #ifdef _DEBUG
 #define dbg_printf(...) printf(__VA_ARGS__)
 #else
-asdfsdf
 #define dbg_printf(...) {}
 #endif
 

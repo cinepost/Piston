@@ -91,12 +91,17 @@ void PxrPointsLRUCache::reduceMemUsage(const size_t mem_size_bytes) {
 
 size_t PxrPointsLRUCache::removeByName(const std::string& name) {
 	size_t removed_count = 0;
-	for(auto& item: mCacheItemsList) {
-		if(item->first.name != name) continue;
-		item--;
-		mCacheItemsMap.erase(item->first);
-		mCacheItemsList.pop_back();
-		mCurrentMemSizeBytes = kInvalidUsedMemSize;
+	std::list<key_value_pair_t>::iterator i = mCacheItemsList.begin();
+
+	while(i != mCacheItemsList.end()) {
+		if(i->first.name == name) {
+			mCacheItemsMap.erase(i->first);
+			mCacheItemsList.pop_back();
+			mCurrentMemSizeBytes = kInvalidUsedMemSize;
+			removed_count++;
+		} else {
+			i++;
+		}
 	}
 
 	return removed_count;
