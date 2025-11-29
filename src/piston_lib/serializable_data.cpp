@@ -7,7 +7,7 @@ SerializableDeformerDataBase::SerializableDeformerDataBase(): mIsPopulated(false
 
 }
 
-bool SerializableDeformerDataBase::serialize(std::vector<std::uint8_t>& v_bson) const {
+bool SerializableDeformerDataBase::serialize(BSON& v_bson) const {
 	if(!isPopulated()) {
 		std::cerr << "Can't serialize empty deformer data !" << std::endl;
 		return false;
@@ -28,7 +28,7 @@ bool SerializableDeformerDataBase::serialize(std::vector<std::uint8_t>& v_bson) 
 	return true;
 }
 
-bool SerializableDeformerDataBase::deserialize(const std::vector<std::uint8_t>& v_bson) {
+bool SerializableDeformerDataBase::deserialize(const BSON& v_bson) {
 	if(v_bson.empty()) return false;
 
 	json j = json::from_bson(v_bson);

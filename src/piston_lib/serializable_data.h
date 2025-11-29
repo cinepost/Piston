@@ -37,8 +37,8 @@ class SerializableDeformerDataBase {
 
 		SerializableDeformerDataBase();
 
-		bool serialize(std::vector<std::uint8_t>& v_bson) const;
-		bool deserialize(const std::vector<std::uint8_t>& v_bson);
+		bool serialize(BSON& v_bson) const;
+		bool deserialize(const BSON& v_bson);
 		void clear();
 
 		virtual bool isPopulated() const { return mIsPopulated; }

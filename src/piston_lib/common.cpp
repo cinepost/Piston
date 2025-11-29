@@ -14,6 +14,8 @@ static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
 	
 namespace Piston {
 
+static const pxr::SdfPath sHiddenPrimPath("/__piston_data__");
+
 const char *stringifyMemSize(size_t bytes) {
 	static const char *suffix[] = {"B", "KB", "MB", "GB", "TB"};
 	static constexpr const char length = sizeof(suffix) / sizeof(suffix[0]);
@@ -88,7 +90,7 @@ void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 
 bool UsdPrimHandle::getDataFromBson(SerializableDeformerDataBase* pDeformerData) const {
 	assert(pDeformerData);
-	std::vector<std::uint8_t> v_bson;
+	BSON v_bson;
 	if(!getBsonFromPrim(pDeformerData->jsonDataKey(), v_bson)) {
 		return false;
 	}
@@ -98,7 +100,7 @@ bool UsdPrimHandle::getDataFromBson(SerializableDeformerDataBase* pDeformerData)
 
 bool UsdPrimHandle::writeDataToBson(SerializableDeformerDataBase* pDeformerData) const {
 	assert(pDeformerData);
-	std::vector<std::uint8_t> v_bson;
+	BSON v_bson;
 	if(!pDeformerData->serialize(v_bson)) {
 		return false;
 	}
@@ -106,34 +108,34 @@ bool UsdPrimHandle::writeDataToBson(SerializableDeformerDataBase* pDeformerData)
 	return setBsonToPrim(pDeformerData->jsonDataKey(), v_bson);
 }
 
-bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, std::vector<std::uint8_t>& v_bson) const {
+bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, BSON& v_bson) const {
 
 	if(!isValid()) {
 		return false;
 	}
 
-	static const pxr::TfToken key("customData");
+	auto pStage = mPrim.GetStage();
+	assert(pStage); 
+
+	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(sHiddenPrimPath);
+	if(!data_prim.IsValid()) {
+		dbg_printf("Stage has no Piston hidden data prim!\n");
+		return false;
+	}
+
 	const pxr::TfToken key_path(identifier);
 
-	if(!mPrim.HasMetadataDictKey(key, key_path)) {
-		std::cerr << "Error getting bson from prim " << getPath() << ". No data \"" << identifier << "\" exist !!! " << std::endl;
+	if(!data_prim.HasCustomDataKey(key_path)) {
+		std::cerr << "Error getting bson from prim " << getPath() << ". No custom data \"" << identifier << "\" exist !!! " << std::endl;
 		return false;
 	}
 
-	pxr::VtArray<uint8_t> v;
-	if(!mPrim.GetMetadataByDictKey(key, key_path, &v)) {
-		return false;
-	}
-
-	if(v.empty()) return false;
-
-	v_bson.resize(v.size());
-	for(size_t i = 0; i < v.size(); ++i) v_bson[i] = v[i];
-
+	auto _v = data_prim.GetCustomDataByKey(key_path);
+	hex_string_to_bson(_v.Get<std::string>(), v_bson);
 	return true;
 }
 
-bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const std::vector<std::uint8_t>& v_bson) const {
+bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const BSON& v_bson) const {
 	if(v_bson.empty()) {
 		std::cout << identifier << " bson is empty!" << std::endl;
 	}
@@ -146,22 +148,27 @@ bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const std::vect
 		return false;
 	}
 
-	static const pxr::TfToken key("customData");
-	const pxr::TfToken key_path(identifier);
+	auto pStage = mPrim.GetStage();
+	assert(pStage); 
 
-	if(mPrim.HasMetadataDictKey(key, key_path)) {
-		if(!mPrim.ClearMetadataByDictKey(key, key_path)) {
-			std::cerr << "Error clearing old " << identifier << " data on " << getName() << std::endl;
-		}
+	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(sHiddenPrimPath);
+	if(!data_prim.IsValid()) {
+		data_prim = pStage->DefinePrim(sHiddenPrimPath);
+		data_prim.SetHidden(true);
 	}
 
+	assert(data_prim.IsValid());
 
-	// TODO: serialize directly to VtArray!
-	pxr::VtArray<uint8_t> v(v_bson.size());
-	for(size_t i = 0; i < v_bson.size(); ++i) v[i] = v_bson[i];
+	const pxr::TfToken key_path(identifier);
 
-	const bool result = mPrim.SetMetadataByDictKey<pxr::VtArray<uint8_t>>(key, key_path, v);
-	return result;
+	if(data_prim.HasCustomDataKey(key_path)) {
+		data_prim.ClearCustomDataByKey(key_path);
+	}
+
+	const pxr::VtValue _v(bson_to_hex_string(v_bson));
+
+	data_prim.SetCustomDataByKey(key_path, _v);
+	return true;
 }
 
 bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
@@ -200,39 +207,30 @@ void PointsList::calcSizeInBytes() const {
 	mSizeInBytes = mPoints.size() * sizeof(pxr::GfVec3f);
 }
 
-std::string bson_to_hex_string(const std::vector<uint8_t>& vec, bool truncate) {
-  std::stringstream ss;
+std::string bson_to_hex_string(const BSON& bson) {
+	dbg_printf("bson_to_hex_string()\n");
+	std::stringstream ss;
 
-  ss << std::hex << std::setfill('0');
+	ss << std::hex << std::setfill('0');
 
-  static const size_t truncated_string_max_size = 64;
-  const size_t _size = truncate ? std::min(truncated_string_max_size, vec.size()) : vec.size(); 
+	for (size_t i = 0; i < bson.size(); ++i) {
+		ss << std::hex << std::setw(2) << static_cast<int>(bson[i]);
+	}
 
-  for (size_t i = 0; i < vec.size(); ++i) {
-    ss << std::hex << std::setw(2) << static_cast<int>(vec[i]);
-  }
-
-  if(truncate) ss << "...";
-
-  return ss.str();
+	return ss.str();
 }
 
-std::vector<uint8_t> hex_string_to_bson(const std::string& str) {
-	std::ostringstream ret;
-	std::string result;
-	std::vector<uint8_t> bson;
-	
-	uint8_t byte;
-	for (std::string::size_type i = 0; i < str.length(); ++i) {
+void hex_string_to_bson(const std::string& str, BSON& bson) {
+	dbg_printf("hex_string_to_bson()\n");
+	bson.clear();
+	bson.reserve(str.size() / 2);
 
-		ret << std::hex << std::setfill('0') << std::setw(2) << (int)str[i];
-		result = ret.str();
-		byte = (uint8_t) strtol(result.c_str(), nullptr, 10);
-		bson.push_back(byte);
-		ret.str("");
-		ret.clear();
+	for(size_t i = 0; i < str.size()/2; ++i) {                   
+		std::istringstream iss(str.substr(i * 2, 2));
+		unsigned int nTmp;
+		iss >> std::hex >> nTmp;
+		bson.push_back(static_cast<uint8_t>(nTmp));
 	}
-	return bson;
 }
 
 } // namespace Piston

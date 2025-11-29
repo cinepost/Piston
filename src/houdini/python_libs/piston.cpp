@@ -26,16 +26,12 @@ char const* greet() {
 	return "Parovoz Piston python library!";
 }
 
-using BSON = std::vector<uint8_t>;
 
-struct BSON_to_hex_string {
-	static PyObject *convert(BSON const& bson) {
-#ifdef _DEBUG
-		bool truncate = false;
-#else
-		bool truncate = true;
-#endif
-		return boost::python::incref(boost::python::object(Piston::bson_to_hex_string(bson, truncate)).ptr());
+struct BSON_to_Python {
+	static PyObject *convert(const Piston::BSON& bson) {
+		dbg_printf("BSON_to_Python::convert()\n");
+		static const std::string sTestString = "Encoded bson data.";
+		return boost::python::incref(boost::python::object(sTestString).ptr());
 	}
 };
 
@@ -107,7 +103,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &DeformerStats::toString)
 	;
 
-	to_python_converter<BSON , BSON_to_hex_string>();
+	to_python_converter<Piston::BSON , BSON_to_Python>();
 
 	def("runTests", &Tests::runTests);	
 	def("greet", greet);

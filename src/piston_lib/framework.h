@@ -16,6 +16,8 @@
 
 namespace Piston {
 
+using BSON = std::vector<std::uint8_t>;
+
 #define enum_class_operators(e_) \
     inline e_ operator& (e_ a, e_ b) { return static_cast<e_>(static_cast<int>(a)& static_cast<int>(b)); } \
     inline e_ operator| (e_ a, e_ b) { return static_cast<e_>(static_cast<int>(a)| static_cast<int>(b)); } \

@@ -22,8 +22,8 @@ namespace Piston {
 
 const char *stringifyMemSize(size_t bytes);
 
-std::string bson_to_hex_string(const std::vector<uint8_t>& vec, bool truncate = false);
-std::vector<uint8_t> hex_string_to_bson(const std::string& str);
+std::string bson_to_hex_string(const BSON& bson);
+void hex_string_to_bson(const std::string& str, BSON& bson);
 
 bool isMeshGeoPrim(const pxr::UsdPrim& pGeoPrim);
 bool isCurvesGeoPrim(const pxr::UsdPrim& getPrim);
@@ -49,8 +49,8 @@ class UsdPrimHandle {
 		bool getDataFromBson(SerializableDeformerDataBase* pDeformerData) const;
 		bool writeDataToBson(SerializableDeformerDataBase* pDeformerData) const;
 
-		bool getBsonFromPrim(const std::string& identifier, std::vector<std::uint8_t>& v_bson) const;
-		bool setBsonToPrim(const std::string& identifier, const std::vector<std::uint8_t>& v_bson) const;
+		bool getBsonFromPrim(const std::string& identifier, BSON& v_bson) const;
+		bool setBsonToPrim(const std::string& identifier, const BSON& v_bson) const;
 		void clearPrimBson(const std::string& identifier) const;
 
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }

@@ -154,7 +154,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 
 		const PointsList* _points_list_ptr = pPointsLRUCache->get(key);
 		if(_points_list_ptr) {
-			dbg_printf("Cache has emtry with key %s\n", to_string(key).c_str());
+			dbg_printf("Cache has entry with key %s\n", to_string(key).c_str());
 			return _points_list_ptr;
 		}
 
