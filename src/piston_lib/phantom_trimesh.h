@@ -40,7 +40,7 @@ class SerializablePhantomTrimesh;
 
 class PhantomTrimesh {
 	public:
-		static constexpr size_t kInvalidTriFaceID = std::numeric_limits<size_t>::max();
+		static constexpr uint32_t kInvalidTriFaceID = std::numeric_limits<uint32_t>::max();
 		using PxrIndexType = int;
 		using UniquePtr = std::unique_ptr<PhantomTrimesh>;
 
@@ -101,7 +101,7 @@ class PhantomTrimesh {
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(const uint32_t id) const { return mFaces[id]; }
-		size_t getFaceCount() const { return mFaces.size(); }
+		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 
 		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const;
 		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v, float& dist) const;

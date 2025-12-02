@@ -188,9 +188,9 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 		// Build deformer data in place if no json data present or not needed
 
 		// First triangulate using simple "fan" triangulation
-		const size_t src_mesh_face_count = pAdjacency->getFaceCount();
+		const uint32_t src_mesh_face_count = pAdjacency->getFaceCount();
 
-		for(size_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
+		for(uint32_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
 			const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
 			
 			if(face_vertex_count < 3 ) {

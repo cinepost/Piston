@@ -311,13 +311,11 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 }
 
 PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {
-	if(!isPopulated()) return nullptr;
-
-	return mpTrimesh.get();
+	return isPopulated() ? mpTrimesh.get() : nullptr;
 }
 
 const PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() const {
-	return this->getTrimesh();
+	return isPopulated() ? mpTrimesh.get() : nullptr;
 }
 
 const std::string& SerializablePhantomTrimesh::typeName() const {

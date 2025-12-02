@@ -43,9 +43,9 @@ class UsdGeomMeshFaceAdjacency {
 
 		uint32_t getVertexFaceId(uint32_t vtx) const;
 
-		size_t getVertexCount() const { return mVertexCount; }
-		size_t getFaceCount() const { return mFaceCount; }
-		size_t getMaxFaceVertexCount() const { return mMaxFaceVertexCount; }
+		uint32_t getVertexCount() const { return mVertexCount; }
+		uint32_t getFaceCount() const { return mFaceCount; }
+		uint32_t getMaxFaceVertexCount() const { return mMaxFaceVertexCount; }
 
 		const std::vector<uint32_t>& getPrimData() const { return mPrimData; }
 
@@ -56,9 +56,9 @@ class UsdGeomMeshFaceAdjacency {
 		size_t calcHash() const;
  
 	protected:
-		size_t mFaceCount;
-		size_t mVertexCount;
-		size_t mMaxFaceVertexCount;
+		uint32_t mFaceCount;
+		uint32_t mVertexCount;
+		uint32_t mMaxFaceVertexCount;
 
     	std::vector<uint32_t> mCounts;   	// per vertex neighbor faces counts
     	std::vector<uint32_t> mOffsets;  	// per vertex neighbor offsets in data array
@@ -68,7 +68,7 @@ class UsdGeomMeshFaceAdjacency {
 
     	std::vector<PxrIndexType> mSrcFaceVertexIndices;
 		std::vector<PxrIndexType> mSrcFaceVertexCounts;
-		std::vector<uint32_t> 	   mSrcFaceVertexOffsets;
+		std::vector<uint32_t> 	  mSrcFaceVertexOffsets;
     
     	bool mValid; // Set by Adjacency data builder!
     
