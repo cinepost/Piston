@@ -84,6 +84,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		
 	protected:
 		bool mDirty = true;
+		bool mDeformerDataWritten = false;
 		
 		UsdPrimHandle mMeshGeoPrimHandle;
 		UsdPrimHandle mCurvesGeoPrimHandle;

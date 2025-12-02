@@ -40,14 +40,19 @@ double stdv(const SimpleProfiler::acc_t& v, const double& mean) {
 
 } // namespace sa
 
-
-ScopedTimeMeasure::ScopedTimeMeasure(const char* name): mName(name) {
-	mTimeStart = SimpleProfiler::Clock::now();
+ScopedTimeMeasure::ScopedTimeMeasure(const char* name): ScopedTimeMeasure(std::string(name)) {
 }
+
+ScopedTimeMeasure::ScopedTimeMeasure(const std::string& name): mName(name), mTimeStart(SimpleProfiler::Clock::now()) {
+} 
 		
 ScopedTimeMeasure::~ScopedTimeMeasure() {
-	size_t time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(SimpleProfiler::Clock::now() - mTimeStart).count();
-	dbg_printf("%s scoped time measurement: %zu ms.\n", mName.c_str(), time_delta);
+	const auto time_end = SimpleProfiler::Clock::now();
+	const SimpleProfiler::TimeDuration fp_ms = time_end - mTimeStart;
+
+	std::chrono::milliseconds duration = std::chrono::duration_cast<std::chrono::milliseconds>(fp_ms);
+
+	dbg_printf("%s scoped time measurement: %zu ms.\n", mName.c_str(), duration.count());
 }
 
 SimpleProfiler::SimpleProfiler( const char* name ): mName(name) {

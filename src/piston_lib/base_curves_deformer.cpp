@@ -8,7 +8,14 @@
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): mPool(std::thread::hardware_concurrency() - 1), mType(t), mName(name), mID(current_id++) {
+BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): 
+	mDirty(true), 
+	mDeformerDataWritten(false), 
+	mPool(std::thread::hardware_concurrency() - 1), 
+	mType(t), 
+	mName(name), 
+	mID(current_id++) {
+	
 	dbg_printf("BaseCurvesDeformer::BaseCurvesDeformer()\n");
 
 	mUniqueName = toString() + mName + std::to_string(mID);
@@ -53,6 +60,10 @@ void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
 }
 
 bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
+	if(mDeformerDataWritten) return true;
+
+	mDeformerDataWritten = false;
+
 	// Write json data if needed
 	if(!buildDeformerData(time_code)) {
 		std::cerr << "Error building deformer data !" << std::endl;
@@ -69,7 +80,8 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 		return false;
 	}
 
-	return writeJsonDataToPrimImpl();
+	mDeformerDataWritten = writeJsonDataToPrimImpl();
+	return mDeformerDataWritten;
 }
 
 bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {
@@ -259,6 +271,7 @@ void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
 void BaseCurvesDeformer::makeDirty() {
 	mStats.clear();
 	mDirty = true;
+	mDeformerDataWritten = false;
 }
 
 const std::string& BaseCurvesDeformer::toString() const {

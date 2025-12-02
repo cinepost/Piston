@@ -51,6 +51,7 @@ class SimpleProfiler {
 class ScopedTimeMeasure {
 	public:
 		ScopedTimeMeasure(const char* name);
+		ScopedTimeMeasure(const std::string& name);
 		~ScopedTimeMeasure();
 
 	private:

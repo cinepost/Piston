@@ -1,8 +1,12 @@
 #include "common.h"
 #include "serializable_data.h"
+#include "simple_profiler.h"
 
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/value.h>
+
+#include <stdio.h>
+#include <stdint.h>
 
 
 static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
@@ -15,6 +19,65 @@ static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
 namespace Piston {
 
 static const pxr::SdfPath sHiddenPrimPath("/__piston_data__");
+
+static inline void bytes_to_hexstr(const std::vector<uint8_t>& bytes, std::string& hexstr) {
+	static const uint8_t lookup[]= "0123456789abcdef";
+	
+	if (bytes.empty()) {
+		return;
+	}
+
+	hexstr.resize(bytes.size() * 2);
+
+	for (size_t i = 0; i < bytes.size(); ++i) {
+		hexstr[i * 2 + 0] = lookup[(bytes[i] >> 4) & 0x0F];
+		hexstr[i * 2 + 1] = lookup[(bytes[i]     ) & 0x0F];
+	}
+}
+
+static inline void hexstr_to_bytes(const std::string& hexstr, std::vector<uint8_t>& bytes) {
+	static const uint8_t lookup[] = {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //  !"#$%&'
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ()*+,-./
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // 01234567
+		0x08, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 89:;<=>?
+		0x00, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00, // @ABCDEFG
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // HIJKLMNO
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // PQRSTUVW
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // XYZ[\]^_
+		0x00, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00, // `abcdefg
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // hijklmno
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // pqrstuvw
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // xyz{|}~.
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ........
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // ........
+	};
+  
+	size_t bytes_count = hexstr.size() / 2;
+	bytes.resize(bytes_count);
+
+	for(size_t i=0; i<bytes_count; ++i) {
+		bytes[i] = lookup[hexstr[i * 2]] << 4 | lookup[hexstr[i * 2 + 1]];
+	}
+}
 
 const char *stringifyMemSize(size_t bytes) {
 	static const char *suffix[] = {"B", "KB", "MB", "GB", "TB"};
@@ -95,14 +158,26 @@ bool UsdPrimHandle::getDataFromBson(SerializableDeformerDataBase* pDeformerData)
 		return false;
 	}
 
-	return pDeformerData->deserialize(v_bson);
+	bool result;
+
+	{
+		ScopedTimeMeasure _t("UsdPrimHandle::getDataFromBson deserialize " + pDeformerData->jsonDataKey());
+		result = pDeformerData->deserialize(v_bson);
+	}
+
+	return result;
 }
 
 bool UsdPrimHandle::writeDataToBson(SerializableDeformerDataBase* pDeformerData) const {
 	assert(pDeformerData);
 	BSON v_bson;
-	if(!pDeformerData->serialize(v_bson)) {
-		return false;
+
+	{
+		ScopedTimeMeasure _t("UsdPrimHandle::writeDataToBson serialize " + pDeformerData->jsonDataKey());
+
+		if(!pDeformerData->serialize(v_bson)) {
+			return false;
+		}
 	}
 
 	return setBsonToPrim(pDeformerData->jsonDataKey(), v_bson);
@@ -166,7 +241,7 @@ bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const BSON& v_b
 	}
 
 	const pxr::VtValue _v(bson_to_hex_string(v_bson));
-
+	
 	data_prim.SetCustomDataByKey(key_path, _v);
 	return true;
 }
@@ -209,28 +284,20 @@ void PointsList::calcSizeInBytes() const {
 
 std::string bson_to_hex_string(const BSON& bson) {
 	dbg_printf("bson_to_hex_string()\n");
-	std::stringstream ss;
 
-	ss << std::hex << std::setfill('0');
+	ScopedTimeMeasure _t("bson_to_hex_string");
 
-	for (size_t i = 0; i < bson.size(); ++i) {
-		ss << std::hex << std::setw(2) << static_cast<int>(bson[i]);
-	}
-
-	return ss.str();
+	std::string result;
+  	bytes_to_hexstr(bson, result);
+	return result;
 }
 
 void hex_string_to_bson(const std::string& str, BSON& bson) {
 	dbg_printf("hex_string_to_bson()\n");
-	bson.clear();
-	bson.reserve(str.size() / 2);
 
-	for(size_t i = 0; i < str.size()/2; ++i) {                   
-		std::istringstream iss(str.substr(i * 2, 2));
-		unsigned int nTmp;
-		iss >> std::hex >> nTmp;
-		bson.push_back(static_cast<uint8_t>(nTmp));
-	}
+	ScopedTimeMeasure _t("hex_string_to_bson");
+
+	hexstr_to_bytes(str, bson);
 }
 
 } // namespace Piston
