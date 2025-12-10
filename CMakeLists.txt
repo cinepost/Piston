@@ -195,24 +195,3 @@ add_subdirectory( src )
 
 #install(FILES src/changelog.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-#------------------------------------------
-# Install third party dependencies
-#------------------------------------------
-
-# third party libs
-if(WIN32)
-  install(DIRECTORY ${EXTERNALS_INSTALL_DIR}/lib/ DESTINATION lib/3rdparty
-    FILES_MATCHING PATTERN "*.dll"
-    PATTERN "*.lib"
-    PATTERN "cmake" EXCLUDE
-    PATTERN "pkgconfig" EXCLUDE
-    PATTERN "libpng" EXCLUDE
-  )
-else()
-  install(DIRECTORY ${EXTERNALS_INSTALL_DIR}/lib/ DESTINATION lib/3rdparty
-    FILES_MATCHING PATTERN "*.so*"
-    PATTERN "cmake" EXCLUDE
-    PATTERN "pkgconfig" EXCLUDE
-    PATTERN "libpng" EXCLUDE
-  )
-endif()

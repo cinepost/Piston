@@ -211,8 +211,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 			const pxr::GfVec3f* p_pts_from_ptr = pPointsFrom->data();
 			const pxr::GfVec3f* p_pts_to_ptr = pPointsTo->data();
 
-			//const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) / static_cast<float>(mMeshGeoPrimHandle.getStageTimeCodesPerSecond());
-			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f);
+			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mMeshGeoPrimHandle.getStageTimeCodesPerSecond());
 
 			for(size_t i = 0; i < tmp_velicities_list_ptr->size(); ++i) {
 				(*tmp_velicities_list_ptr)[i] = (p_pts_to_ptr[i] - p_pts_from_ptr[i]) * k;
