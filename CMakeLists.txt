@@ -131,6 +131,14 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 endif ()
 
+if(WIN32)
+add_compile_definitions(
+  $<$<CONFIG:RELEASE>:NDEBUG>
+  $<$<CONFIG:DEBUG>:_DEBUG>
+  $<$<CONFIG:DEBUG>:Py_DEBUG>
+  )
+endif()
+
 if ( MSVC )
   ADD_DEFINITIONS(/W3 /std:c++17 /permissive- /MP /wd4005 /wd4068)
   add_compile_options($<$<CONFIG:DEBUG>:/bigobj>)
