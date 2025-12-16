@@ -30,22 +30,22 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 	public:
 		~WrapCurvesDeformer();
 
-		static SharedPtr create();
+		static SharedPtr create(const std::string& name);
 		virtual const std::string& toString() const override;
 
 		void setBindMode(BindMode mode);
 		const BindMode& getBindMode() const;
 
 	protected:
-		WrapCurvesDeformer();
-		virtual bool deformImpl(pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(pxr::UsdTimeCode time_code) override;
+		WrapCurvesDeformer(const std::string& name);
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 
-		bool deformImpl_SpaceMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
-		bool deformImpl_DistMode(bool multi_threaded, std::vector<pxr::GfVec3f>& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_DistMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
 	private:
-		bool __deform__(bool multi_threaded, pxr::UsdTimeCode time_code);
+		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
 		virtual bool writeJsonDataToPrimImpl()const override;
@@ -56,6 +56,7 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		std::unique_ptr<WrapCurvesDeformerData> mpWrapCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 				mLiveVertexNormals;
+		std::vector<pxr::GfVec3f> 				mLiveTriFaceNormals;
 };
 
 } // namespace Piston

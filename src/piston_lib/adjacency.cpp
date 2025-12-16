@@ -19,7 +19,7 @@ bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTi
 
 	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
 
-	mFaceCount = mesh.GetFaceCount(rest_time_code);
+	mFaceCount = static_cast<uint32_t>(mesh.GetFaceCount(rest_time_code));
 	if(mFaceCount == 0) {
 		std::cerr << "Mesh " << mesh.GetPath() << " has no faces !" << std::endl;
 		return false;
@@ -58,18 +58,18 @@ bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTi
 		for(uint32_t i = 0; i < mSrcFaceVertexCounts.size(); ++i) {
 			mSrcFaceVertexOffsets[i] = face_vertex_offset;
 			face_vertex_offset += mSrcFaceVertexCounts[i];
-			mMaxFaceVertexCount = std::max(mMaxFaceVertexCount, static_cast<size_t>(mSrcFaceVertexCounts[i]));
+			mMaxFaceVertexCount = std::max(mMaxFaceVertexCount, static_cast<uint32_t>(mSrcFaceVertexCounts[i]));
 		}
 	}
 
-	auto getIndex = [&] (int i) {
+	auto getIndex = [&] (size_t i) {
 		return mSrcFaceVertexIndices[i];
 	};
 
 	size_t mesh_index_count = mSrcFaceVertexIndices.size();
 	
 	for(int c: mSrcFaceVertexIndices) {
-		mVertexCount = std::max(mVertexCount, static_cast<size_t>(c));
+		mVertexCount = std::max(mVertexCount, static_cast<uint32_t>(c));
 	}
 	
 	mVertexCount += 1;
@@ -149,7 +149,7 @@ bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTi
 
 	// build reverse vertex to face relations data 
 	{
-		for (size_t face_id = 0; face_id < mFaceCount; ++face_id) {
+		for (uint32_t face_id = 0; face_id < mFaceCount; ++face_id) {
 			for(uint32_t j = mSrcFaceVertexOffsets[face_id]; j < mSrcFaceVertexOffsets[face_id] + mSrcFaceVertexCounts[face_id]; ++j) {
 				mVtxToFace[mSrcFaceVertexIndices[j]] = face_id;
 			}

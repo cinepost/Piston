@@ -135,6 +135,14 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 endif ()
 
+if(WIN32)
+add_compile_definitions(
+  $<$<CONFIG:RELEASE>:NDEBUG>
+  $<$<CONFIG:DEBUG>:_DEBUG>
+  $<$<CONFIG:DEBUG>:Py_DEBUG>
+  )
+endif()
+
 if ( MSVC )
   ADD_DEFINITIONS(/W3 /std:c++17 /permissive- /MP /wd4005 /wd4068)
   add_compile_options($<$<CONFIG:DEBUG>:/bigobj>)
@@ -191,24 +199,3 @@ add_subdirectory( src )
 
 #install(FILES src/changelog.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-#------------------------------------------
-# Install third party dependencies
-#------------------------------------------
-
-# third party libs
-if(WIN32)
-  install(DIRECTORY ${EXTERNALS_INSTALL_DIR}/lib/ DESTINATION lib/3rdparty
-    FILES_MATCHING PATTERN "*.dll"
-    PATTERN "*.lib"
-    PATTERN "cmake" EXCLUDE
-    PATTERN "pkgconfig" EXCLUDE
-    PATTERN "libpng" EXCLUDE
-  )
-else()
-  install(DIRECTORY ${EXTERNALS_INSTALL_DIR}/lib/ DESTINATION lib/3rdparty
-    FILES_MATCHING PATTERN "*.so*"
-    PATTERN "cmake" EXCLUDE
-    PATTERN "pkgconfig" EXCLUDE
-    PATTERN "libpng" EXCLUDE
-  )
-endif()

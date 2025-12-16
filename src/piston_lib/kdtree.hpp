@@ -7,6 +7,8 @@
 #ifndef KDTREE_HPP
 #define KDTREE_HPP
 
+#include "framework.h"
+
 #include <algorithm>   // std::sort, std::nth_element
 #include <array>       // std::array
 #include <cmath>       // std::floor
@@ -29,6 +31,12 @@
 
 
 namespace neighbour_search {
+
+#if REST_LINE_POINTS_PXR
+    using PixarPointsVector
+#else
+
+#endif
 
 const static auto DEFAULT_RECURSION_DEPTH = static_cast<std::uint32_t>(std::floor(std::log2(std::thread::hardware_concurrency())));
 

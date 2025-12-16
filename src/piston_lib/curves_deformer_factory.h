@@ -4,6 +4,9 @@
 #include "base_curves_deformer.h"
 #include "fast_curves_deformer.h"
 #include "wrap_curves_deformer.h"
+#include "pxr_points_lru_cache.h"
+
+#include "simple_profiler.h"
 
 #include <string>
 #include <vector>
@@ -11,6 +14,8 @@
 #include <mutex>
 
 namespace Piston {
+
+static const bool kDefaultCacheState = false;
 
 /*
  * Factory singleton class
@@ -28,6 +33,8 @@ class CurvesDeformerFactory {
 		};
 
 	public:
+		~CurvesDeformerFactory();
+		
     	// Deleting the copy constructor to prevent copies
     	CurvesDeformerFactory(const CurvesDeformerFactory& obj) = delete;
 
@@ -37,19 +44,22 @@ class CurvesDeformerFactory {
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 
+	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
+
 	private:
 		BaseCurvesDeformer::SharedPtr getDeformer(BaseCurvesDeformer::Type type, const std::string& name);
 
 	private:
 		std::map<Key, BaseCurvesDeformer::SharedPtr> mDeformers;
-		
+		PxrPointsLRUCache::UniquePtr mpPxrPointsLRUCache;
+
 		// Mutex to ensure thread safety
     	static std::mutex mMutex;
 
     	// Static pointer to the CurvesDeformerFactory instance
     	static CurvesDeformerFactory* mInstancePtr;
 
-    	CurvesDeformerFactory() {}
+    	CurvesDeformerFactory();
 };
 
 } // namespace Piston

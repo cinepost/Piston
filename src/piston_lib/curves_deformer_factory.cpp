@@ -2,6 +2,8 @@
 
 namespace Piston {
 
+static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
+
 CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
     if (mInstancePtr == nullptr) {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -30,19 +32,28 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 	switch(type) {
 		case BaseCurvesDeformer::Type::WRAP: 
 		{
-			auto result = mDeformers.emplace(key, WrapCurvesDeformer::create());
+			auto result = mDeformers.emplace(key, WrapCurvesDeformer::create(name));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating WrapCurvesDeformer !");
 		}
 		case BaseCurvesDeformer::Type::FAST:
 		default:
 		{
-			auto result = mDeformers.emplace(key, FastCurvesDeformer::create());
+			auto result = mDeformers.emplace(key, FastCurvesDeformer::create(name));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating FastCurvesDeformer !");
 		}
 	}
 }
+
+CurvesDeformerFactory::~CurvesDeformerFactory() {
+	SimpleProfiler::printReport();
+}
+
+CurvesDeformerFactory::CurvesDeformerFactory() {
+	mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
+}
+
 
 } // namespace Piston
 

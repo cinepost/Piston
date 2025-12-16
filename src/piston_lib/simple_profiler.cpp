@@ -1,5 +1,10 @@
 #include "simple_profiler.h"
 
+#include <numeric>
+
+
+
+static const size_t kDefaultCallerNameWidth = 16;
 
 namespace Piston {
 
@@ -11,12 +16,50 @@ void updateMaximum(std::atomic<T>& maximum_value, T const& value) noexcept {
 	while(prev_value < value && !maximum_value.compare_exchange_weak(prev_value, value)) {}
 }
 
+} // namespace
+
+
+namespace sa {
+
+double mean(const SimpleProfiler::acc_t& v){
+	if(v.empty()){
+        return 0;
+    }
+
+    return static_cast<double>(std::reduce(v.begin(), v.end())) / static_cast<double>(v.size());
 }
 
-SimpleProfiler::SimpleProfiler( const char* name ) {
-	mName = std::string(name);
+size_t summ(const SimpleProfiler::acc_t& v) {
+	return std::accumulate(v.begin(), v.end(), 0);
+}
+
+double stdv(const SimpleProfiler::acc_t& v, const double& mean) {
+	double sq_sum = std::inner_product(v.begin(), v.end(), v.begin(), 0.0);
+	return std::sqrt((sq_sum / static_cast<double>(v.size())) - (mean * mean));
+}
+
+} // namespace sa
+
+ScopedTimeMeasure::ScopedTimeMeasure(const char* name): ScopedTimeMeasure(std::string(name)) {
+}
+
+ScopedTimeMeasure::ScopedTimeMeasure(const std::string& name): mName(name), mTimeStart(SimpleProfiler::Clock::now()) {
+} 
+		
+ScopedTimeMeasure::~ScopedTimeMeasure() {
+	const auto time_end = SimpleProfiler::Clock::now();
+	const SimpleProfiler::TimeDuration fp_ms = time_end - mTimeStart;
+
+	std::chrono::milliseconds duration = std::chrono::duration_cast<std::chrono::milliseconds>(fp_ms);
+
+	dbg_printf("%s scoped time measurement: %zu ms.\n", mName.c_str(), duration.count());
+}
+
+SimpleProfiler::SimpleProfiler( const char* name ): mName(name) {
+	dbg_printf("%s\n", name);
+
 	updateMaximum(mCallerNameWidth, mName.size());
-  mTimeStart = Clock::now();
+	mTimeStart = Clock::now();
 }
 
 SimpleProfiler::~SimpleProfiler() {
@@ -26,36 +69,37 @@ SimpleProfiler::~SimpleProfiler() {
 	if( p == mMap.end() ) {
 		// this is the first time this scope has run
 		acc_t acc;
-		std::pair<std::string,acc_t> pr(mName,acc);
-		p = mMap.insert(pr).first;
+		p = mMap.emplace(mName, acc).first;
 	}
 	// add the time of running to the accumulator for this scope
-	(p->second)( std::chrono::duration_cast<std::chrono::milliseconds>(t - mTimeStart).count() );
+	p->second.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(t - mTimeStart).count());
+}
+
+void SimpleProfiler::clear() {
+	if(mMap.empty()) return;
+
+	SimpleProfiler::mCallerNameWidth = kDefaultCallerNameWidth;
+	SimpleProfiler::mMap.clear();
 }
 
 // Generate profile report
 void SimpleProfiler::printReport() {
 	if(mMap.empty()) return;
-	//TimePoint f = Clock::now();
-
+	
 	printf("SimpleProfiler report...\n");
 	printf("%42s Calls\tMean (secs)\tStdDev\tTotal (secs)\n","Scope");
 	for(std::map<std::string, acc_t>::iterator p = mMap.begin(); p != mMap.end(); p++ ) {
-		float av = ba::mean(p->second);
-		float stdev = sqrt((double)(ba::variance(p->second)));
+		double _avg = sa::mean(p->second);
+		double _std = sa::stdv(p->second, _avg);
+		size_t _sum = sa::summ(p->second);
 
-		size_t sum = ba::sum(p->second);
-		//size_t cnt = ba::count(p->second);
-		//float worst = ba::extract_result<ba::tag::max>(p->second);
-		//float best = ba::extract_result<ba::tag::min>(p->second);
-
-		printf("%42s %lu\t%f\t%f\t%f\n", p->first.c_str(), ba::count(p->second), av * 0.001f, stdev * 0.001f, float(sum) * 0.001f);
+		printf("%42s %lu\t%f\t%f\t%f\n", p->first.c_str(), p->second.size(), static_cast<float>(_avg) * 0.001f, static_cast<float>(_std) * 0.001f, float(_sum) * 0.001f);
 	}
 	printf("\n");
 }
 
-std::map<std::string, ba::accumulator_set<uint64_t, ba::stats<ba::tag::variance(ba::lazy)> >> SimpleProfiler::mMap;
+std::map<std::string, SimpleProfiler::acc_t> SimpleProfiler::mMap;
 
-std::atomic<size_t> SimpleProfiler::mCallerNameWidth = 30; 
+std::atomic<size_t> SimpleProfiler::mCallerNameWidth = kDefaultCallerNameWidth; 
 
 }  // namespace Falcor

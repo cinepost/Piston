@@ -16,6 +16,7 @@ namespace boost = hboost;
 #include "../../piston_lib/wrap_curves_deformer.h"
 #include "../../piston_lib/curves_deformer_factory.h"
 #include "../../piston_lib/deformer_stats.h"
+#include "../../piston_lib/simple_profiler.h"
 #include "../../piston_lib/tests.h"
 
 #include <vector>
@@ -25,22 +26,30 @@ char const* greet() {
 	return "Parovoz Piston python library!";
 }
 
-using BSON = std::vector<uint8_t>;
 
-struct BSON_to_hex_string {
-    static PyObject *convert(BSON const& bson) {
-    	return boost::python::incref(boost::python::object(Piston::bson_to_hex_string(bson)).ptr());
-    }
+struct BSON_to_Python {
+	static PyObject *convert(const Piston::BSON& bson) {
+		dbg_printf("BSON_to_Python::convert()\n");
+		static const std::string sTestString = "Encoded bson data.";
+		return boost::python::incref(boost::python::object(sTestString).ptr());
+	}
 };
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_mt_overloads, Piston::BaseCurvesDeformer::deform_mt, 0, 1)
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_dbg_overloads, Piston::BaseCurvesDeformer::deform_dbg, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_overloads, Piston::BaseCurvesDeformer::writeJsonDataToPrim, 0, 1)
 
 
 BOOST_PYTHON_MODULE(_piston) {
-  using namespace boost::python;
-  using namespace Piston;
+ 	using namespace boost::python;
+	using namespace Piston;
+
+	class_<SimpleProfiler, boost::noncopyable>("Profiler",  no_init)
+		.def("printReport", &SimpleProfiler::printReport)
+		.staticmethod("printReport")
+		.def("clear", &SimpleProfiler::clear)
+		.staticmethod("clear")
+	;
 
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>())
@@ -55,8 +64,14 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getMeshRestPositionAttrName", &BaseCurvesDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
 		.def("setСurvesSkinPrimAttrName", &BaseCurvesDeformer::setСurvesSkinPrimAttrName)
 		.def("getСurvesSkinPrimAttrName", &BaseCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
+		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
+		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
+
+		.def("setMotionBlurState", &BaseCurvesDeformer::setMotionBlurState)
+		.def("getMotionBlurState", &BaseCurvesDeformer::getMotionBlurState)
+
 		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
-		.def("deform_mt", &BaseCurvesDeformer::deform_mt, BaseCurvesDeformer_deform_mt_overloads(args("time_code")))
+		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_overloads(args("time_code")))
 
 		.def("setReadJsonDataFromPrim", &BaseCurvesDeformer::setReadJsonDataFromPrim)
 		.def("writeJsonDataToPrim", &BaseCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
@@ -82,15 +97,14 @@ BOOST_PYTHON_MODULE(_piston) {
     	.value("SPACE", WrapCurvesDeformer::BindMode::SPACE)
     	.value("DIST", WrapCurvesDeformer::BindMode::DIST)
     	.export_values()
-    ;
+  ;
 
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)
 		.def("toString", &DeformerStats::toString)
 	;
 
-	to_python_converter<BSON , BSON_to_hex_string>();
+	to_python_converter<Piston::BSON , BSON_to_Python>();
 
-	def("runTests", &Tests::runTests);
-	
+	def("runTests", &Tests::runTests);	
 	def("greet", greet);
 }

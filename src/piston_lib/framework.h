@@ -4,9 +4,8 @@
 #include <memory>
 #include <iostream>
 
-#ifndef should_not_get_here
-#define should_not_get_here() assert(false)
-#endif
+#include <pxr/base/vt/array.h>
+#include <pxr/base/gf/matrix3f.h>
 
 #ifdef _DEBUG
 #define dbg_printf(...) printf(__VA_ARGS__)
@@ -16,6 +15,17 @@
 
 
 namespace Piston {
+
+using BSON = std::vector<std::uint8_t>;
+
+#define enum_class_operators(e_) \
+    inline e_ operator& (e_ a, e_ b) { return static_cast<e_>(static_cast<int>(a)& static_cast<int>(b)); } \
+    inline e_ operator| (e_ a, e_ b) { return static_cast<e_>(static_cast<int>(a)| static_cast<int>(b)); } \
+    inline e_& operator|= (e_& a, e_ b) { a = a | b; return a; } \
+    inline e_& operator&= (e_& a, e_ b) { a = a & b; return a; } \
+    inline e_  operator~ (e_ a) { return static_cast<e_>(~static_cast<int>(a)); } \
+    inline bool is_set(e_ val, e_ flag) { return (val & flag) != static_cast<e_>(0); } \
+    inline void flip_bit(e_& val, e_ flag) { val = is_set(val, flag) ? (val & (~flag)) : (val | flag); }
 
 // This is a helper class which should be used in case a class derives from a base class which derives from enable_shared_from_this
 // If Derived will also inherit enable_shared_from_this, it will cause multiple inheritance from enable_shared_from_this, which results in a runtime errors because we have 2 copies of the WeakPtr inside shared_ptr

@@ -14,6 +14,7 @@
 #include <array>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 
 
 namespace Piston {
@@ -39,13 +40,20 @@ class SerializablePhantomTrimesh;
 
 class PhantomTrimesh {
 	public:
-		static constexpr size_t kInvalidTriFaceID = std::numeric_limits<size_t>::max();
+		static constexpr uint32_t kInvalidTriFaceID = std::numeric_limits<uint32_t>::max();
 		using PxrIndexType = int;
 		using UniquePtr = std::unique_ptr<PhantomTrimesh>;
 
 		struct TriFace {
 			using IndicesList = std::array<PxrIndexType, 3>;
 			static constexpr PxrIndexType kInvalidVertexID = std::numeric_limits<PxrIndexType>::max();
+
+			enum class Flags: uint8_t {
+				None 	= 0x0,      ///< None
+				Bound 	= 0x1,      ///< Some curves are bound to this face
+
+				Default = None
+			};
 
 			TriFace(): indices{kInvalidVertexID} { }
 			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c): indices{a, b, c} { }
@@ -72,7 +80,7 @@ class PhantomTrimesh {
 			pxr::GfVec3f 	restNormal;
 		};
 
-		PhantomTrimesh() : mValid(false) {};
+		PhantomTrimesh();
 
 	public:
 		static PhantomTrimesh::UniquePtr create();
@@ -82,24 +90,31 @@ class PhantomTrimesh {
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
 		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
 
-		uint32_t getOrCreate(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
+		std::vector<TriFace::Flags>& getFaceFlags() { return mFaceFlags; }
+		const std::vector<TriFace::Flags>& getFaceFlags() const { return mFaceFlags; }
+
+		TriFace::Flags getFaceFlag(const uint32_t face_id) { assert(face_id < mFaceFlags.size()); return mFaceFlags[face_id]; }
+		void setFaceFlag(const uint32_t face_id, const TriFace::Flags flag) { assert(face_id < mFaceFlags.size()); mFaceFlags[face_id] = flag; }
+
+		uint32_t getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
+		uint32_t getOrCreateFaceID(PxrIndexType a, PxrIndexType b, PxrIndexType c);
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
-		const TriFace& getFace(uint32_t id) const { return mFaces[id]; }
-		size_t getFaceCount() const { return mFaces.size(); }
+		const TriFace& getFace(const uint32_t id) const { return mFaces[id]; }
+		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 
-		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v) const;
-		bool projectPoint(const pxr::GfVec3f& pt, uint32_t face_id, float& u, float& v, float& dist) const;
+		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const;
+		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v, float& dist) const;
 		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v) const;
 		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v, float& dist) const;
 
-		pxr::GfVec3f getInterpolatedRestPosition(uint32_t face_id, float u, float v) const;
-		pxr::GfVec3f getInterpolatedLivePosition(uint32_t face_id, float u, float v) const;
+		pxr::GfVec3f getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const;
+		pxr::GfVec3f getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const;
 
-		pxr::GfVec3f getFaceRestCentroid(uint32_t face_id) const;
+		pxr::GfVec3f getFaceRestCentroid(const uint32_t face_id) const;
 
-		const pxr::GfVec3f& getFaceRestNormal(uint32_t face_id) const;
-		pxr::GfVec3f getFaceLiveNormal(uint32_t face_id) const;
+		const pxr::GfVec3f& getFaceRestNormal(const uint32_t face_id) const;
+		pxr::GfVec3f getFaceLiveNormal(const uint32_t face_id) const;
 
 		bool isValid() const { return mValid; }
 		void invalidate();
@@ -109,11 +124,12 @@ class PhantomTrimesh {
 		size_t calcHash() const;
 
 	private:
-		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshRestPositions;
+		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
 		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
 
-		mutable std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
-		mutable std::vector<TriFace> 							mFaces;
+		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
+		std::vector<TriFace> 									mFaces;
+		std::vector<TriFace::Flags>								mFaceFlags;
 
 		bool                                        			mValid;
 
@@ -132,6 +148,7 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 
 		bool buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
+		PhantomTrimesh* getTrimesh();
 		const PhantomTrimesh* getTrimesh() const;
 
 		virtual const std::string& typeName() const override;
@@ -148,6 +165,10 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 		typename PhantomTrimesh::UniquePtr	mpTrimesh;
 };
 
+using TriFaceFlags = PhantomTrimesh::TriFace::Flags;
+
+inline TriFaceFlags operator& (TriFaceFlags a, TriFaceFlags b) { return static_cast<TriFaceFlags>(static_cast<uint8_t>(a)& static_cast<uint8_t>(b)); } \
+inline bool is_set(TriFaceFlags val, TriFaceFlags flag) { return (val & flag) != static_cast<TriFaceFlags>(0); } \
 
 } // namespace Piston
 

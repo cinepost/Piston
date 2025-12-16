@@ -30,7 +30,7 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 			float u, v, dist;
 			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
 
-			bool isValid() const { return face_id != kInvalidFaceID; }
+			inline bool isValid() const { return face_id != kInvalidFaceID; }
 		};
 
 		const std::vector<PointBindData>& 		getPointBinds() const { return mPointBinds; }
