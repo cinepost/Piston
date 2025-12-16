@@ -38,8 +38,12 @@ else() # WIN
 endif()
 
 if (NOT DEFINED ENV{HFS})
-  message( WARNING "Houdini HFS environment variable not set. Using default path: ${DEFAULT_HFS_PATH}")
-  set(ENV{HFS} ${DEFAULT_HFS_PATH})
+  if(WIN32)
+    message( WARNING "Houdini HFS environment variable not set. Using default path: ${DEFAULT_HFS_PATH}")
+    set(ENV{HFS} ${DEFAULT_HFS_PATH})
+  else()
+    message( FATAL_ERROR "Houdini HFS environment variable not set. Source .houdini_setup first!")
+  endif()
 endif()
 
 if (NOT DEFINED ENV{HIH})
