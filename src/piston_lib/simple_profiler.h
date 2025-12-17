@@ -13,7 +13,7 @@
 #include "framework.h"
 
 
-#ifdef _DEBUG
+#ifdef PISTON_DEBUG
 #define PROFILE(NAME) Piston::SimpleProfiler(NAME)
 #define PROFILE_PRINT() Piston::SimpleProfiler::printReport()
 #else

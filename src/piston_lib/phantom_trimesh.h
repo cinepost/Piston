@@ -57,6 +57,8 @@ class PhantomTrimesh {
 
 			TriFace(): indices{kInvalidVertexID} { }
 			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c): indices{a, b, c} { }
+			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c, const pxr::GfVec3f& _restNormal): indices{a, b, c}, restNormal(_restNormal) {}
+			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c, const float& n0, const float& n1, const float& n2): indices{a, b, c}, restNormal{n0, n1, n2} {}
 			TriFace(const std::array<PxrIndexType, 3>& d): indices{d} { }
 
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
@@ -116,6 +118,8 @@ class PhantomTrimesh {
 		const pxr::GfVec3f& getFaceRestNormal(const uint32_t face_id) const;
 		pxr::GfVec3f getFaceLiveNormal(const uint32_t face_id) const;
 
+		const std::vector<PxrIndexType>& getVertices() const { return mVertices; }
+
 		bool isValid() const { return mValid; }
 		void invalidate();
 
@@ -130,6 +134,9 @@ class PhantomTrimesh {
 		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
 		std::vector<TriFace> 									mFaces;
 		std::vector<TriFace::Flags>								mFaceFlags;
+
+		std::vector<PxrIndexType> 								mVertices;
+		std::unordered_set<PxrIndexType> 						mTmpVertices; // this is used only to insert unused vertices into mVertices
 
 		bool                                        			mValid;
 

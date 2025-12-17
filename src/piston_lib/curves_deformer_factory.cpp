@@ -46,6 +46,15 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 	}
 }
 
+void CurvesDeformerFactory::clear() {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+	factory.mDeformers.clear();
+	if(factory.mpPxrPointsLRUCache) {
+		factory.mpPxrPointsLRUCache->clear();
+	}
+}
+
 CurvesDeformerFactory::~CurvesDeformerFactory() {
 	SimpleProfiler::printReport();
 }

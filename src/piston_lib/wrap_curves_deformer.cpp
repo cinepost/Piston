@@ -56,7 +56,9 @@ bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(points.size() == mpWrapCurvesDeformerData->getPointBinds().size());
 	assert(mpAdjacencyData);
 
-	buildVertexNormals(mpAdjacencyData->getAdjacency(), pPhantomTrimesh, mLiveVertexNormals, true);
+	const bool build_live = true;
+
+	buildVertexNormals(mpAdjacencyData->getAdjacency(), pPhantomTrimesh, mLiveVertexNormals, build_live, (multi_threaded ? &mPool : nullptr));
 
 	bool result = false;
 	switch(mpWrapCurvesDeformerData->getBindMode()) {
@@ -160,10 +162,8 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
-bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) {
+bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	assert(mpAdjacencyData);
-
-	// Get mesh adjacency
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	assert(pAdjacency);
 
@@ -225,7 +225,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 		dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", src_mesh_face_count, tri_face_count);
 
 		std::vector<pxr::GfVec3f> rest_vertex_normals;
-		buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, false);
+		buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, false, (multi_threaded ? &mPool : nullptr));
 		mLiveVertexNormals.resize(rest_vertex_normals.size());
 
 		// Bind curve points

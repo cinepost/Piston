@@ -84,7 +84,7 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 	return mDeformerDataWritten;
 }
 
-bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code) {
+bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded) {
 	if(!mDirty) return true;
 
 	SimpleProfiler::clear();
@@ -126,7 +126,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code)
 		return false;
 	}
 
-	if(!buildDeformerDataImpl(reference_time_code)) {
+	if(!buildDeformerDataImpl(reference_time_code, multi_threaded)) {
 		std::cerr << "Error building deform data !" << std::endl;
 		return false;
 	}
@@ -140,7 +140,7 @@ bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code) {
 }
 
 bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {	
-	if(!buildDeformerData(time_code)) {
+	if(!buildDeformerData(time_code, multi_threaded)) {
 		return false;
 	}
 

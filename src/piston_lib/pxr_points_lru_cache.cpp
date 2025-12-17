@@ -39,6 +39,7 @@ PointsList* PxrPointsLRUCache::put(const CompositeKey& key, size_t points_count,
 }
 
 PointsList* PxrPointsLRUCache::put(const PxrPointsLRUCache::CompositeKey& key, PointsList&& points) {
+	std::lock_guard<std::mutex> lock(mMutex);
 	const size_t new_points_mem_reqs = points.sizeInBytes();
 	reduceMemUsage(mMaxMemSizeBytes - new_points_mem_reqs);
 
@@ -57,6 +58,7 @@ PointsList* PxrPointsLRUCache::put(const PxrPointsLRUCache::CompositeKey& key, P
 }
 
 const PointsList* PxrPointsLRUCache::get(const PxrPointsLRUCache::CompositeKey& key) const {
+	std::lock_guard<std::mutex> lock(mMutex);
 	auto it = mCacheItemsMap.find(key);
 	if (it == mCacheItemsMap.end()) {
 		dbg_printf("There is no such key (%s) in PxrPointsLRUCache.\n", key.name.c_str());
@@ -105,6 +107,13 @@ size_t PxrPointsLRUCache::removeByName(const std::string& name) {
 	}
 
 	return removed_count;
+}
+
+void PxrPointsLRUCache::clear() {
+	std::lock_guard<std::mutex> lock(mMutex);
+	mCacheItemsMap.clear();
+	mCacheItemsList.clear();
+	mCurrentMemSizeBytes = kInvalidUsedMemSize;
 }
 
 std::string PxrPointsLRUCache::getCacheUtilizationString() const {

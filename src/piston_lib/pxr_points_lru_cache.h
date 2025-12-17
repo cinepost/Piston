@@ -67,6 +67,8 @@ class PxrPointsLRUCache {
 
 		size_t itemsCount() const { return mCacheItemsList.size(); }
 
+		void clear();
+
 	private:
 		static constexpr size_t kInvalidUsedMemSize = std::numeric_limits<size_t>::max();
 
@@ -88,6 +90,7 @@ class PxrPointsLRUCache {
 		void shrink_unlock() { mShrinkLock = false; reduceMemUsage(mMaxMemSizeBytes); }
 
 		std::atomic<bool> mShrinkLock;
+		mutable std::mutex mMutex;
 
 		friend class PxrPointsLRUCacheShrinkLock;
 };

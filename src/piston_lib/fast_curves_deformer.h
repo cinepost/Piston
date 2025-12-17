@@ -38,12 +38,12 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) override;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override;
 		virtual bool writeJsonDataToPrimImpl() const override;
 
 		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
-		bool calcPerBindNormals(bool build_live);
-		bool calcPerBindTangentsAndBiNormals(bool build_live);
+		void calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pPhantomTrimesh, const std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
+		void calcPerBindTangentsAndBiNormals(const PhantomTrimesh* pPhantomTrimesh, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 
 		void transformCurvesToNTB();
 

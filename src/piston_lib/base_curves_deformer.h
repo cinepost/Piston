@@ -102,8 +102,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		DeformerStats mStats;
 
 	private:
-		bool buildDeformerData(pxr::UsdTimeCode reference_time_code);
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code) = 0;
+		bool buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
 		const std::string& uniqueName() const { return mUniqueName; }

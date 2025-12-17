@@ -7,7 +7,7 @@
 #include <pxr/base/vt/array.h>
 #include <pxr/base/gf/matrix3f.h>
 
-#ifdef _DEBUG
+#ifdef PISTON_DEBUG
 #define dbg_printf(...) printf(__VA_ARGS__)
 #else
 #define dbg_printf(...) {}

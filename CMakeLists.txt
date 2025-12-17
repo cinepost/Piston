@@ -130,15 +130,21 @@ set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bin 
 
 add_definitions(-DPISTON_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}")
 
+  message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_definitions(-D_DEBUG)
+  message("DEBUG!")
+  add_definitions(-DPISTON_DEBUG)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
-endif ()
+else()
+  message("RELEASE!")
+  remove_definitions(-DPISTON_DEBUG)
+endif()
 
 if(WIN32)
 add_compile_definitions(
   $<$<CONFIG:RELEASE>:NDEBUG>
-  $<$<CONFIG:DEBUG>:_DEBUG>
+  $<$<CONFIG:DEBUG>:PISTON_DEBUG>
   $<$<CONFIG:DEBUG>:Py_DEBUG>
   )
 endif()

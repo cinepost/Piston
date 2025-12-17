@@ -57,6 +57,9 @@ void PhantomTrimesh::invalidate() {
 	mFaceMap.clear();
 	mFaces.clear();
 	mFaceFlags.clear();
+
+	mVertices.clear();
+	mTmpVertices.clear();
 }
 
 uint32_t PhantomTrimesh::getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const {
@@ -84,6 +87,12 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, Phant
 
 	mFaces.emplace_back(indices);
 	mFaceFlags.emplace_back(TriFace::Flags::None);
+
+	mTmpVertices.insert(a);
+
+	if(mTmpVertices.insert(a).second == true) mVertices.push_back(a);
+	if(mTmpVertices.insert(b).second == true) mVertices.push_back(b);
+	if(mTmpVertices.insert(c).second == true) mVertices.push_back(c);
 
 	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
 
@@ -200,41 +209,72 @@ size_t PhantomTrimesh::calcHash() const {
 	size_t hash = 0;
 
 	for(const auto& pos: mUsdMeshRestPositions) {
-		hash += size_t(pos[0]) + size_t(pos[1]*10.f) + size_t(pos[2]*100.f);
+		hash += static_cast<uint32_t>(pos[0]) + (static_cast<uint32_t>(pos[1]) << 1) + (static_cast<uint32_t>(pos[2]) << 2);
 	}
-	hash += mUsdMeshRestPositions.size() * 100;
+	hash += mUsdMeshRestPositions.size() << 3;
 
 	for(const auto& face: mFaces) {
 		hash += face.calcHash();
 	}
-	hash += mFaces.size() * 1000;
+	hash += mFaces.size() << 6;
 
 	for(const TriFace::Flags flag: mFaceFlags) {
 		hash += static_cast<size_t>(flag);
 	}
-	hash += mFaceFlags.size() * 10000;
+	hash += mFaceFlags.size() << 8;
 
-	for( const auto& [k, v]: mFaceMap) {
-		hash += k[0] + k[1]*2 + k[2]*3 + v * 1000;
+	for(const auto& [k, v]: mFaceMap) {
+		hash += k[0] + (k[1] << 1) + (k[2] << 2) + (v << 7);
 	}
-	hash += mFaceMap.size() * 100000;
+	hash += mFaceMap.size() << 10;
+
+	size_t verices_hash = 0;
+	for(const PxrIndexType& i: mVertices) {
+		verices_hash += static_cast<uint32_t>(i); 
+	}
+	hash += verices_hash << 16;
 
 	return hash;
 }
 
-void to_json(json& j, const PhantomTrimesh::TriFace& face) {
-	j["indices"] = face.indices;
-	to_json(j["normal"], face.restNormal);
+//void to_json(json& j, const PhantomTrimesh::TriFace& face) {
+//	j["indices"] = face.indices;
+//	to_json(j["normal"], face.restNormal);
+//}
+
+//void from_json(const json& j, PhantomTrimesh::TriFace& face) {
+//	j.at("indices").get_to(face.indices);
+//	from_json(j["normal"], face.restNormal);
+//}
+
+void to_json(json& j, const std::vector<PhantomTrimesh::TriFace>& trifaces) {
+	for(const auto& f: trifaces) {
+    	j.push_back({
+    		f.indices[0], f.indices[1], f.indices[2],
+    		f.restNormal[0], f.restNormal[1], f.restNormal[2],
+    	});
+    }
 }
 
-void from_json(const json& j, PhantomTrimesh::TriFace& face) {
-	j.at("indices").get_to(face.indices);
-	from_json(j["normal"], face.restNormal);
+void from_json(const json& j, std::vector<PhantomTrimesh::TriFace>& trifaces) {
+	trifaces.clear();
+	for (const auto& e : j) {
+ 		trifaces.emplace_back(
+ 			e.at(0).template get<PhantomTrimesh::PxrIndexType>(),
+ 			e.at(1).template get<PhantomTrimesh::PxrIndexType>(),
+ 			e.at(2).template get<PhantomTrimesh::PxrIndexType>(),
+ 			e.at(3).template get<float>(),
+ 			e.at(4).template get<float>(),
+ 			e.at(5).template get<float>()
+ 		);
+	}
 }
+
 
 
 static constexpr const char* kJUsdRestPositions = "rest_pos";
 static constexpr const char* kJFaces = "faces";
+static constexpr const char* kJVertices = "vertices";
 static constexpr const char* kJFaceMap = "face_map";
 static constexpr const char* kJFaceFlags = "face_flags";
 static constexpr const char* kJDataHash = "hash";
@@ -276,6 +316,7 @@ bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 	j[kJFaces] = mpTrimesh->mFaces;
 	j[kJFaceMap] = mpTrimesh->mFaceMap;
 	j[kJFaceFlags] = mpTrimesh->mFaceFlags;
+	j[kJVertices] = mpTrimesh->mVertices;
 
 	j[kJDataHash] = mpTrimesh->calcHash();
 
@@ -290,6 +331,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	mpTrimesh->mFaces = j[kJFaces].template get<std::vector<PhantomTrimesh::TriFace>>();
 	mpTrimesh->mFaceMap = j[kJFaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
 	mpTrimesh->mFaceFlags = j[kJFaceFlags].template get<std::vector<PhantomTrimesh::TriFace::Flags>>();
+	mpTrimesh->mVertices = j[kJVertices].template get<std::vector<PhantomTrimesh::PxrIndexType>>();
 
 	const size_t json_trimesh_data_hash = j[kJDataHash];
 	const size_t calc_trimesh_data_hash = mpTrimesh->calcHash();
@@ -301,6 +343,11 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	if(mpTrimesh->mFaces.size() != mpTrimesh->mFaceFlags.size()) {
 		std::cerr << "Trimesh face and face_flags array sizes mismatch!" << std::endl;
 		return false;
+	}
+
+	mpTrimesh->mTmpVertices.clear();
+	for(const auto& vtx: mpTrimesh->mVertices) {
+		mpTrimesh->mTmpVertices.insert(vtx);
 	}
 
 	mpTrimesh->mValid = true;

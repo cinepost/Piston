@@ -55,6 +55,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>())
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
 		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
+		.def("clear", &CurvesDeformerFactory::clear)
 	;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)

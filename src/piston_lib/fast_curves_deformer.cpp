@@ -52,13 +52,20 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 		return false;
 	}
 
-	const bool build_live = true; // build using live data
-	if(!calcPerBindNormals(build_live)) {
-		std::cerr << "Error building interpolated live normals !" << std::endl;
+	assert(mpAdjacencyData);
+	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	assert(pAdjacency);
+
+	if(!pAdjacency) {
 		return false;
 	}
 
-	calcPerBindTangentsAndBiNormals(build_live);
+	const bool build_live = true; // build using live data
+	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
+
+	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+	calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+	calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
 
 	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
 
@@ -90,6 +97,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	};
 
 	if(multi_threaded) {
+		dbg_printf("FastCurvesDeformer::__deform__ %s\n", multi_threaded ? "multi_threaded" : "single thread");
 		mPool.detach_blocks(0u, curveBinds.size(), func);
 		mPool.wait();
 	} else {
@@ -107,19 +115,9 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
-bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) {
+bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	PROFILE("FastCurvesDeformer::buildDeformerDataImpl");
 	dbg_printf("FastCurvesDeformer::buildDeformerDataImpl()\n");
-
-	assert(mpAdjacencyData);
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
-	if(!pAdjacency->isValid()) {
-		std::cerr << "No valid mesh adjacency data!" << std::endl;
-		return false;
-	}
-
-	assert(pAdjacency->getMaxFaceVertexCount() > 0);
-
 
 	if(!mpFastCurvesDeformerData) {
 		mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
@@ -129,6 +127,24 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpFastCurvesDeformerData.get())) {
 		// Build deformer data in place if no json data present or not needed
 		
+		assert(mpAdjacencyData);
+		const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+		assert(pAdjacency);
+		if(!pAdjacency->isValid()) {
+			std::cerr << "No valid mesh adjacency data!" << std::endl;
+			return false;
+		}
+
+		assert(pAdjacency->getMaxFaceVertexCount() > 0);
+
+		assert(mpPhantomTrimeshData);
+		const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+		assert(pPhantomTrimesh);
+		if(!pPhantomTrimesh->isValid()) {
+			std::cerr << "No valid phantom trimesh data!" << std::endl;
+			return false;
+		}
+
 		if(!buildCurvesBindingData(rest_time_code)) {
 			return false;
 		}
@@ -140,18 +156,12 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 		mpFastCurvesDeformerData->mPerBindRestTBs.resize(binds_count);
 
 		// Additional per-bind rest normals if needed
-		const bool build_live_per_bind_data = false; // build using rest data
-
-		if(!calcPerBindNormals(build_live_per_bind_data)) {
-			std::cerr << "Error building per curve " << (build_live_per_bind_data ? "\"live\"" : "\"rest\"") << " normals !" << std::endl;
-			return false;
-		}
-
-		if(!calcPerBindTangentsAndBiNormals(build_live_per_bind_data)) {
-			std::cerr << "Error building per curve " << (build_live_per_bind_data ? "\"live\"" : "\"rest\"") << " tangents and binormals !" << std::endl;
-			return false;
-		}
-	
+		const bool build_live = false; // build using rest data
+		std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
+		buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+		calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+		calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
+		
 		mpFastCurvesDeformerData->setPopulated(true);
 	}
 
@@ -165,45 +175,38 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code) 
 	return true; 
 }
 
-bool FastCurvesDeformer::calcPerBindNormals(bool build_live) {
-	assert(mpAdjacencyData);
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pPhantomTrimesh, const std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool) {
 	assert(pAdjacency);
-
-	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
-
-	if(!pAdjacency || !pPhantomTrimesh) return false;
-
-	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
-
-	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live);
 
 	// Build per bind normals
 	auto& perBindNormals = build_live ? mPerBindLiveNormals : mpFastCurvesDeformerData->mPerBindRestNormals;
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
 	assert(perBindNormals.size() == curveBinds.size());
 
-	for(size_t i = 0; i < curveBinds.size(); ++i) {
-		const auto& bind = curveBinds[i];
+	auto func = [&](const std::size_t i) {
+        const auto& bind = curveBinds[i];
 		
-		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
+		if(bind.face_id != CurveBindData::kInvalidFaceID) {
+			const auto& face = pPhantomTrimesh->getFace(bind.face_id);
+			perBindNormals[i] = pxr::GfGetNormalized(bind.u * vertex_normals[face.indices[1]] + bind.v * vertex_normals[face.indices[2]] + (1.f - bind.u - bind.v) * vertex_normals[face.indices[0]]);
+    	}
+    };
 
-		const auto& face = pPhantomTrimesh->getFace(bind.face_id);
-		perBindNormals[i] = pxr::GfGetNormalized(bind.u * vertex_normals[face.indices[1]] + bind.v * vertex_normals[face.indices[2]] + (1.f - bind.u - bind.v) * vertex_normals[face.indices[0]]);
-	}
-
-	return true;
+	if(pThreadPool) {
+        BS::multi_future<void> loop = pThreadPool->submit_loop(0u, curveBinds.size(), func);
+        loop.wait();
+    } else {
+        for(size_t i = 0; i < curveBinds.size(); ++i) {
+            func(i);
+        }
+    }
 }
 
-bool FastCurvesDeformer::calcPerBindTangentsAndBiNormals(bool build_live) {
+void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* pPhantomTrimesh, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool) {
 	static constexpr float kF = 1.f / 3.f;
 
-	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
-
 	auto& perBindNormals = build_live ? mPerBindLiveNormals : mpFastCurvesDeformerData->mPerBindRestNormals;
 
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
@@ -222,19 +225,26 @@ bool FastCurvesDeformer::calcPerBindTangentsAndBiNormals(bool build_live) {
 		face_center_points[i] = (pt_positions[face.indices[0]] + pt_positions[face.indices[1]] + pt_positions[face.indices[2]]) * kF;
 	}
 
-	for(size_t i = 0; i < curveBinds.size(); ++i) {
+	auto func = [&](const std::size_t i) {
 		const auto& bind = curveBinds[i];
 		
-		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
+		if(bind.face_id != CurveBindData::kInvalidFaceID) {
+			const auto& face = faces[bind.face_id];
+			const pxr::GfVec3f root_proj_pos = bind.u * pt_positions[face.indices[0]] + bind.v * pt_positions[face.indices[2]] + (1.f - bind.u - bind.v) * pt_positions[face.indices[1]];
+			const pxr::GfVec3f tmp_binormal = face_center_points[bind.face_id] - root_proj_pos;
+			mPerBindTBs[i].first = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], tmp_binormal)); // tangent
+			mPerBindTBs[i].second = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], mPerBindTBs[i].first)); //binormal
+    	}
+    };
 
-		const auto& face = faces[bind.face_id];
-		const pxr::GfVec3f root_proj_pos = bind.u * pt_positions[face.indices[0]] + bind.v * pt_positions[face.indices[2]] + (1.f - bind.u - bind.v) * pt_positions[face.indices[1]];
-		const pxr::GfVec3f tmp_binormal = face_center_points[bind.face_id] - root_proj_pos;
-		mPerBindTBs[i].first = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], tmp_binormal)); // tangent
-		mPerBindTBs[i].second = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], mPerBindTBs[i].first)); //binormal
-	}
-
-	return true;
+	if(pThreadPool) {
+        BS::multi_future<void> loop = pThreadPool->submit_loop(0u, curveBinds.size(), func);
+        loop.wait();
+    } else {
+        for(size_t i = 0; i < curveBinds.size(); ++i) {
+            func(i);
+        }
+    }
 }
 
 void FastCurvesDeformer::transformCurvesToNTB() {

@@ -5,6 +5,9 @@
 
 #include <memory>
 #include <string>
+
+#include "BS_thread_pool.hpp"
+
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 
@@ -65,7 +68,7 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &u, float &v);
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v);
 
-void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live);
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 
 } // namespace Piston
 
