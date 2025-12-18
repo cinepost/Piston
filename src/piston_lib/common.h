@@ -25,8 +25,8 @@ const char *stringifyMemSize(size_t bytes);
 std::string bson_to_hex_string(const BSON& bson);
 void hex_string_to_bson(const std::string& str, BSON& bson);
 
-bool isMeshGeoPrim(const pxr::UsdPrim& pGeoPrim);
-bool isCurvesGeoPrim(const pxr::UsdPrim& getPrim);
+inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "Mesh"; }
+inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "BasisCurves"; }
 
 class SerializableDeformerDataBase;
 
@@ -39,8 +39,8 @@ class UsdPrimHandle {
 
 		bool isValid() const { return mPrim.IsValid(); }
 
-		bool isMeshGeoPrim() const { return mPrim.GetTypeName() == "Mesh"; }
-		bool isHairGeoPrim() const { return mPrim.GetTypeName() == "BasisCurves"; }
+		bool isMeshGeoPrim() const { return Piston::isMeshGeoPrim(mPrim); }
+		bool isBasisCurvesGeoPrim() const { return Piston::isBasisCurvesGeoPrim(mPrim); }
 
 		std::string  getName() const { return getPath().GetName(); }
 		pxr::SdfPath getPath() const { return mPrim.GetPath(); }

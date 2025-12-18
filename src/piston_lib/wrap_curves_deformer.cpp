@@ -49,7 +49,7 @@ bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
-	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid() || !pPhantomTrimesh->update(mMeshGeoPrimHandle, time_code)) {
+	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid() || !pPhantomTrimesh->update(mDeformerGeoPrimHandle, time_code)) {
 		return false;
 	}
 

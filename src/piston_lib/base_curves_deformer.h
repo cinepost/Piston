@@ -35,7 +35,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		enum class Type { 
 			FAST, 
-			WRAP, 
+			WRAP,
+			GUIDE, 
 			UNKNOWN 
 		};
 
@@ -48,8 +49,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	public:
 		virtual ~BaseCurvesDeformer() {}
 
-		void setMeshGeoPrim(const pxr::UsdPrim& pGeoPrim);
-		void setCurvesGeoPrim(const pxr::UsdPrim& pGeoPrim);
+		void setDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
+		void setCurvesGeoPrim(const pxr::UsdPrim& geoPrim);
 
 		void setReadJsonDataFromPrim(bool state);
 		bool getReadJsonDataState() const { return mReadJsonDeformerData; }
@@ -78,6 +79,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
+		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
+
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		void makeDirty();
@@ -86,7 +89,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		bool mDirty = true;
 		bool mDeformerDataWritten = false;
 		
-		UsdPrimHandle mMeshGeoPrimHandle;
+		UsdPrimHandle mDeformerGeoPrimHandle;
 		UsdPrimHandle mCurvesGeoPrimHandle;
 
 		SerializableUsdGeomMeshFaceAdjacency::UniquePtr 	mpAdjacencyData;

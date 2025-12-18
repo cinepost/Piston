@@ -33,6 +33,8 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 		static SharedPtr create(const std::string& name);
 		virtual const std::string& toString() const override;
 
+		void setMeshGeoPrim(const pxr::UsdPrim& geoPrim) { setDeformerGeoPrim(geoPrim); }
+
 		void setBindMode(BindMode mode);
 		const BindMode& getBindMode() const;
 

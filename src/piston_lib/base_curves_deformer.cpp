@@ -24,24 +24,28 @@ BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const s
 	mpTempStage = pxr::UsdStage::CreateInMemory();
 }
 
-void BaseCurvesDeformer::setMeshGeoPrim(const pxr::UsdPrim& geoPrim) {
-	//assert(pGeoPrim);
-	if(mMeshGeoPrimHandle == geoPrim) return;
-	if(!isMeshGeoPrim(geoPrim)) {
-		mMeshGeoPrimHandle.clear();
-		std::cerr << "Mesh geometry prim is not \"Mesh\"!" << std::endl;
+void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
+	if(mDeformerGeoPrimHandle == geoPrim) return;
+	
+	if(!validateDeformerGeoPrim(geoPrim)) {
+		mDeformerGeoPrimHandle.clear();
+		std::cerr << "Invalid deformer geometry prim " <<  geoPrim.GetPath().GetText() << " type!" << std::endl;
 		return;
 	}
 
-	mMeshGeoPrimHandle = UsdPrimHandle(geoPrim);
+	mDeformerGeoPrimHandle = UsdPrimHandle(geoPrim);
 	makeDirty();
 
-	dbg_printf("Mesh geometry prim is set to: %s\n", mMeshGeoPrimHandle.getPath().GetText());
+	dbg_printf("Mesh geometry prim is set to: %s\n", mDeformerGeoPrimHandle.getPath().GetText());
+}
+
+bool BaseCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
+	return isMeshGeoPrim(geoPrim);
 }
 
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
 	if(mCurvesGeoPrimHandle == geoPrim) return;
-	if(!isCurvesGeoPrim(geoPrim)) {
+	if(!isBasisCurvesGeoPrim(geoPrim)) {
 		mCurvesGeoPrimHandle.clear();
 		std::cerr << "Curves geometry prim is not \"BasisCurves\"!" << std::endl;
 		return;
@@ -70,7 +74,7 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 		return false;
 	}
 
-	if(!mMeshGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
+	if(!mDeformerGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
 		std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !" << std::endl;
 		return false;
 	}
@@ -89,7 +93,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 
 	SimpleProfiler::clear();
 
-	if(!mMeshGeoPrimHandle || !mCurvesGeoPrimHandle) {
+	if(!mDeformerGeoPrimHandle || !mCurvesGeoPrimHandle) {
 		std::cerr << "No mesh or curves UsdPrim is set !" << std::endl;
 		return false;
 	}
@@ -99,9 +103,9 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 	}
 
 	// Get primitive adjacency json data if present
-	if(!mReadJsonDeformerData || !mMeshGeoPrimHandle.getDataFromBson(mpAdjacencyData.get())) {
+	if(!mReadJsonDeformerData || !mDeformerGeoPrimHandle.getDataFromBson(mpAdjacencyData.get())) {
 		// Build in place if no json data present or not needed
-		if(!mpAdjacencyData->buildInPlace(mMeshGeoPrimHandle)) {
+		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
 			std::cerr << "Error building mesh adjacency data!" << std::endl;
 			return false;
 		}
@@ -114,7 +118,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 	// Get phantom mesh json data if present
 	if(!mReadJsonDeformerData || !mCurvesGeoPrimHandle.getDataFromBson(mpPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
-		if(!mpPhantomTrimeshData->buildInPlace(mMeshGeoPrimHandle, getMeshRestPositionAttrName())) {
+		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getMeshRestPositionAttrName())) {
 			std::cerr << "Error building phantom mesh data!" << std::endl;
 			return false;
 		}
@@ -211,7 +215,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 			const pxr::GfVec3f* p_pts_from_ptr = pPointsFrom->data();
 			const pxr::GfVec3f* p_pts_to_ptr = pPointsTo->data();
 
-			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mMeshGeoPrimHandle.getStageTimeCodesPerSecond());
+			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mDeformerGeoPrimHandle.getStageTimeCodesPerSecond());
 
 			for(size_t i = 0; i < tmp_velicities_list_ptr->size(); ++i) {
 				(*tmp_velicities_list_ptr)[i] = (p_pts_to_ptr[i] - p_pts_from_ptr[i]) * k;

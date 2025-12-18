@@ -97,16 +97,6 @@ const char *stringifyMemSize(size_t bytes) {
 	return output;
 }
 
-bool isMeshGeoPrim(const pxr::UsdPrim& geoPrim) {
-	if(geoPrim.GetTypeName() != "Mesh") return false;
-	return true;
-}
-
-bool isCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
-	if(geoPrim.GetTypeName() != "BasisCurves") return false;
-	return true;
-}
-
 UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()) {}
 
 UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim) {

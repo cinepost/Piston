@@ -4,6 +4,7 @@
 #include "base_curves_deformer.h"
 #include "fast_curves_deformer.h"
 #include "wrap_curves_deformer.h"
+#include "guides_curves_deformer.h"
 #include "pxr_points_lru_cache.h"
 
 #include "simple_profiler.h"
@@ -43,6 +44,7 @@ class CurvesDeformerFactory {
 
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
+	    static GuidesCurvesDeformer::SharedPtr getGuidesDeformer(const std::string& name);
 
 	    static void clear();
 
