@@ -2,7 +2,7 @@
 #define PISTON_LIB_FAST_CURVES_DEFORMER_H_
 
 #include "framework.h"
-#include "base_curves_deformer.h"
+#include "base_mesh_curves_deformer.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 #include "curves_container.h"
@@ -19,7 +19,7 @@
 
 namespace Piston {
 
-class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, FastCurvesDeformer> {
+class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_from_this<BaseMeshCurvesDeformer, FastCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;
 		using CurveBindData = FastCurvesDeformerData::CurveBindData;
@@ -40,8 +40,8 @@ class FastCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override;
-		virtual bool writeJsonDataToPrimImpl() const override;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		virtual bool writeJsonDataToPrimImpl() const;
 
 		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
 		void calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pPhantomTrimesh, const std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);

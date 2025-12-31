@@ -3,8 +3,15 @@
 namespace Piston {
 
 
-PxrCurvesContainer::PxrCurvesContainer() {
+PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0) {
 
+}
+
+PxrCurvesContainer::PxrCurvesContainer(PxrCurvesContainer& other) {
+	mCurvesCount = other.mCurvesCount;
+	mCurveOffsets = other.mCurveOffsets;
+	mCurveRootPositions = other.mCurveRootPositions;
+	mCurveVectors = other.mCurveVectors;
 }
 
 bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
@@ -21,9 +28,9 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	}
 
 	// Curves. points
-	pxr::VtArray<pxr::GfVec3f> curveRestPoints;
+	pxr::VtArray<pxr::GfVec3f> curvePoints;
 
-	if(!geom_curves.GetPointsAttr().Get(&curveRestPoints, rest_time_code)) {
+	if(!geom_curves.GetPointsAttr().Get(&curvePoints, rest_time_code)) {
 		std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
 		return false;
 	}
@@ -46,15 +53,15 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	}
 
 	// Calc curves derivs
-	mCurveRestRootPositions.resize(mCurvesCount);
-	mCurveRestVectors.resize(total_vertex_count);
+	mCurveRootPositions.resize(mCurvesCount);
+	mCurveVectors.resize(total_vertex_count);
 	for(size_t i = 0; i < mCurvesCount; ++i) {
-		mCurveRestRootPositions[i] = curveRestPoints[mCurveOffsets[i]];
+		mCurveRootPositions[i] = curvePoints[mCurveOffsets[i]];
 		
-		mCurveRestVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
+		mCurveVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
 
 		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			mCurveRestVectors[mCurveOffsets[i] + j] = curveRestPoints[mCurveOffsets[i] + j] - mCurveRestRootPositions[i];
+			mCurveVectors[mCurveOffsets[i] + j] = curvePoints[mCurveOffsets[i] + j] - mCurveRootPositions[i];
 		}
 	}
 
@@ -63,6 +70,9 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	return true;
 }
 
+PxrCurvesContainer::UniquePtr PxrCurvesContainer::create() {
+	return PxrCurvesContainer::UniquePtr(new PxrCurvesContainer());
+}
 
 PxrCurvesContainer::UniquePtr PxrCurvesContainer::create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	PxrCurvesContainer::UniquePtr pResult = PxrCurvesContainer::UniquePtr(new PxrCurvesContainer());
@@ -74,13 +84,13 @@ PxrCurvesContainer::UniquePtr PxrCurvesContainer::create(const UsdPrimHandle& pr
 PxrCurvesContainer::CurveDataPtr PxrCurvesContainer::getCurveDataPtr(size_t curve_idx) {
 	assert(curve_idx < mCurveOffsets.size());
 
-	return {mCurveVertexCounts[curve_idx], &mCurveRestVectors[mCurveOffsets[curve_idx]]};
+	return {mCurveVertexCounts[curve_idx], &mCurveVectors[mCurveOffsets[curve_idx]]};
 }
 
 const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t curve_idx) const {
-	assert(curve_idx < mCurveRestRootPositions.size());
+	assert(curve_idx < mCurveRootPositions.size());
 
-	return mCurveRestRootPositions[curve_idx];
+	return mCurveRootPositions[curve_idx];
 }
 
 } // namespace Piston

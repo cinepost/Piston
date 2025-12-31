@@ -19,7 +19,7 @@ namespace Piston {
 static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
-WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
+WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
 	dbg_printf("WrapCurvesDeformer::WrapCurvesDeformer(%s)\n", name.c_str());
 
 	mpWrapCurvesDeformerData = std::make_unique<WrapCurvesDeformerData>();
@@ -155,6 +155,10 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 }
 
 bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
+	if(!BaseMeshCurvesDeformer::writeJsonDataToPrimImpl()) {
+		return false;
+	}
+
 	if(!mCurvesGeoPrimHandle.writeDataToBson(mpWrapCurvesDeformerData.get())) {
 		std::cerr << "Error writing " << mpWrapCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
@@ -163,6 +167,11 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 }
 
 bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+
+	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
+		return false;
+	}
+
 	assert(mpAdjacencyData);
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	assert(pAdjacency);

@@ -5,7 +5,7 @@
 #include "base_curves_deformer.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
-#include "curves_container.h"
+#include "guide_curves_container.h"
 #include "guides_curves_deformer_data.h"
 
 #include <memory>
@@ -19,6 +19,11 @@
 
 namespace Piston {
 
+namespace {
+	const std::string kGuideIDPrimAttrName = "clumpid";
+}
+
+
 class GuidesCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, GuidesCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<GuidesCurvesDeformer>;
@@ -29,6 +34,9 @@ class GuidesCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fr
 
 		static SharedPtr create(const std::string& name);
 		virtual const std::string& toString() const override;
+
+		void setGuideIDPrimAttrName(const std::string& name);
+		const std::string& getGuideIDPrimAttrName() const { return mGuideIDPrimAttrName; }
 
 	protected:
 		GuidesCurvesDeformer(const std::string& name);
@@ -41,10 +49,14 @@ class GuidesCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fr
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override;
-		virtual bool writeJsonDataToPrimImpl() const override;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		virtual bool writeJsonDataToPrimImpl() const;
 
-		std::unique_ptr<GuidesCurvesDeformerData>             mpGuidesCurvesDeformerData;
+		std::unique_ptr<GuidesCurvesDeformerData>   mpGuidesCurvesDeformerData;
+
+		GuideCurvesContainer::UniquePtr 			mpGuideCurvesContainer;
+		
+		std::string 								mGuideIDPrimAttrName = kGuideIDPrimAttrName;
 };
 
 } // namespace Piston

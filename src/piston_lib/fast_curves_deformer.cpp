@@ -20,7 +20,7 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 
 namespace Piston {
 
-FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
+FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
 	dbg_printf("FastCurvesDeformer::FastCurvesDeformer(%s)\n", name.c_str());
 	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
 }
@@ -108,6 +108,10 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 }
 
 bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
+	if(!BaseMeshCurvesDeformer::writeJsonDataToPrimImpl()) {
+		return false;
+	}
+
 	if(!mCurvesGeoPrimHandle.writeDataToBson(mpFastCurvesDeformerData.get())) {
 		std::cerr << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
@@ -118,6 +122,10 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	PROFILE("FastCurvesDeformer::buildDeformerDataImpl");
 	dbg_printf("FastCurvesDeformer::buildDeformerDataImpl()\n");
+
+	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
+		return false;
+	}
 
 	if(!mpFastCurvesDeformerData) {
 		mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();

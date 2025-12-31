@@ -19,10 +19,12 @@ class GuidesCurvesDeformer;
 class GuidesCurvesDeformerData : public SerializableDeformerDataBase {
 	public:
 		struct PointBindData {
-			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
-			uint32_t face_id;
-			float u, v;
-			PointBindData(): face_id(kInvalidFaceID) {};
+			static constexpr uint32_t kInvalid = std::numeric_limits<uint16_t>::max();
+			uint16_t guide_id, vtx;
+			pxr::GfVec3f vec;
+			PointBindData(): guide_id(kInvalid), vtx(kInvalid) {};
+
+			inline size_t hash() const { return static_cast<size_t>(guide_id + vtx) + static_cast<size_t>(vec[0] + vec[1] + vec[2]); }
 		};
 
 		const std::vector<PointBindData>& 							getPointBinds() const { return mPointBinds; }

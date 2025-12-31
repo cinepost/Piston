@@ -12,25 +12,10 @@ void GuidesCurvesDeformerData::clearData() {
 size_t GuidesCurvesDeformerData::calcHash() const {
 	size_t hash = 0;
 
-	for(const auto& bind: mCurveBinds) {
-		hash += static_cast<size_t>(bind.face_id * (bind.u + bind.v));
+	for(const auto& bind: mPointBinds) {
+		hash += bind.hash();
 	}
-	hash += mCurveBinds.size();
-
-	for(const auto& n: mRestVertexNormals) {
-		hash += static_cast<size_t>(n[0] + n[1] + n[2]);
-	}
-	hash += mRestVertexNormals.size();
-
-	for(const auto& n: mPerBindRestNormals) {
-		hash += static_cast<size_t>(n[0] + n[1] + n[2]);
-	}
-	hash += mPerBindRestNormals.size();
-
-	for(const auto& [t, b]: mPerBindRestTBs) {
-		hash += static_cast<size_t>(t[0]*b[0] + t[1]*b[1] + t[2]*b[2]);
-	}
-	hash += mPerBindRestTBs.size();
+	hash += mPointBinds.size();
 
 	return hash;
 }
@@ -69,17 +54,17 @@ const std::string& GuidesCurvesDeformerData::jsonDataKey() const {
 }
 
 const SerializableDeformerDataBase::DataVersion& GuidesCurvesDeformerData::jsonDataVersion() const {
-	return kFastBindingDataVersion;
+	return kGuidesBindingDataVersion;
 }
 
-void to_json(json& j, const GuidesCurvesDeformerData::CurveBindData& bind) {
-	j = {bind.face_id, bind.u, bind.v};
+void to_json(json& j, const GuidesCurvesDeformerData::PointBindData& bind) {
+	j = {bind.guide_id, bind.vtx, bind.vec[0], bind.vec[1], bind.vec[2]};
 }
 
-void from_json(const json& j, GuidesCurvesDeformerData::CurveBindData& bind) {
-	bind.face_id = j.at(0).template get<uint32_t>();
-	bind.u = j.at(1).template get<float>();
-	bind.v = j.at(2).template get<float>();
+void from_json(const json& j, GuidesCurvesDeformerData::PointBindData& bind) {
+	bind.guide_id = j.at(0).template get<uint16_t>();
+	bind.vtx = j.at(1).template get<uint16_t>();
+	bind.vec = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
 }
 
 } // namespace Piston

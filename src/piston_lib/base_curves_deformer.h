@@ -6,8 +6,6 @@
 #include "curves_container.h"
 #include "deformer_stats.h"
 #include "serializable_data.h"
-#include "adjacency.h"
-#include "phantom_trimesh.h"
 #include "simple_profiler.h"
 
 #include "BS_thread_pool.hpp" // BS::multi_future, BS::thread_pool
@@ -24,8 +22,6 @@
 namespace Piston {
 
 namespace {
-	const std::string kMeshRestPositionAttrName = "rest_p";
-	const std::string kСurvesSkinPrimAttrName = "skinprim";
 	const std::string kVelocitiAttrName = "velocities";
 }
 
@@ -36,7 +32,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		enum class Type { 
 			FAST, 
 			WRAP,
-			GUIDE, 
+			GUIDES, 
 			UNKNOWN 
 		};
 
@@ -56,12 +52,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		bool getReadJsonDataState() const { return mReadJsonDeformerData; }
 		bool writeJsonDataToPrim(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		void setMeshRestPositionAttrName(const std::string& name);
-		const std::string& getMeshRestPositionAttrName() const { return mMeshRestPositionAttrName; }
-
-		void setСurvesSkinPrimAttrName(const std::string& name);
-		const std::string& getСurvesSkinPrimAttrName() const { return mСurvesSkinPrimAttrName; }
-
 		void setVelocityAttrName(const std::string& name);
 		const std::string& getVelocityAttrName() const { return mVelocityAttrName; }
 
@@ -79,7 +69,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
-		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
+		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) = 0;
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
@@ -92,11 +82,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		UsdPrimHandle mDeformerGeoPrimHandle;
 		UsdPrimHandle mCurvesGeoPrimHandle;
 
-		SerializableUsdGeomMeshFaceAdjacency::UniquePtr 	mpAdjacencyData;
-		SerializablePhantomTrimesh::UniquePtr				mpPhantomTrimeshData;
-
-		std::string   mMeshRestPositionAttrName = kMeshRestPositionAttrName;
-		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		std::string   mVelocityAttrName = kVelocitiAttrName;
 		
 		PxrCurvesContainer::UniquePtr mpCurvesContainer;
@@ -104,11 +89,12 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		BS::thread_pool<BS::tp::none> mPool;
 		DeformerStats mStats;
 
-	private:
-		bool buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);
+	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
+	private:
+		bool buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);
 		const std::string& uniqueName() const { return mUniqueName; }
 		std::string velocityKeyName() const { return uniqueName() + "_vel"; }
 
@@ -121,7 +107,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		pxr::UsdStageRefPtr mpTempStage;
 
-		bool mCalcMotionVectors = true;
+		bool mCalcMotionVectors = false;
 		MotionBlurDirection mMotionBlurDirection = MotionBlurDirection::TRAILING;
 
 		bool mReadJsonDeformerData = false;

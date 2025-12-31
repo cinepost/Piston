@@ -39,10 +39,6 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
 	dbg_printf("Mesh geometry prim is set to: %s\n", mDeformerGeoPrimHandle.getPath().GetText());
 }
 
-bool BaseCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
-	return isMeshGeoPrim(geoPrim);
-}
-
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
 	if(mCurvesGeoPrimHandle == geoPrim) return;
 	if(!isBasisCurvesGeoPrim(geoPrim)) {
@@ -74,16 +70,6 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 		return false;
 	}
 
-	if(!mDeformerGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
-		std::cerr << "Error writing " << mpAdjacencyData->typeName() << " deformer mesh data to json !" << std::endl;
-		return false;
-	}
-
-	if(!mCurvesGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
-		std::cerr << "Error writing " << mpPhantomTrimeshData->typeName() << " deformer curves data to json !" << std::endl;
-		return false;
-	}
-
 	mDeformerDataWritten = writeJsonDataToPrimImpl();
 	return mDeformerDataWritten;
 }
@@ -98,32 +84,6 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 		return false;
 	}
 
-	if(!mpAdjacencyData) {
-		mpAdjacencyData = std::make_unique<SerializableUsdGeomMeshFaceAdjacency>();
-	}
-
-	// Get primitive adjacency json data if present
-	if(!mReadJsonDeformerData || !mDeformerGeoPrimHandle.getDataFromBson(mpAdjacencyData.get())) {
-		// Build in place if no json data present or not needed
-		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
-			std::cerr << "Error building mesh adjacency data!" << std::endl;
-			return false;
-		}
-	}
-
-	if(!mpPhantomTrimeshData) {
-		mpPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
-	}
-
-	// Get phantom mesh json data if present
-	if(!mReadJsonDeformerData || !mCurvesGeoPrimHandle.getDataFromBson(mpPhantomTrimeshData.get())) {
-		// Build in place if no json data present or not needed
-		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getMeshRestPositionAttrName())) {
-			std::cerr << "Error building phantom mesh data!" << std::endl;
-			return false;
-		}
-	}
-	
 	mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, reference_time_code);
 	if(!mpCurvesContainer) {
 		std::cerr << "Error creating curves container !" << std::endl;
@@ -131,7 +91,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 	}
 
 	if(!buildDeformerDataImpl(reference_time_code, multi_threaded)) {
-		std::cerr << "Error building deform data !" << std::endl;
+		std::cerr << "Error building deformer data !" << std::endl;
 		return false;
 	}
 
@@ -254,17 +214,6 @@ void BaseCurvesDeformer::setMotionBlurState(bool state) {
 	}
 }
 
-void BaseCurvesDeformer::setMeshRestPositionAttrName(const std::string& name) {
-	if(mMeshRestPositionAttrName == name) return;
-	mMeshRestPositionAttrName = name;
-	makeDirty();
-}
-
-void BaseCurvesDeformer::setСurvesSkinPrimAttrName(const std::string& name) {
-	if(mСurvesSkinPrimAttrName == name) return;
-	mСurvesSkinPrimAttrName = name;
-	makeDirty();
-}
 
 void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
 	if(mVelocityAttrName == name) return;

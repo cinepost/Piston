@@ -12,6 +12,7 @@ namespace boost = hboost;
 #endif // BOOST_PYTHON_MODULE
 
 #include "../../piston_lib/base_curves_deformer.h"
+#include "../../piston_lib/base_mesh_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
 #include "../../piston_lib/wrap_curves_deformer.h"
 #include "../../piston_lib/guides_curves_deformer.h"
@@ -63,10 +64,6 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
 		.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim)
 		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim)
-		.def("setMeshRestPositionAttrName", &BaseCurvesDeformer::setMeshRestPositionAttrName)
-		.def("getMeshRestPositionAttrName", &BaseCurvesDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
-		.def("setСurvesSkinPrimAttrName", &BaseCurvesDeformer::setСurvesSkinPrimAttrName)
-		.def("getСurvesSkinPrimAttrName", &BaseCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
 		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
 		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
 
@@ -82,26 +79,40 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &BaseCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
-	class_<FastCurvesDeformer, FastCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("FastCurvesDeformer", no_init)
+	class_<BaseMeshCurvesDeformer, BaseMeshCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("BaseMeshCurvesDeformer",  no_init)
+		.def("setMeshRestPositionAttrName", &BaseMeshCurvesDeformer::setMeshRestPositionAttrName)
+		.def("getMeshRestPositionAttrName", &BaseMeshCurvesDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
+		.def("setСurvesSkinPrimAttrName", &BaseMeshCurvesDeformer::setСurvesSkinPrimAttrName)
+		.def("getСurvesSkinPrimAttrName", &BaseMeshCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
+
+		.def("setReadJsonDataFromPrim", &BaseMeshCurvesDeformer::setReadJsonDataFromPrim)
+		.def("writeJsonDataToPrim", &BaseMeshCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
+
+		.def("toString", &BaseMeshCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+	;
+
+	class_<FastCurvesDeformer, FastCurvesDeformer::SharedPtr, bases<BaseMeshCurvesDeformer>, boost::noncopyable>("FastCurvesDeformer", no_init)
 		.def("create", &FastCurvesDeformer::create)
 		.staticmethod("create")
 		.def("setMeshGeoPrim", &FastCurvesDeformer::setMeshGeoPrim)
 		.def("toString", &FastCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
-	class_<GuidesCurvesDeformer, GuidesCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("GuidesCurvesDeformer", no_init)
-		.def("create", &GuidesCurvesDeformer::create)
-		.staticmethod("create")
-		.def("toString", &GuidesCurvesDeformer::toString, return_value_policy<copy_const_reference>())
-	;
-
-	class_<WrapCurvesDeformer, WrapCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("WrapCurvesDeformer", no_init)
+	class_<WrapCurvesDeformer, WrapCurvesDeformer::SharedPtr, bases<BaseMeshCurvesDeformer>, boost::noncopyable>("WrapCurvesDeformer", no_init)
 		.def("create", &WrapCurvesDeformer::create)
 		.staticmethod("create")
 		.def("setMeshGeoPrim", &WrapCurvesDeformer::setMeshGeoPrim)
 		.def("setBindMode", &WrapCurvesDeformer::setBindMode)
 		.def("getBindMode", &WrapCurvesDeformer::getBindMode, return_value_policy<copy_const_reference>())
 		.def("toString", &WrapCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+	;
+
+	class_<GuidesCurvesDeformer, GuidesCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("GuidesCurvesDeformer", no_init)
+		.def("create", &GuidesCurvesDeformer::create)
+		.staticmethod("create")
+		.def("toString", &GuidesCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+		.def("setGuideIDPrimAttrName",  &GuidesCurvesDeformer::setGuideIDPrimAttrName)
+		.def("getGuideIDPrimAttrName", &GuidesCurvesDeformer::getGuideIDPrimAttrName, return_value_policy<copy_const_reference>())
 	;
 
 	enum_<WrapCurvesDeformer::BindMode>("__BindMode")

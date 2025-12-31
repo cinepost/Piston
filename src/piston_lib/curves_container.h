@@ -25,6 +25,7 @@ class PxrCurvesContainer {
 		using UniquePtr = std::unique_ptr<PxrCurvesContainer>;
 		using CurveDataPtr = std::pair<int, pxr::GfVec3f*>;  // curve <count, ptr> pair
 
+		static UniquePtr create();
 		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
 		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code);
@@ -32,18 +33,10 @@ class PxrCurvesContainer {
 		bool empty() const { return mCurvesCount == 0; }
 
 		size_t 		getCurvesCount() const { return mCurvesCount; }
-		size_t 		getTotalVertexCount() const { return mCurveRestVectors.size(); }
+		size_t 		getTotalVertexCount() const { return mCurveVectors.size(); }
 		uint32_t	getCurveVertexOffset(size_t curve_idx) const { return mCurveOffsets[curve_idx]; }
 
 		int 		getCurveVertexCount(size_t curve_idx) const { return mCurveVertexCounts[curve_idx]; }
-
-		//std::vector<pxr::GfVec3f>& getPointsCache() { return mPointsCache; }
-		//std::vector<pxr::GfVec3f>* getPointsCachePtr() { return &mPointsCache; }
-
-		//const std::vector<pxr::GfVec3f>& getPointsCache() const { return mPointsCache; }
-		//const std::vector<pxr::GfVec3f>* getPointsCachePtr() const { return &mPointsCache; }
-
-		//pxr::VtArray<pxr::GfVec3f> getPointsCacheVtArray() const;
 
 		CurveDataPtr getCurveDataPtr(size_t curve_idx);
 
@@ -51,17 +44,16 @@ class PxrCurvesContainer {
 
 	private:
 		PxrCurvesContainer();
+		PxrCurvesContainer(PxrCurvesContainer& other);
 	
 	private:
 		size_t                                  mCurvesCount;
 		pxr::VtArray<int> 						mCurveVertexCounts;
 		std::vector<uint32_t> 					mCurveOffsets;
-		std::vector<pxr::GfVec3f>              	mCurveRestRootPositions;
-		pxr::VtArray<pxr::GfVec3f>              mCurveRestVectors;
+		std::vector<pxr::GfVec3f>              	mCurveRootPositions;
+		pxr::VtArray<pxr::GfVec3f>              mCurveVectors;
 
-		//std::vector<pxr::GfVec3f> 				mPointsCache;
-
-		//mutable pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
+		pxr::VtArray<pxr::GfVec3f> 				mTempCurvePoints;
 };
 
 } // namespace Piston

@@ -17,12 +17,14 @@ file( GLOB SOURCES
     ./geometry_tools.cpp
     ./serializable_data.cpp
     ./base_curves_deformer.cpp
+    ./base_mesh_curves_deformer.cpp
     ./fast_curves_deformer.cpp
     ./fast_curves_deformer_data.cpp
     ./wrap_curves_deformer.cpp
     ./wrap_curves_deformer_data.cpp
-    ./guide_curves_deformer.cpp
-    ./guide_curves_deformer_data.cpp
+    ./guide_curves_container.cpp
+    ./guides_curves_deformer.cpp
+    ./guides_curves_deformer_data.cpp
     ./curves_deformer_factory.cpp
     ./simple_profiler.cpp
     ./deformer_stats.cpp

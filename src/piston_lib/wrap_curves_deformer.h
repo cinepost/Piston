@@ -2,7 +2,7 @@
 #define PISTON_LIB_WRAP_CURVES_DEFORMER_H_
 
 #include "framework.h"
-#include "base_curves_deformer.h"
+#include "base_mesh_curves_deformer.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 #include "curves_container.h"
@@ -20,7 +20,7 @@
 
 namespace Piston {
 
-class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from_this<BaseCurvesDeformer, WrapCurvesDeformer> {
+class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_from_this<BaseMeshCurvesDeformer, WrapCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<WrapCurvesDeformer>;
 
@@ -49,8 +49,8 @@ class WrapCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_from
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override;
-		virtual bool writeJsonDataToPrimImpl()const override;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		virtual bool writeJsonDataToPrimImpl() const;
 		
 		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
