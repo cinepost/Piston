@@ -33,9 +33,9 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 			inline bool isValid() const { return face_id != kInvalidFaceID; }
 		};
 
-		const std::vector<PointBindData>& 		getPointBinds() const { return mPointBinds; }
-		const BindMode&        					getBindMode() const { return mBindMode; }
-		void  setBindMode(const BindMode& mode);
+		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
+		BindMode        					getBindMode() const { return mBindMode; }
+		void  								setBindMode(const BindMode& mode);
 
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;

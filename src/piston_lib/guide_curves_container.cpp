@@ -3,12 +3,57 @@
 
 namespace Piston {
 
-PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0) {
+GuideCurvesContainer::GuideCurvesContainer(): mCurvesCount(0) {
 	mCurveOffsets.reserve(1024);
 }
 
-GuideCurvesContainer::SharedPtr GuideCurvesContainer::create() {
+GuideCurvesContainer::UniquePtr GuideCurvesContainer::create() {
 	return GuideCurvesContainer::UniquePtr(new GuideCurvesContainer());
+}
+
+bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
+	if(!prim_handle.isBasisCurvesGeoPrim()) {
+		return false;
+	}
+
+	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
+	if(!geom_curves) {
+		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
+		return false;
+	}
+
+	mCurvesCount = geom_curves.GetCurveCount(rest_time_code);
+	if(mCurvesCount == 0) {
+		std::cerr << "No curves exist in primitive " << prim_handle.getName() << " !" << std::endl;
+		return false;
+	}
+
+	// Curves. points
+	if(!geom_curves.GetPointsAttr().Get(&mRestCurvePoints, rest_time_code)) {
+		std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
+		return false;
+	}
+
+	// Curves. Counts/offsets
+	if(!geom_curves.GetCurveVertexCountsAttr().Get(&mCurveVertexCounts, rest_time_code)){
+		std::cerr << "Error getting curves vertices counts from " << prim_handle.getName() << "  !" << std::endl;
+		return false;
+	}
+
+	assert(mCurveVertexCounts.size() == mCurvesCount);
+
+	// Calc offsets
+	mCurveOffsets.resize(mCurvesCount);
+	uint32_t total_vertex_count = 0u;
+	for(size_t i = 0; i < mCurvesCount; ++i) {
+		mCurveOffsets[i] = total_vertex_count;
+		total_vertex_count += mCurveVertexCounts[i];
+
+	}
+
+	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
+
+	return true;
 }
 
 } // namespace Piston

@@ -41,13 +41,14 @@ bool WrapCurvesDeformerData::dumpToJSON(json& j) const {
 }
 
 bool WrapCurvesDeformerData::readFromJSON(const json& j) {
-	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
 	const BindMode bind_mode = from_string(j[kJMode].template get<std::string>());
 
 	if(bind_mode != mBindMode) {
 		std::cerr << typeName() << " json data bind mode mismatch !";
 		return false;
 	}
+
+	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
 
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		std::cerr << typeName() << " json data hash mismatch !";

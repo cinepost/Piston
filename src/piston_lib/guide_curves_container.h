@@ -2,6 +2,7 @@
 #define PISTON_LIB_GUIDE_CURVES_CONTAINER_H_
 
 #include "framework.h"
+#include "common.h"
 
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/curves.h>
@@ -13,12 +14,12 @@ namespace Piston {
 
 class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesContainer> {
 	public:
-		using SharedPtr = std::shared_ptr<GuideCurvesContainer>;
+		using UniquePtr = std::unique_ptr<GuideCurvesContainer>;
 
 	public:
 		~GuideCurvesContainer();
 
-		static SharedPtr create();
+		static UniquePtr create();
 
 		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code);
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);

@@ -56,6 +56,27 @@ inline float lengthSquared(const pxr::GfVec3f &v) {
 	return (v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]);
 }
 
+inline float distanceSquared(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b) {
+	pxr::GfVec3f ab = b - a;
+    pxr::GfVec3f ap = p - a;
+
+    float len_squared_ab = lengthSquared(ab);
+    
+    // Handle degenerate segment (A == B)
+    if (len_squared_ab == 0.0f) {
+        return lengthSquared(ap); // Distance to point A
+    }
+
+    float t = pxr::GfDot(ap, ab) / len_squared_ab;
+
+    // Clamp t to [0, 1]
+    t = std::max(0.0f, std::min(1.0f, t)); 
+
+    pxr::GfVec3f closestPoint = {a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]};
+    
+    return lengthSquared(p - closestPoint);
+}
+
 
 glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2);
 

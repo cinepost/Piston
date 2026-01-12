@@ -20,11 +20,13 @@ size_t GuidesCurvesDeformerData::calcHash() const {
 	return hash;
 }
 
+static constexpr const char* kJMode = "mode";
 static constexpr const char* kJPointBinds = "pointbinds";
 static constexpr const char* kJDataHash = "data_hash";
 
 
 bool GuidesCurvesDeformerData::dumpToJSON(json& j) const {
+	j[kJMode] = static_cast<uint8_t>(mBindMode);
 	j[kJPointBinds] = mPointBinds;
 	j[kJDataHash] = calcHash();
 
@@ -32,6 +34,13 @@ bool GuidesCurvesDeformerData::dumpToJSON(json& j) const {
 }
 
 bool GuidesCurvesDeformerData::readFromJSON(const json& j) {
+	const BindMode bind_mode = static_cast<GuidesCurvesDeformerData::BindMode>(j[kJMode].template get<uint8_t>());
+
+	if(bind_mode != mBindMode) {
+		std::cerr << typeName() << " json data bind mode mismatch !";
+		return false;
+	}
+
 	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
 
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {

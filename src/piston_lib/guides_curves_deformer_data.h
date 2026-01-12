@@ -18,6 +18,11 @@ class GuidesCurvesDeformer;
 
 class GuidesCurvesDeformerData : public SerializableDeformerDataBase {
 	public:
+		enum class BindMode: uint8_t { 
+			SPACE, 
+			DIST 
+		};
+
 		struct PointBindData {
 			static constexpr uint32_t kInvalid = std::numeric_limits<uint16_t>::max();
 			uint16_t guide_id, vtx;
@@ -27,7 +32,9 @@ class GuidesCurvesDeformerData : public SerializableDeformerDataBase {
 			inline size_t hash() const { return static_cast<size_t>(guide_id + vtx) + static_cast<size_t>(vec[0] + vec[1] + vec[2]); }
 		};
 
-		const std::vector<PointBindData>& 							getPointBinds() const { return mPointBinds; }
+		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
+		BindMode        					getBindMode() const { return mBindMode; }
+		void  								setBindMode(const BindMode& mode);
 
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
@@ -42,13 +49,24 @@ class GuidesCurvesDeformerData : public SerializableDeformerDataBase {
 	private:
 		size_t calcHash() const;
 
-		std::vector<PointBindData>              			mPointBinds;
+		std::vector<PointBindData> 	mPointBinds;
+		BindMode                    mBindMode = BindMode::DIST;
 
 		friend class GuidesCurvesDeformer;
 };
 
 void to_json(json& j, const GuidesCurvesDeformerData::PointBindData& bind);
 void from_json(const json& j, GuidesCurvesDeformerData::PointBindData& bind);
+
+inline std::string to_string(const GuidesCurvesDeformerData::BindMode& mode) {
+	std::string str;
+	switch(mode) {
+		case GuidesCurvesDeformerData::BindMode::SPACE:
+			return "SPACE";
+		default:
+			return "DIST";
+	}
+}
 
 } // namespace Piston
 

@@ -49,6 +49,8 @@ class GuidesCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fr
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
+		bool buildDeformerDataDistMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
@@ -57,6 +59,9 @@ class GuidesCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fr
 		GuideCurvesContainer::UniquePtr 			mpGuideCurvesContainer;
 		
 		std::string 								mGuideIDPrimAttrName = kGuideIDPrimAttrName;
+		pxr::VtArray<int> 							mGuideIndices;
+
+		float                                       mFalloff = .0f;
 };
 
 } // namespace Piston
