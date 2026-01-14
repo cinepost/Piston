@@ -5,13 +5,6 @@ namespace Piston {
 
 static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 0u);
 
-void  WrapCurvesDeformerData::setBindMode(const WrapCurvesDeformerData::BindMode& mode) {
-	if(mBindMode == mode) return;
-
-	mBindMode = mode;
-	clear();
-}
-
 void WrapCurvesDeformerData::clearData() {
 	mPointBinds.clear();
 }
@@ -58,6 +51,13 @@ bool WrapCurvesDeformerData::readFromJSON(const json& j) {
 	dbg_printf("WrapCurvesDeformerData data read from json payload !\n");
 
 	return true;
+}
+
+void  WrapCurvesDeformerData::setBindMode(const WrapCurvesDeformerData::BindMode& mode) {
+	if(mBindMode == mode) return;
+
+	mBindMode = mode;
+	clear();
 }
 
 const std::string& WrapCurvesDeformerData::typeName() const {

@@ -17,8 +17,6 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 		using UniquePtr = std::unique_ptr<GuideCurvesContainer>;
 
 	public:
-		~GuideCurvesContainer();
-
 		static UniquePtr create();
 
 		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code);

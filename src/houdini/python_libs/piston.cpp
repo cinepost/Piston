@@ -15,7 +15,7 @@ namespace boost = hboost;
 #include "../../piston_lib/base_mesh_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
 #include "../../piston_lib/wrap_curves_deformer.h"
-#include "../../piston_lib/guides_curves_deformer.h"
+#include "../../piston_lib/guide_curves_deformer.h"
 #include "../../piston_lib/curves_deformer_factory.h"
 #include "../../piston_lib/deformer_stats.h"
 #include "../../piston_lib/simple_profiler.h"
@@ -107,19 +107,25 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &WrapCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
-	class_<GuidesCurvesDeformer, GuidesCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("GuidesCurvesDeformer", no_init)
-		.def("create", &GuidesCurvesDeformer::create)
+	class_<GuideCurvesDeformer, GuideCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("GuideCurvesDeformer", no_init)
+		.def("create", &GuideCurvesDeformer::create)
 		.staticmethod("create")
-		.def("toString", &GuidesCurvesDeformer::toString, return_value_policy<copy_const_reference>())
-		.def("setGuideIDPrimAttrName",  &GuidesCurvesDeformer::setGuideIDPrimAttrName)
-		.def("getGuideIDPrimAttrName", &GuidesCurvesDeformer::getGuideIDPrimAttrName, return_value_policy<copy_const_reference>())
+		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+		.def("setGuideIDPrimAttrName",  &GuideCurvesDeformer::setGuideIDPrimAttrName)
+		.def("getGuideIDPrimAttrName", &GuideCurvesDeformer::getGuideIDPrimAttrName, return_value_policy<copy_const_reference>())
 	;
 
-	enum_<WrapCurvesDeformer::BindMode>("__BindMode")
+	enum_<WrapCurvesDeformer::BindMode>("__WrapDeformer_BindMode")
     	.value("SPACE", WrapCurvesDeformer::BindMode::SPACE)
     	.value("DIST", WrapCurvesDeformer::BindMode::DIST)
     	.export_values()
-  ;
+    ;
+
+    enum_<GuideCurvesDeformer::BindMode>("__GuideDeformer_BindMode")
+    	.value("SPACE", GuideCurvesDeformer::BindMode::SPACE)
+    	.value("DIST", GuideCurvesDeformer::BindMode::DIST)
+    	.export_values()
+	;
 
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)
 		.def("toString", &DeformerStats::toString)

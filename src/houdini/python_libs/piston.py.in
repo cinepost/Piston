@@ -2,9 +2,9 @@ import importlib
 import atexit
 import _piston
 
-#####################################################
-# This is a simple module wrapper for hot reloading #
-#####################################################
+###################################
+# This is a simple module wrapper #
+###################################
 
 
 def reload(func):
@@ -18,7 +18,8 @@ def reload(func):
 def __getattr__(name):
 	return getattr(_piston, name)
 
-setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__BindMode)
+setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__WrapDeformer_BindMode)
+setattr(_piston.GuideCurvesDeformer, "BindMode", _piston.__GuideDeformer_BindMode)
 
 #
 # Debug stuff

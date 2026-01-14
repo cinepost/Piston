@@ -22,8 +22,8 @@ WrapCurvesDeformer::SharedPtr CurvesDeformerFactory::getWrapDeformer(const std::
 	return std::dynamic_pointer_cast<WrapCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::WRAP, name));
 }
 
-GuidesCurvesDeformer::SharedPtr CurvesDeformerFactory::getGuidesDeformer(const std::string& name) {
-	return std::dynamic_pointer_cast<GuidesCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::GUIDES, name));
+GuideCurvesDeformer::SharedPtr CurvesDeformerFactory::getGuidesDeformer(const std::string& name) {
+	return std::dynamic_pointer_cast<GuideCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::GUIDES, name));
 }
 
 BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDeformer::Type type, const std::string& name) {
@@ -42,7 +42,7 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 		}
 		case BaseCurvesDeformer::Type::GUIDES: 
 		{
-			auto result = mDeformers.emplace(key, GuidesCurvesDeformer::create(name));
+			auto result = mDeformers.emplace(key, GuideCurvesDeformer::create(name));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating GuideCurvesDeformer !");
 		}

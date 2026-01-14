@@ -56,4 +56,9 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	return true;
 }
 
+bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
+
+	return true;
+}
+
 } // namespace Piston
