@@ -7,6 +7,7 @@ static const SerializableDeformerDataBase::DataVersion kGuidesBindingDataVersion
 
 void GuideCurvesDeformerData::clearData() {
 	mPointBinds.clear();
+	mSkinPrimPath = "";
 }
 
 size_t GuideCurvesDeformerData::calcHash() const {
@@ -23,11 +24,12 @@ size_t GuideCurvesDeformerData::calcHash() const {
 static constexpr const char* kJMode = "mode";
 static constexpr const char* kJPointBinds = "pointbinds";
 static constexpr const char* kJDataHash = "data_hash";
-
+static constexpr const char* kJSkinPrimPath = "skin_prim_path";
 
 bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 	j[kJMode] = static_cast<uint8_t>(mBindMode);
 	j[kJPointBinds] = mPointBinds;
+	j[kJSkinPrimPath] = mSkinPrimPath;
 	j[kJDataHash] = calcHash();
 
 	return true;
@@ -38,6 +40,12 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 
 	if(bind_mode != mBindMode) {
 		std::cerr << typeName() << " json data bind mode mismatch !";
+		return false;
+	}
+
+	const std::string skin_prim_path = j[kJSkinPrimPath].template get<std::string>();
+	if((skin_prim_path != mSkinPrimPath) && (mBindMode == BindMode::NTB)) {
+		std::cerr << typeName() << " json data skin primitive path mismatch !";
 		return false;
 	}
 
@@ -52,11 +60,15 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 	return true;
 }
 
-void  GuideCurvesDeformerData::setBindMode(const GuideCurvesDeformerData::BindMode& mode) {
+void GuideCurvesDeformerData::setBindMode(const GuideCurvesDeformerData::BindMode& mode) {
 	if(mBindMode == mode) return;
-
 	mBindMode = mode;
 	clear();
+}
+
+void GuideCurvesDeformerData::setSkinPrimPath(const std::string& prim_path) {
+	if(mSkinPrimPath == prim_path) return;
+	mSkinPrimPath = prim_path;
 }
 
 const std::string& GuideCurvesDeformerData::typeName() const {
@@ -74,12 +86,11 @@ const SerializableDeformerDataBase::DataVersion& GuideCurvesDeformerData::jsonDa
 }
 
 void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {
-	j = {bind.guide_id, bind.vtx, bind.vec[0], bind.vec[1], bind.vec[2]};
+	j = {bind.encoded_id, bind.vec[0], bind.vec[1], bind.vec[2]};
 }
 
 void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind) {
-	bind.guide_id = j.at(0).template get<uint16_t>();
-	bind.vtx = j.at(1).template get<uint16_t>();
+	bind.encoded_id = j.at(0).template get<uint32_t>();
 	bind.vec = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
 }
 

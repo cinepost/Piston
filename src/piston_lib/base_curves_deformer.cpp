@@ -36,7 +36,7 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
 	mDeformerGeoPrimHandle = UsdPrimHandle(geoPrim);
 	makeDirty();
 
-	dbg_printf("Mesh geometry prim is set to: %s\n", mDeformerGeoPrimHandle.getPath().GetText());
+	dbg_printf("Deformer geometry prim is set to: %s\n", mDeformerGeoPrimHandle.getPath().GetText());
 }
 
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
@@ -51,6 +51,22 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
 	makeDirty();
 
 	dbg_printf("Curves geometry prim is set to: %s\n", mCurvesGeoPrimHandle.getPath().GetText());
+}
+
+void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
+	if(mDeformerRestAttrName == name) return;
+	mDeformerRestAttrName = name;
+	makeDirty();
+
+	dbg_printf("Deformer geometry rest attribute name is set to: %s\n", name);
+}
+
+void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
+	if(mCurvesRestAttrName == name) return;
+	mCurvesRestAttrName = name;
+	makeDirty();
+
+	dbg_printf("Curves geometry rest attribute name is set to: %s\n", name);
 }
 
 void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {

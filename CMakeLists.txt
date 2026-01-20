@@ -82,6 +82,8 @@ endif()
 
 message("Install path: ${CMAKE_INSTALL_PREFIX}")
 
+option(USE_CGAL "Use CGAL library" ON)
+
 # Handle superbuild first
 option (USE_SUPERBUILD "Whether or not a superbuild should be invoked" OFF)
 
@@ -130,7 +132,7 @@ set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bin 
 
 add_definitions(-DPISTON_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}")
 
-  message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
+message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("DEBUG!")
@@ -199,6 +201,12 @@ if(WIN32)
   set(ENV{LIBPATH} "$ENV{LIBPATH};${HROOT}\\python${_houdini_python_dotless_version}\\libs;${HROOT}")
   set(ENV{LIB} "$ENV{LIB};${HROOT}\\python${_houdini_python_dotless_version}\\libs;${HROOT}\\custom\\houdini\\dsolib")
 endif() #WIN32
+
+if(USE_CGAL)
+  message("Using CGAL")
+  add_definitions(-DUSE_CGAL)
+endif()
+
 
 add_subdirectory( src )
 #add_subdirectory( contrib )

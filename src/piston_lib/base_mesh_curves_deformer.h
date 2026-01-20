@@ -20,9 +20,6 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 	public:
 		virtual ~BaseMeshCurvesDeformer() {}
 
-		void setMeshRestPositionAttrName(const std::string& name);
-		const std::string& getMeshRestPositionAttrName() const { return mMeshRestPositionAttrName; }
-
 		void setСurvesSkinPrimAttrName(const std::string& name);
 		const std::string& getСurvesSkinPrimAttrName() const { return mСurvesSkinPrimAttrName; }
 
@@ -37,7 +34,6 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		SerializableUsdGeomMeshFaceAdjacency::UniquePtr 	mpAdjacencyData;
 		SerializablePhantomTrimesh::UniquePtr				mpPhantomTrimeshData;
 
-		std::string   mMeshRestPositionAttrName = kMeshRestPositionAttrName;
 		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 	protected:

@@ -50,19 +50,13 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	// Get phantom mesh json data if present
 	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
-		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getMeshRestPositionAttrName())) {
+		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
 			std::cerr << "Error building phantom mesh data!" << std::endl;
 			return false;
 		}
 	}
 	
 	return true;
-}
-
-void BaseMeshCurvesDeformer::setMeshRestPositionAttrName(const std::string& name) {
-	if(mMeshRestPositionAttrName == name) return;
-	mMeshRestPositionAttrName = name;
-	makeDirty();
 }
 
 void BaseMeshCurvesDeformer::setСurvesSkinPrimAttrName(const std::string& name) {

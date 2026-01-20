@@ -21,6 +21,8 @@ namespace Piston {
 
 namespace {
 	const std::string kGuideIDPrimAttrName = "clumpid";
+	const std::string kGuidesSkinPrimAttrName = "skinprim";
+	const std::string kGuidesSkinPrimRestAttrName = "rest";
 }
 
 
@@ -38,10 +40,18 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		virtual const std::string& toString() const override;
 
 		void setBindMode(BindMode mode);
-		const BindMode& getBindMode() const;
+		BindMode getBindMode() const;
 
 		void setGuideIDPrimAttrName(const std::string& name);
 		const std::string& getGuideIDPrimAttrName() const { return mGuideIDPrimAttrName; }
+
+		void setGuidesSkinPrimAttrName(const std::string& name);
+		const std::string& getGuidesSkinPrimAttrName() const { return mGuidesSkinPrimAttrName; }
+
+		void setGuidesSkinPrim(const pxr::UsdPrim& geoPrim);
+
+		void setGuidesSkinPrimRestAttrName(const std::string& name);
+		const std::string& getGuidesSkinPrimRestAttrName() const { return mGuidesSkinPrimRestAttrName; }
 
 	protected:
 		GuideCurvesDeformer(const std::string& name);
@@ -54,19 +64,29 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		bool buildDeformerDataDistMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		bool buildSkinPrimData(bool multi_threaded);
+
+		bool buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
+		bool buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
+		bool buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
-		std::unique_ptr<GuideCurvesDeformerData>   mpGuideCurvesDeformerData;
-
-		GuideCurvesContainer::UniquePtr 			mpGuideCurvesContainer;
+		std::unique_ptr<GuideCurvesDeformerData>   		mpGuideCurvesDeformerData;
+		GuideCurvesContainer::UniquePtr 				mpGuideCurvesContainer;
 		
-		std::string 								mGuideIDPrimAttrName = kGuideIDPrimAttrName;
-		pxr::VtArray<int> 							mGuideIndices;
+		UsdPrimHandle 									mGuidesSkinGeoPrimHandle;
+		SerializableUsdGeomMeshFaceAdjacency::UniquePtr mpSkinAdjacencyData;
+		SerializablePhantomTrimesh::UniquePtr			mpSkinPhantomTrimeshData;
 
-		float                                       mFalloff = .0f;
+
+		std::string 									mGuideIDPrimAttrName = kGuideIDPrimAttrName;
+		std::string 									mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;
+		std::string                                     mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
+		pxr::VtArray<int> 								mGuideIndices;
+
+		float                                       	mFalloff = .0f;
 };
 
 } // namespace Piston

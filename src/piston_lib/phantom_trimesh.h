@@ -82,6 +82,24 @@ class PhantomTrimesh {
 			pxr::GfVec3f 	restNormal;
 		};
 
+		struct Tetrahedron {
+			using IndicesList = std::array<PxrIndexType, 4>;
+			static const PxrIndexType kInvalidVertexID = TriFace::kInvalidVertexID;
+
+			struct CountAndOffset {
+				uint16_t count;
+				uint16_t offset;
+
+				CountAndOffset(): count(0) {};
+				CountAndOffset(uint16_t _count, uint16_t _offset): count(_count), offset(_offset) {};
+			};
+
+			Tetrahedron(): indices{kInvalidVertexID} { }
+			Tetrahedron(PxrIndexType a, PxrIndexType b, PxrIndexType c, PxrIndexType d): indices{a, b, c, d} { }
+
+			IndicesList 	indices;
+		};
+
 		PhantomTrimesh();
 
 	public:
@@ -123,6 +141,10 @@ class PhantomTrimesh {
 		bool isValid() const { return mValid; }
 		void invalidate();
 
+		bool buildTetrahedrons();
+		bool hasTetrahedrons() const { return (mTetrahedronCountsAndOffsets.size() == mVertices.size()) && !mTetrahedrons.empty(); }
+		const std::vector<Tetrahedron>& getTetrahedrons() const { return mTetrahedrons; }
+
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default()) const;
 
 		size_t calcHash() const;
@@ -131,10 +153,16 @@ class PhantomTrimesh {
 		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
 		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
 
+		// TriFaces part
 		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
 		std::vector<TriFace> 									mFaces;
 		std::vector<TriFace::Flags>								mFaceFlags;
 
+		// Tetrahedrons part
+		std::vector<Tetrahedron::CountAndOffset> 				mTetrahedronCountsAndOffsets;
+		std::vector<Tetrahedron> 								mTetrahedrons;
+
+		//
 		std::vector<PxrIndexType> 								mVertices;
 		std::unordered_set<PxrIndexType> 						mTmpVertices; // this is used only to insert unused vertices into mVertices
 
@@ -154,7 +182,8 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 		SerializablePhantomTrimesh();
 
 		bool buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
-
+		bool isValid() const { return mpTrimesh && mpTrimesh->isValid(); }
+		
 		PhantomTrimesh* getTrimesh();
 		const PhantomTrimesh* getTrimesh() const;
 

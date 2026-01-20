@@ -64,6 +64,12 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
 		.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim)
 		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim)
+
+		.def("setDeformerRestAttrName", &BaseCurvesDeformer::setDeformerRestAttrName)
+		.def("getDeformerRestAttrName", &BaseCurvesDeformer::getDeformerRestAttrName, return_value_policy<copy_const_reference>())
+		.def("setCurvesRestAttrName", &BaseCurvesDeformer::setCurvesRestAttrName)
+		.def("getCurvesRestAttrName", &BaseCurvesDeformer::getCurvesRestAttrName, return_value_policy<copy_const_reference>())
+
 		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
 		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
 
@@ -80,8 +86,6 @@ BOOST_PYTHON_MODULE(_piston) {
 	;
 
 	class_<BaseMeshCurvesDeformer, BaseMeshCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("BaseMeshCurvesDeformer",  no_init)
-		.def("setMeshRestPositionAttrName", &BaseMeshCurvesDeformer::setMeshRestPositionAttrName)
-		.def("getMeshRestPositionAttrName", &BaseMeshCurvesDeformer::getMeshRestPositionAttrName, return_value_policy<copy_const_reference>())
 		.def("setСurvesSkinPrimAttrName", &BaseMeshCurvesDeformer::setСurvesSkinPrimAttrName)
 		.def("getСurvesSkinPrimAttrName", &BaseMeshCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
 
@@ -111,8 +115,13 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("create", &GuideCurvesDeformer::create)
 		.staticmethod("create")
 		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
-		.def("setGuideIDPrimAttrName",  &GuideCurvesDeformer::setGuideIDPrimAttrName)
+		.def("setGuideIDPrimAttrName", &GuideCurvesDeformer::setGuideIDPrimAttrName)
 		.def("getGuideIDPrimAttrName", &GuideCurvesDeformer::getGuideIDPrimAttrName, return_value_policy<copy_const_reference>())
+		.def("setGuidesSkinPrimAttrName", &GuideCurvesDeformer::setGuidesSkinPrimAttrName)
+		.def("getGuidesSkinPrimAttrName", &GuideCurvesDeformer::getGuidesSkinPrimAttrName, return_value_policy<copy_const_reference>())
+		.def("setGuidesSkinPrimRestAttrName", &GuideCurvesDeformer::setGuidesSkinPrimRestAttrName)
+		.def("getGuidesSkinPrimRestAttrName", &GuideCurvesDeformer::getGuidesSkinPrimRestAttrName, return_value_policy<copy_const_reference>())
+		.def("setGuidesSkinPrim", &GuideCurvesDeformer::setGuidesSkinPrim)
 	;
 
 	enum_<WrapCurvesDeformer::BindMode>("__WrapDeformer_BindMode")
@@ -122,8 +131,9 @@ BOOST_PYTHON_MODULE(_piston) {
     ;
 
     enum_<GuideCurvesDeformer::BindMode>("__GuideDeformer_BindMode")
+    	.value("NTB", GuideCurvesDeformer::BindMode::NTB)
+    	.value("ANGLE", GuideCurvesDeformer::BindMode::ANGLE)
     	.value("SPACE", GuideCurvesDeformer::BindMode::SPACE)
-    	.value("DIST", GuideCurvesDeformer::BindMode::DIST)
     	.export_values()
 	;
 

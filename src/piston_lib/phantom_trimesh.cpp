@@ -3,6 +3,13 @@
 #include "geometry_tools.h"
 #include "simple_profiler.h"
 
+#ifdef USE_CGAL
+
+#define CGAL_DO_NOT_USE_BOOST_MP
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Triangulation_3.h>
+
+#endif // USE_CGAL
 
 namespace Piston {
 
@@ -48,12 +55,57 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	return mValid;
 }
 
+#ifdef USE_CGAL
+
+bool PhantomTrimesh::buildTetrahedrons() {
+	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
+	using Triangulation = CGAL::Triangulation_3<Kernel>;
+	using CGAL_Point = Triangulation::Point;
+
+	using CGAL_CellHandle = Triangulation::Cell_handle;
+	using CGAL_VtxHandle = Triangulation::Vertex_handle;
+	using CGAL_LocateType = Triangulation::Locate_type;
+
+	if(mUsdMeshRestPositions.size() < 4) {
+		std::cerr << "Mesh has less than 4 vertices !" << std::endl;
+		return false;
+	}
+
+	std::vector<CGAL_Point> mesh_points(mUsdMeshRestPositions.size());
+	for(size_t i = 0; i < mUsdMeshRestPositions.size(); ++i) {
+		const auto& pxr_pt = mUsdMeshRestPositions[i];
+		mesh_points[i] = CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]);
+	}
+
+	Triangulation T(mesh_points.begin(), mesh_points.end());
+
+	for(const CGAL_CellHandle& cell_handle: T.all_cell_handles()) {
+		const Triangulation::Tetrahedron& tetrahedron = T.tetrahedron(cell_handle);
+	}
+
+	return true;
+}
+
+#else  // no USE_CGAL
+
+bool PhantomTrimesh::buildTetrahedrons() {
+	std::cerr << "PhantomTrimesh::buildTetrahedrons() NOT IMPLEMENTED !!!" << std::endl;
+	return false;
+}
+
+#endif  // USE_CGAL
+
 void PhantomTrimesh::invalidate() {
 	mValid = false;
 
 	mUsdMeshRestPositions.clear();
 	mUsdMeshLivePositions.clear();
 
+	// Tetrahedrons
+	mTetrahedronCountsAndOffsets.clear();
+	mTetrahedrons.clear();
+
+	// Trifaces
 	mFaceMap.clear();
 	mFaces.clear();
 	mFaceFlags.clear();

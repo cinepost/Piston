@@ -42,6 +42,7 @@ class UsdPrimHandle {
 		bool isMeshGeoPrim() const { return Piston::isMeshGeoPrim(mPrim); }
 		bool isBasisCurvesGeoPrim() const { return Piston::isBasisCurvesGeoPrim(mPrim); }
 
+		std::string  getFullName() const { return getPath().GetText(); }
 		std::string  getName() const { return getPath().GetName(); }
 		pxr::SdfPath getPath() const { return mPrim.GetPath(); }
 		pxr::UsdStageWeakPtr getStage() const { return mPrim.GetStage(); }
