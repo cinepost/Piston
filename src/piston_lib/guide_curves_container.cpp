@@ -61,4 +61,24 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
 	return true;
 }
 
+const pxr::GfVec3f& GuideCurvesContainer::getGuideRestPoint(uint32_t guide_id, uint32_t vertex_id) {
+	assert(guide_id < mCurveVertexCounts.size() && guide_id < mCurveOffsets.size());
+	assert(vertex_id < mCurveVertexCounts[guide_id] && vertex_id < mCurveOffsets[guide_id]);
+
+	const size_t global_vtx_id = mCurveOffsets[guide_id] + vertex_id;
+	assert(global_vtx_id < mRestCurvePoints.size());
+
+	return mRestCurvePoints[global_vtx_id];
+}
+
+const pxr::GfVec3f& GuideCurvesContainer::getGuideLivePoint(uint32_t guide_id, uint32_t vertex_id) {
+	assert(guide_id < mCurveVertexCounts.size() && guide_id < mCurveOffsets.size());
+	assert(vertex_id < mCurveVertexCounts[guide_id] && vertex_id < mCurveOffsets[guide_id]);
+
+	const size_t global_vtx_id = mCurveOffsets[guide_id] + vertex_id;
+	assert(global_vtx_id < mLiveCurvePoints.size());
+
+	return mLiveCurvePoints[global_vtx_id];
+}
+
 } // namespace Piston

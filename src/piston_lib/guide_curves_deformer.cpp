@@ -158,7 +158,8 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
-	auto& pointBinds = mpGuideCurvesDeformerData->pointBinds();
+	auto& pointBinds = mpGuideCurvesDeformerData->mPointBinds;
+	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
 	auto func = [&](const size_t curve_index) {
     	const int guide_id = mGuideIndices[curve_index];
@@ -172,6 +173,26 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
         		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(mpGuideCurvesContainer->getRestCurvePoints(), false /*threaded*/);
         	}
         	pKDTree = kdtrees[guide_id].get();
+        }
+
+        PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
+
+        const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+
+        const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+        const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_index);
+
+        for(uint32_t i = 0; i < curve_vertices_count; ++i) {
+        	auto& bind = pointBinds[curve_vertex_offset + i];
+        	bind.encoded_id = PointBindData::kInvalid;
+        	const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
+
+        	const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
+			const uint32_t guide_vertex_id = nearest_pt.first;
+
+			const pxr::GfVec3f guide_pt = mpGuideCurvesContainer->getGuideRestPoint(mGuideIndices[curve_index], guide_vertex_id);
+
+			bind.vec = curr_pt - guide_pt;
         }
 
     };

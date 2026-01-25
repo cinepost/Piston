@@ -66,6 +66,12 @@ void GuideCurvesDeformerData::setBindMode(const GuideCurvesDeformerData::BindMod
 	clear();
 }
 
+static uint32_t GuideCurvesDeformerData::encodeID_ANGLE(uint32_t guide_id, uint32_t guide_vertex_id) {
+	// We use 24 bits for guide curve id and 8 bits for guide curve vertex
+
+	return 
+}
+
 void GuideCurvesDeformerData::setSkinPrimPath(const std::string& prim_path) {
 	if(mSkinPrimPath == prim_path) return;
 	mSkinPrimPath = prim_path;

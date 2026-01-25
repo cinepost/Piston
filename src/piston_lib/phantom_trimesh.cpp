@@ -58,6 +58,8 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 #ifdef USE_CGAL
 
 bool PhantomTrimesh::buildTetrahedrons() {
+	std::cout << "PhantomTrimesh::buildTetrahedrons is incomplete !!!" << std::endl;
+	
 	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
 	using Triangulation = CGAL::Triangulation_3<Kernel>;
 	using CGAL_Point = Triangulation::Point;
@@ -79,7 +81,16 @@ bool PhantomTrimesh::buildTetrahedrons() {
 
 	Triangulation T(mesh_points.begin(), mesh_points.end());
 
+	std::cout << "T number of cells: " << T.number_of_cells() << std::endl;
+
+	size_t i = 0;
 	for(const CGAL_CellHandle& cell_handle: T.all_cell_handles()) {
+		std::cout << "cell " << i << " vertices ";
+		std::cout << cell_handle->vertex(0) << " ";
+		std::cout << cell_handle->vertex(1) << " ";
+		std::cout << cell_handle->vertex(2) << " ";
+		std::cout << cell_handle->vertex(3) << std::endl;
+
 		const Triangulation::Tetrahedron& tetrahedron = T.tetrahedron(cell_handle);
 	}
 

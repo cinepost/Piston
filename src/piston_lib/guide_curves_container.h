@@ -30,6 +30,9 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 
 		const std::vector<uint32_t>& getCurveOffsets() const { return mCurveOffsets; }
 
+		const pxr::GfVec3f& getGuideRestPoint(uint32_t guide_id, uint32_t vertex_id);
+		const pxr::GfVec3f& getGuideLivePoint(uint32_t guide_id, uint32_t vertex_id);
+
 	protected:
 		GuideCurvesContainer();
 

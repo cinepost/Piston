@@ -32,6 +32,8 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			PointBindData(): encoded_id(kInvalid) {};
 
 			inline size_t hash() const { return static_cast<size_t>(encoded_id) + static_cast<size_t>(vec[0] + vec[1] + vec[2]); }
+
+			static uint32_t encodeID_ANGLE(uint32_t guide_id, uint32_t guide_vertex_id);
 		};
 
 		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
