@@ -36,7 +36,7 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		void setMeshGeoPrim(const pxr::UsdPrim& geoPrim) { setDeformerGeoPrim(geoPrim); }
 
 		void setBindMode(BindMode mode);
-		const BindMode& getBindMode() const;
+		BindMode getBindMode() const;
 
 	protected:
 		WrapCurvesDeformer(const std::string& name);

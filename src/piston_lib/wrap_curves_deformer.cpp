@@ -582,13 +582,15 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVe
 }
 
 void WrapCurvesDeformer::setBindMode(WrapCurvesDeformer::BindMode mode) {
+	assert(mpWrapCurvesDeformerData);
 	if(mpWrapCurvesDeformerData->getBindMode() == mode) return;
 
 	mpWrapCurvesDeformerData->setBindMode(mode);
 	makeDirty();
 }
 
-const WrapCurvesDeformer::BindMode& WrapCurvesDeformer::getBindMode() const {
+WrapCurvesDeformer::BindMode WrapCurvesDeformer::getBindMode() const {
+	assert(mpWrapCurvesDeformerData);
 	return mpWrapCurvesDeformerData->getBindMode();
 }
 

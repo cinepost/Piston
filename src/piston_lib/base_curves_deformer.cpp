@@ -58,7 +58,7 @@ void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
 	mDeformerRestAttrName = name;
 	makeDirty();
 
-	dbg_printf("Deformer geometry rest attribute name is set to: %s\n", name);
+	dbg_printf("Deformer geometry rest attribute name is set to: %s\n", name.c_str());
 }
 
 void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
@@ -66,7 +66,7 @@ void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
 	mCurvesRestAttrName = name;
 	makeDirty();
 
-	dbg_printf("Curves geometry rest attribute name is set to: %s\n", name);
+	dbg_printf("Curves geometry rest attribute name is set to: %s\n", name.c_str());
 }
 
 void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {

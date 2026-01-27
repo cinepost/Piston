@@ -80,6 +80,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		SerializableUsdGeomMeshFaceAdjacency::UniquePtr mpSkinAdjacencyData;
 		SerializablePhantomTrimesh::UniquePtr			mpSkinPhantomTrimeshData;
 
+		SerializablePhantomTrimesh::UniquePtr			mpGuidesPhantomTrimeshData;
+
 
 		std::string 									mGuideIDPrimAttrName = kGuideIDPrimAttrName;
 		std::string 									mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;

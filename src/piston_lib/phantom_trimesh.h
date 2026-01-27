@@ -86,16 +86,10 @@ class PhantomTrimesh {
 			using IndicesList = std::array<PxrIndexType, 4>;
 			static const PxrIndexType kInvalidVertexID = TriFace::kInvalidVertexID;
 
-			struct CountAndOffset {
-				uint16_t count;
-				uint16_t offset;
-
-				CountAndOffset(): count(0) {};
-				CountAndOffset(uint16_t _count, uint16_t _offset): count(_count), offset(_offset) {};
-			};
-
 			Tetrahedron(): indices{kInvalidVertexID} { }
 			Tetrahedron(PxrIndexType a, PxrIndexType b, PxrIndexType c, PxrIndexType d): indices{a, b, c, d} { }
+
+			bool isValid() const { return indices[0] != indices[1] != indices[2] != indices[3] != kInvalidVertexID; }
 
 			IndicesList 	indices;
 		};
@@ -107,6 +101,7 @@ class PhantomTrimesh {
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
+		size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
 		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
 
@@ -137,12 +132,13 @@ class PhantomTrimesh {
 		pxr::GfVec3f getFaceLiveNormal(const uint32_t face_id) const;
 
 		const std::vector<PxrIndexType>& getVertices() const { return mVertices; }
+		size_t getVertexCount() const { return mVertices.size(); }
 
 		bool isValid() const { return mValid; }
 		void invalidate();
 
 		bool buildTetrahedrons();
-		bool hasTetrahedrons() const { return (mTetrahedronCountsAndOffsets.size() == mVertices.size()) && !mTetrahedrons.empty(); }
+		bool hasTetrahedrons() const { return !mTetrahedrons.empty() && (mTetrahedronCounts.size() == mTetrahedronOffsets.size() == mUsdMeshRestPositions.size()); }
 		const std::vector<Tetrahedron>& getTetrahedrons() const { return mTetrahedrons; }
 
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default()) const;
@@ -159,8 +155,11 @@ class PhantomTrimesh {
 		std::vector<TriFace::Flags>								mFaceFlags;
 
 		// Tetrahedrons part
-		std::vector<Tetrahedron::CountAndOffset> 				mTetrahedronCountsAndOffsets;
 		std::vector<Tetrahedron> 								mTetrahedrons;
+		// maps points to tetrahedrons
+		std::vector<uint32_t> 									mTetrahedronCounts;
+		std::vector<uint32_t>                                   mTetrahedronOffsets;
+		std::vector<uint32_t>                                   mTetrahedronIndices;
 
 		//
 		std::vector<PxrIndexType> 								mVertices;

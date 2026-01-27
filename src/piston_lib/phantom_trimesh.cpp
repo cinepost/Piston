@@ -7,6 +7,7 @@
 
 #define CGAL_DO_NOT_USE_BOOST_MP
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Triangulation_vertex_base_with_info_3.h>
 #include <CGAL/Triangulation_3.h>
 
 #endif // USE_CGAL
@@ -30,24 +31,20 @@ PhantomTrimesh::PhantomTrimesh() : mValid(false) {
 bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
 	mValid = false;
 
-	assert(prim_handle.isMeshGeoPrim());
-
-	if(!prim_handle.isMeshGeoPrim()) return false;
+	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
-	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
-
-	// Keep rest position for further calculations
 	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
+		
 	if(!restPositionPrimVar) {
-		std::cerr << "No valid primvar \"" << rest_p_name << "\" exists in mesh " << prim_handle.getPath() << " !" << std::endl;
+		std::cerr << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << " !" << std::endl;
 		return false;
 	}
 
 	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
 	if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
-		std::cerr << "Error getting mesh " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
+		std::cerr << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
 		return false;
 	}
 
@@ -58,40 +55,56 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 #ifdef USE_CGAL
 
 bool PhantomTrimesh::buildTetrahedrons() {
-	std::cout << "PhantomTrimesh::buildTetrahedrons is incomplete !!!" << std::endl;
-	
 	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
-	using Triangulation = CGAL::Triangulation_3<Kernel>;
+	using Vb =  CGAL::Triangulation_vertex_base_with_info_3<uint32_t, Kernel>;
+	using Tds = CGAL::Triangulation_data_structure_3<Vb>;
+	using Triangulation = CGAL::Triangulation_3<Kernel, Tds>;
+	
 	using CGAL_Point = Triangulation::Point;
 
 	using CGAL_CellHandle = Triangulation::Cell_handle;
 	using CGAL_VtxHandle = Triangulation::Vertex_handle;
 	using CGAL_LocateType = Triangulation::Locate_type;
 
-	if(mUsdMeshRestPositions.size() < 4) {
+	const size_t points_count = mUsdMeshRestPositions.size();
+
+	if(points_count < 4) {
 		std::cerr << "Mesh has less than 4 vertices !" << std::endl;
 		return false;
 	}
 
-	std::vector<CGAL_Point> mesh_points(mUsdMeshRestPositions.size());
-	for(size_t i = 0; i < mUsdMeshRestPositions.size(); ++i) {
+	std::vector< std::pair<CGAL_Point, uint32_t> > points;
+	for(size_t i = 0; i < points_count; ++i) {
 		const auto& pxr_pt = mUsdMeshRestPositions[i];
-		mesh_points[i] = CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]);
-	}
+  		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
+  	}
 
-	Triangulation T(mesh_points.begin(), mesh_points.end());
+	Triangulation T(points.begin(), points.end());
 
-	std::cout << "T number of cells: " << T.number_of_cells() << std::endl;
+	dbg_printf("T number of cells: %zu\n", (size_t)T.number_of_cells());
+	dbg_printf("T number of finite cells: %zu\n", (size_t)T.number_of_finite_cells());
+
+	mTetrahedrons.resize(T.number_of_finite_cells());
 
 	size_t i = 0;
-	for(const CGAL_CellHandle& cell_handle: T.all_cell_handles()) {
-		std::cout << "cell " << i << " vertices ";
-		std::cout << cell_handle->vertex(0) << " ";
-		std::cout << cell_handle->vertex(1) << " ";
-		std::cout << cell_handle->vertex(2) << " ";
-		std::cout << cell_handle->vertex(3) << std::endl;
+	for(const CGAL_CellHandle& cell_handle: T.finite_cell_handles()) {
+		dbg_printf("cell %zu vertices: %d %d %d %d\n", i, cell_handle->vertex(0)->info(), cell_handle->vertex(1)->info(), cell_handle->vertex(2)->info(), cell_handle->vertex(3)->info());
+		mTetrahedrons[i].indices[0] = cell_handle->vertex(0)->info();
+		mTetrahedrons[i].indices[1] = cell_handle->vertex(1)->info();
+		mTetrahedrons[i].indices[2] = cell_handle->vertex(2)->info();
+		mTetrahedrons[i].indices[3] = cell_handle->vertex(3)->info();
+		i++;
+	}
 
-		const Triangulation::Tetrahedron& tetrahedron = T.tetrahedron(cell_handle);
+	mTetrahedronCounts.resize(points_count);
+	std::fill(mTetrahedronCounts.begin(), mTetrahedronCounts.end(), 0);
+	mTetrahedronOffsets.resize(points_count);
+	
+	for(const Tetrahedron& tetra: mTetrahedrons) {
+		mTetrahedronCounts[tetra.indices[0]]++;
+		mTetrahedronCounts[tetra.indices[1]]++;
+		mTetrahedronCounts[tetra.indices[2]]++;
+		mTetrahedronCounts[tetra.indices[3]]++;
 	}
 
 	return true;
@@ -347,7 +360,7 @@ SerializablePhantomTrimesh::SerializablePhantomTrimesh() {
 }
 
 bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
-	assert(prim_handle.isMeshGeoPrim());
+	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 	clearData();
 
 	if(!mpTrimesh) {

@@ -37,18 +37,24 @@ void GuideCurvesDeformer::setGuideIDPrimAttrName(const std::string& name) {
 	if(mGuideIDPrimAttrName == name) return;
 	mGuideIDPrimAttrName = name;
 	makeDirty();
+
+	dbg_printf("Guide ID attribute name is set to: %s\n", name.c_str());
 }
 
 void GuideCurvesDeformer::setGuidesSkinPrimAttrName(const std::string& name) {
 	if(mGuidesSkinPrimAttrName == name) return;
 	mGuidesSkinPrimAttrName = name;
 	makeDirty();
+
+	dbg_printf("Guide skin prim attribute name is set to: %s\n", name.c_str());
 }
 
 void GuideCurvesDeformer::setGuidesSkinPrimRestAttrName(const std::string& name) {
 	if(mGuidesSkinPrimRestAttrName == name) return;
 	mGuidesSkinPrimRestAttrName = name;
 	makeDirty();
+
+	dbg_printf("Guide skin prim rest attribute name is set to: %s\n", name.c_str());
 }
 
 void GuideCurvesDeformer::setGuidesSkinPrim(const pxr::UsdPrim& geoPrim) {
@@ -133,9 +139,29 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 }
 
 bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	// UNIMPLEMENTED !!!
-	std::cerr << "SPACE points binding method is unimplemented yet !" << std::endl;
-	return false;
+	if(!mpGuidesPhantomTrimeshData) {
+		mpGuidesPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
+	}
+
+	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(mpGuidesPhantomTrimeshData.get())) {
+		// Build in place if no json data present or not needed
+		if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
+			std::cerr << "Error building phantom mesh data!" << std::endl;
+			return false;
+		}
+	}
+
+	PhantomTrimesh* pPhantomTrimesh = mpGuidesPhantomTrimeshData->getTrimesh();
+	assert(pPhantomTrimesh);
+
+	if(!pPhantomTrimesh->hasTetrahedrons()) {
+		if(!pPhantomTrimesh->buildTetrahedrons()) {
+			std::cerr << "Error building tetrahedrons!" << std::endl;
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
@@ -162,7 +188,8 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
 	auto func = [&](const size_t curve_index) {
-    	const int guide_id = mGuideIndices[curve_index];
+		assert(mGuideIndices[curve_index] >= 0);
+    	const uint32_t guide_id = (uint32_t)mGuideIndices[curve_index];
     	assert(guide_id < guides_count);
         const neighbour_search::KDTree<float, 3>* pKDTree;
         
@@ -188,11 +215,12 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
         	const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
 
         	const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
+			
 			const uint32_t guide_vertex_id = nearest_pt.first;
 
-			const pxr::GfVec3f guide_pt = mpGuideCurvesContainer->getGuideRestPoint(mGuideIndices[curve_index], guide_vertex_id);
-
+			const pxr::GfVec3f guide_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, guide_vertex_id);
 			bind.vec = curr_pt - guide_pt;
+			bind.encoded_id = GuideCurvesDeformerData::PointBindData::encodeID_modeANGLE(guide_id, guide_vertex_id);
         }
 
     };
@@ -241,23 +269,26 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 		}
 	}
 
-	std::cerr << "!!!! CHECK THAT buildSkinPrimData(0) implementation is really done properly!" << std::endl;
-
 	return true;
 }
 
 bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
-	if(!mCurvesGeoPrimHandle.writeDataToBson(mpGuideCurvesDeformerData.get())) {
+	if(mpGuidesPhantomTrimeshData && !mDeformerGeoPrimHandle.writeDataToBson(mpGuidesPhantomTrimeshData.get())) {
+		std::cerr << "Error writing " << mpGuidesPhantomTrimeshData->typeName() << " deformer data to json !" << std::endl;
+		return false;
+	}
+
+	if(mpGuideCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(mpGuideCurvesDeformerData.get())) {
 		std::cerr << "Error writing " << mpGuideCurvesDeformerData->typeName() << " deformer data to json !" << std::endl;
 		return false;
 	}
 
-	if(!mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
+	if(mpSkinAdjacencyData && mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
 		std::cerr << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !" << std::endl;
 		return false;
 	}
 
-	if(!mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
+	if(mpSkinPhantomTrimeshData && !mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
 		std::cerr << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !" << std::endl;
 		return false;
 	}
