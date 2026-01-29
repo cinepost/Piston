@@ -2,6 +2,7 @@
 #include "phantom_trimesh.h"
 #include "geometry_tools.h"
 #include "simple_profiler.h"
+#include "math.h"
 
 #ifdef USE_CGAL
 
@@ -48,6 +49,8 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 		return false;
 	}
 
+	std::cout << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions" << std::endl;
+
 	mValid = true;
 	return mValid;
 }
@@ -66,7 +69,8 @@ bool PhantomTrimesh::buildTetrahedrons() {
 	using CGAL_VtxHandle = Triangulation::Vertex_handle;
 	using CGAL_LocateType = Triangulation::Locate_type;
 
-	const size_t points_count = mUsdMeshRestPositions.size();
+	const pxr::VtArray<pxr::GfVec3f>& rest_positions = getRestPositions();
+	const size_t points_count = rest_positions.size();
 
 	if(points_count < 4) {
 		std::cerr << "Mesh has less than 4 vertices !" << std::endl;
@@ -75,7 +79,7 @@ bool PhantomTrimesh::buildTetrahedrons() {
 
 	std::vector< std::pair<CGAL_Point, uint32_t> > points;
 	for(size_t i = 0; i < points_count; ++i) {
-		const auto& pxr_pt = mUsdMeshRestPositions[i];
+		const auto& pxr_pt = rest_positions[i];
   		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
   	}
 
@@ -107,6 +111,28 @@ bool PhantomTrimesh::buildTetrahedrons() {
 		mTetrahedronCounts[tetra.indices[3]]++;
 	}
 
+	uint32_t offset = 0;
+	for(size_t i = 0; i < mTetrahedronCounts.size(); ++i) {
+		mTetrahedronOffsets[i] = offset;
+		offset += mTetrahedronCounts[i];
+	}
+
+	mTetrahedronIndices.resize(mTetrahedrons.size() * 4);
+	std::fill(mTetrahedronIndices.begin(), mTetrahedronIndices.end(), Tetrahedron::kInvalidVertexID);
+
+	std::fill(mTetrahedronCounts.begin(), mTetrahedronCounts.end(), 0);
+	for(size_t i = 0; i < mTetrahedrons.size(); ++i) {
+		const auto& tindices = mTetrahedrons[i].indices;
+		mTetrahedronIndices[mTetrahedronOffsets[tindices[0]] + mTetrahedronCounts[tindices[0]]++] = i;
+		mTetrahedronIndices[mTetrahedronOffsets[tindices[1]] + mTetrahedronCounts[tindices[1]]++] = i;
+		mTetrahedronIndices[mTetrahedronOffsets[tindices[2]] + mTetrahedronCounts[tindices[2]]++] = i;
+		mTetrahedronIndices[mTetrahedronOffsets[tindices[3]] + mTetrahedronCounts[tindices[3]]++] = i;
+	}
+
+	for(size_t i = 0; i < mTetrahedronCounts.size(); ++i) {
+		dbg_printf("pt %zu tetras count %zu\n", i, (size_t)mTetrahedronCounts[i]);
+	}
+
 	return true;
 }
 
@@ -119,6 +145,91 @@ bool PhantomTrimesh::buildTetrahedrons() {
 
 #endif  // USE_CGAL
 
+pxr::GfVec3f PhantomTrimesh::getTetrahedronRestCentroid(const Tetrahedron& t) const {
+	assert(t.isValid());
+
+	const pxr::VtArray<pxr::GfVec3f>& rest_positions = getRestPositions();
+	return (rest_positions[t.indices[0]] + rest_positions[t.indices[1]] + rest_positions[t.indices[2]] + rest_positions[t.indices[3]]) / 4.0f;
+}
+
+pxr::GfVec3f PhantomTrimesh::getTetrahedronRestCentroid(size_t idx) const {
+	assert(idx < mTetrahedrons.size());
+	return getTetrahedronRestCentroid(mTetrahedrons[idx]);
+}
+
+void PhantomTrimesh::barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const {
+	assert(t.isValid());
+
+	const pxr::VtArray<pxr::GfVec3f>& rest_positions = getRestPositions();
+
+	const pxr::GfVec3f& a = rest_positions[t.indices[0]];
+	const pxr::GfVec3f& b = rest_positions[t.indices[1]];
+	const pxr::GfVec3f& c = rest_positions[t.indices[2]];
+	const pxr::GfVec3f& d = rest_positions[t.indices[3]];
+
+    pxr::GfVec3f vap = p - a;
+    pxr::GfVec3f vbp = p - b;
+
+    pxr::GfVec3f vab = b - a;
+    pxr::GfVec3f vac = c - a;
+    pxr::GfVec3f vad = d - a;
+
+    pxr::GfVec3f vbc = c - b;
+    pxr::GfVec3f vbd = d - b;
+
+    // ScTP computes the scalar triple product
+    auto ScTP = [](const pxr::GfVec3f &a, const pxr::GfVec3f &b, const pxr::GfVec3f &c) {
+    	// computes scalar triple product
+    	return pxr::GfDot(a, pxr::GfCross(b, c));
+	};
+
+    float va6 = ScTP(vbp, vbd, vbc);
+    float vb6 = ScTP(vap, vac, vad);
+    float vc6 = ScTP(vap, vad, vab);
+    float vd6 = ScTP(vap, vab, vac);
+    float v6 = 1.f / ScTP(vab, vac, vad);
+
+    u = va6*v6;
+    v = vb6*v6;
+    w = vc6*v6;
+    x = vd6*v6;
+
+    float _x = 1.0f - (u + v + w);
+
+    if(!floatsAreEqualRelative(x, _x)) {
+    	std::cout << "x " << x << " _x " << _x << std::endl;
+    }
+}
+
+void PhantomTrimesh::barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const {
+	assert(idx < mTetrahedrons.size());
+	barycentricTetrahedronRestCoords(mTetrahedrons[idx], p, u, v, w, x);
+}
+
+pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const {
+	assert(t.isValid());
+
+	const pxr::VtArray<pxr::GfVec3f>& live_positions = getLivePositions();
+
+	assert(t.indices[0] < live_positions.size());
+	assert(t.indices[1] < live_positions.size());
+	assert(t.indices[2] < live_positions.size());
+	assert(t.indices[3] < live_positions.size());
+
+	return live_positions[t.indices[0]] * u + live_positions[t.indices[1]] * v, live_positions[t.indices[2]] * w + live_positions[t.indices[3]] * x;
+}
+
+pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const {
+	assert(idx < mTetrahedrons.size());
+	return getPointPositionFromBarycentricTetrahedronLiveCoords(mTetrahedrons[idx], u, v, w, x);
+}
+
+uint32_t PhantomTrimesh::getPointConnectedTetrahedronIndex(size_t pt_index, size_t tetra_local_index) const { 
+	assert(pt_index < mTetrahedronCounts.size()); 
+	assert(tetra_local_index < mTetrahedronCounts[pt_index]);
+	return mTetrahedronIndices[mTetrahedronOffsets[pt_index] + tetra_local_index];
+}
+
 void PhantomTrimesh::invalidate() {
 	mValid = false;
 
@@ -126,7 +237,9 @@ void PhantomTrimesh::invalidate() {
 	mUsdMeshLivePositions.clear();
 
 	// Tetrahedrons
-	mTetrahedronCountsAndOffsets.clear();
+	mTetrahedronCounts.clear();
+	mTetrahedronOffsets.clear();
+	mTetrahedronIndices.clear();
 	mTetrahedrons.clear();
 
 	// Trifaces
@@ -247,9 +360,9 @@ pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(const uint32_t face_id) const {
 }
 
 bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const {
-	assert(prim_handle.isMeshGeoPrim());
+	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
-	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
+	pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
 
 	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
 		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
@@ -257,7 +370,7 @@ bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode t
 	}
 
 	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
-		std::cerr << prim_handle.getPath() << " \"rest\" and live mesh point positions count mismatch!" << std::endl;
+		std::cerr << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mUsdMeshRestPositions.size() << " vs " << mUsdMeshLivePositions.size() << " ) mismatch !" << std::endl;
 		return false;
 	}
 

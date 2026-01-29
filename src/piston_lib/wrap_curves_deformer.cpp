@@ -82,7 +82,7 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
-	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid()) return false;
+	if(!pPhantomTrimesh->isValid()) return false;
 
 	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
 
@@ -231,7 +231,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 
 		const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
 
-		dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", src_mesh_face_count, tri_face_count);
+		dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", (size_t)src_mesh_face_count, tri_face_count);
 
 		std::vector<pxr::GfVec3f> rest_vertex_normals;
 		buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, false, (multi_threaded ? &mPool : nullptr));

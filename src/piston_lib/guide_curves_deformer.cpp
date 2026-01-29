@@ -10,6 +10,7 @@
 #include <random>
 #include <algorithm>
 #include <mutex>
+#include <atomic>
 
 
 namespace Piston {
@@ -86,7 +87,48 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 		return false;
 	}
 
-	return true;
+	assert(points.size() == mpGuideCurvesDeformerData->getPointBinds().size());
+	const auto bind_mode = getBindMode();
+
+	switch(bind_mode) {
+		case BindMode::SPACE:
+			return deformImpl_SpaceMode(multi_threaded, points, time_code);
+		default:
+			std::cerr << "Unimplemented bind mode " << to_string(bind_mode) << " !!!" << std::endl;
+			break;
+	}
+
+	return false;
+}
+
+bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+	assert(mpGuidesPhantomTrimeshData);
+	PhantomTrimesh* pPhantomTrimesh = mpGuidesPhantomTrimeshData->getTrimesh();
+	assert(pPhantomTrimesh);
+
+	if(!pPhantomTrimesh->update(mDeformerGeoPrimHandle, time_code)) {
+		return false;
+	}
+
+	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = pointBinds[i];
+			if(bind.encoded_id == PointBindData::kInvalid) continue;
+
+			const auto& tetra = pPhantomTrimesh->getTetrahedron(bind.encoded_id);
+			points[i] = pPhantomTrimesh->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, bind.vec[0], bind.vec[1], bind.vec[2], (1 - (bind.vec[0] + bind.vec[1] + bind.vec[2])));
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, pointBinds.size(), func);
+		mPool.wait();
+	} else {
+		func(0u, pointBinds.size());
+	}
+
+    return true;
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
@@ -160,6 +202,138 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 			return false;
 		}
 	}
+
+	const std::vector<PhantomTrimesh::Tetrahedron>& tetrahedrons = pPhantomTrimesh->getTetrahedrons();
+
+	// Build kdtree
+	auto buildTetrahedronsRestCentroidsKDTree = [&](bool multi_threaded) {
+		pxr::VtArray<pxr::GfVec3f> centroids(tetrahedrons.size());
+		for(uint32_t t_id = 0; t_id < tetrahedrons.size(); ++t_id) {
+			centroids[t_id] = pPhantomTrimesh->getTetrahedronRestCentroid(t_id);
+		}
+
+		return neighbour_search::KDTree<float, 3>(centroids, multi_threaded);
+	};
+
+	auto buildRestPositionsKDTree = [&](bool multi_threaded) {
+		return neighbour_search::KDTree<float, 3>(pPhantomTrimesh->getRestPositions(), multi_threaded);
+	};
+
+	neighbour_search::KDTree<float, 3> centroids_kdtree = buildTetrahedronsRestCentroidsKDTree(multi_threaded);
+	neighbour_search::KDTree<float, 3> restpoints_kdtree = buildRestPositionsKDTree(multi_threaded);
+
+	const size_t curves_count = mpCurvesContainer->getCurvesCount();
+
+	assert(mpGuideCurvesDeformerData);
+	auto& pointBinds = mpGuideCurvesDeformerData->mPointBinds;
+	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
+
+	std::atomic<size_t> total_points = 0;
+	std::atomic<size_t> bound_points = 0;
+	std::atomic<size_t> proximity_bound_points = 0;
+	std::atomic<size_t> unboud_points = 0;
+	
+	auto bind_func = [&](const std::size_t start, const std::size_t end) {
+    	if(multi_threaded) {
+    		const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
+    		dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *thread_index);
+    	}
+
+    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> sorted_tetra_centorids; // sorted tetrahedron centroids for brute force search
+    	sorted_tetra_centorids.reserve(tetrahedrons.size());
+
+		for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
+    		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx);
+
+    		const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+
+        	const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_idx);
+        	const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_idx);
+
+        	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
+        		total_points++;
+
+        		bool bound = false;
+        		const size_t curr_point_index = curve_vertex_offset + i;
+        		auto& bind = pointBinds[curr_point_index];
+        		bind.encoded_id = PointBindData::kInvalid;
+
+        		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
+
+        		//findKNearestNeighboursWithinRadiusSquared(const PointType &target, std::size_t k, CoordinateType radius_squared, std::vector<ReturnType> &result)
+
+        		// First try to find tetrahedron is connected to cleset point in point cloud
+        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = restpoints_kdtree.findNearestNeighbour(curr_pt);
+        		const size_t point_connected_tetras_count = pPhantomTrimesh->getPointConnectedTetrahedronsCount(nearest_pt.first);
+
+        		for(size_t lti = 0; lti < point_connected_tetras_count; ++lti) {
+        			uint32_t tetra_index = pPhantomTrimesh->getPointConnectedTetrahedronIndex(nearest_pt.first, lti);
+
+        			float x;
+        			pPhantomTrimesh->barycentricTetrahedronRestCoords(tetra_index, curr_pt, bind.vec[0], bind.vec[1], bind.vec[2], x);
+
+        			if(bind.vec[0] < 0.0f || bind.vec[1] < 0.0f || bind.vec[2] < 0.0f || x < 0.0f ||
+        			   bind.vec[0] > 1.0f || bind.vec[1] > 1.0f || bind.vec[2] > 1.0f || x > 1.0f ) {
+        				// neighbour test failed;
+        				continue;
+        			}
+
+        			// bound by nerest point cloud vertex;
+        			bind.encoded_id = tetra_index;
+        			bound_points++;
+        			break;
+        		}
+
+        		// If point os not boud by previous method we test it against closest tetraheron centroid
+        		if(bind.encoded_id == PointBindData::kInvalid) {
+        			const neighbour_search::KDTree<float, 3>::ReturnType nearest_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
+					
+					float x;
+					pPhantomTrimesh->barycentricTetrahedronRestCoords(nearest_centroid.first, curr_pt, bind.vec[0], bind.vec[1], bind.vec[2], x);
+        			if(!(bind.vec[0] < 0.0f || bind.vec[1] < 0.0f || bind.vec[2] < 0.0f || x < 0.0f ||
+        			   	bind.vec[0] > 1.0f || bind.vec[1] > 1.0f || bind.vec[2] > 1.0f || x > 1.0f )) {
+        				// bound by nearest tetra centroid
+        				bind.encoded_id = nearest_centroid.first;
+        				bound_points++;
+        			}
+        		}
+
+        		// Brute force search for contaning centroid
+        		if(bind.encoded_id == PointBindData::kInvalid) {
+        			const bool sort = false;
+        			centroids_kdtree.findAllNearestNeighboursWithinRadiusSquared(curr_pt, sorted_tetra_centorids, sort);
+					
+					float x;
+        			for(const auto& centroid: sorted_tetra_centorids) {
+						pPhantomTrimesh->barycentricTetrahedronRestCoords(centroid.first, curr_pt, bind.vec[0], bind.vec[1], bind.vec[2], x);
+        				if(!(bind.vec[0] < 0.0f || bind.vec[1] < 0.0f || bind.vec[2] < 0.0f || x < 0.0f ||
+        			   	    bind.vec[0] > 1.0f || bind.vec[1] > 1.0f || bind.vec[2] > 1.0f || x > 1.0f)) {
+        				   	// bound by brute force search
+        					bind.encoded_id = centroid.first;
+        					bound_points++;
+        					break;
+        				}
+        			}
+        		}
+
+        		if(bind.encoded_id == PointBindData::kInvalid) {
+        			unboud_points++;
+        		}
+        	}
+    	}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, curves_count, bind_func);
+		mPool.wait();
+	} else {
+		bind_func(0u, curves_count);
+	}
+
+	dbg_printf("Total points: %zu\n", total_points.load());
+	dbg_printf("Bound points: %zu\n", bound_points.load());
+	dbg_printf("Proximity bound points: %zu\n", proximity_bound_points.load());
+	dbg_printf("Unbound points: %zu\n", unboud_points.load());
 
 	return true;
 }

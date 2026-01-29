@@ -118,14 +118,16 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         return std::make_pair(nearest_node->index, min_distance_squared);
     }
 
-    [[nodiscard]] ReturnType findNearestNeighbour(const pxr::GfVec3f& target) const {
+    [[nodiscard]] ReturnType findNearestNeighbour(const pxr::GfVec3f& point) const {
         static_assert(number_of_dimensions == 3);
         static_assert(std::is_same<CoordinateType, float>::value);
 
         Node *nearest_node = nullptr;
         CoordinateType min_distance_squared = std::numeric_limits<CoordinateType>::max();
 
-        findNearestNeighbourRecursively(root_, {target[0], target[1], target[2]}, 0UL, min_distance_squared, nearest_node);
+        const PointType target({point[0], point[1], point[2]});
+
+        findNearestNeighbourRecursively(root_, target, 0UL, min_distance_squared, nearest_node);
 
         return std::make_pair(nearest_node->index, min_distance_squared);
     }
@@ -224,6 +226,27 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         if (sort) {
             std::sort(result.begin(), result.end(), [](const ReturnType &d1, const ReturnType &d2) { return (d1.second < d2.second); });
         }
+    }
+
+    void findAllNearestNeighboursWithinRadiusSquared(const pxr::GfVec3f &point, CoordinateType radius_squared, std::vector<ReturnType> &result, bool sort = true) const noexcept {
+        static_assert(number_of_dimensions == 3);
+        static_assert(std::is_same<CoordinateType, float>::value);
+
+        result.clear();
+
+        const PointType target {point[0], point[1], point[2]};
+
+        findAllNeighborsWithinRadiusSquaredRecursively(root_, target, 0UL, radius_squared, result);
+
+        if (sort) {
+            std::sort(result.begin(), result.end(), [](const ReturnType &d1, const ReturnType &d2) { return (d1.second < d2.second); });
+        }
+    }
+
+    /// Unlimited distance search
+    void findAllNearestNeighboursWithinRadiusSquared(const pxr::GfVec3f &point, std::vector<ReturnType> &result, bool sort = true) const noexcept {
+        CoordinateType radius_squared = std::numeric_limits<CoordinateType>::max();
+        findAllNearestNeighboursWithinRadiusSquared(point, radius_squared, result, sort);
     }
 
   private:

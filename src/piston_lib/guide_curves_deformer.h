@@ -70,6 +70,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 
+		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 

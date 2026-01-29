@@ -116,7 +116,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 }
 
 bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code) {	
-	return deform(time_code);
+	return deform(time_code, false);
 }
 
 bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {	

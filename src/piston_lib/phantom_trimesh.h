@@ -84,12 +84,15 @@ class PhantomTrimesh {
 
 		struct Tetrahedron {
 			using IndicesList = std::array<PxrIndexType, 4>;
-			static const PxrIndexType kInvalidVertexID = TriFace::kInvalidVertexID;
+			static constexpr PxrIndexType kInvalidVertexID = std::numeric_limits<PxrIndexType>::max();
 
 			Tetrahedron(): indices{kInvalidVertexID} { }
 			Tetrahedron(PxrIndexType a, PxrIndexType b, PxrIndexType c, PxrIndexType d): indices{a, b, c, d} { }
 
-			bool isValid() const { return indices[0] != indices[1] != indices[2] != indices[3] != kInvalidVertexID; }
+			bool isValid() const { return !(
+				indices[0] == indices[1] || indices[0] == indices[2] || indices[0] == indices[3] ||
+				indices[0] == kInvalidVertexID || indices[1] == kInvalidVertexID || indices[2] == kInvalidVertexID || indices[3] == kInvalidVertexID); 
+			}
 
 			IndicesList 	indices;
 		};
@@ -102,8 +105,8 @@ class PhantomTrimesh {
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
-		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions; }
-		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions; }
+		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
+		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions.AsConst(); }
 
 		std::vector<TriFace::Flags>& getFaceFlags() { return mFaceFlags; }
 		const std::vector<TriFace::Flags>& getFaceFlags() const { return mFaceFlags; }
@@ -140,6 +143,19 @@ class PhantomTrimesh {
 		bool buildTetrahedrons();
 		bool hasTetrahedrons() const { return !mTetrahedrons.empty() && (mTetrahedronCounts.size() == mTetrahedronOffsets.size() == mUsdMeshRestPositions.size()); }
 		const std::vector<Tetrahedron>& getTetrahedrons() const { return mTetrahedrons; }
+		const Tetrahedron& getTetrahedron(size_t i) const { assert(i < mTetrahedrons.size()); return mTetrahedrons[i]; }
+
+		size_t getPointConnectedTetrahedronsCount(size_t pt_index) const { assert(pt_index < mTetrahedronCounts.size()); return mTetrahedronCounts[pt_index];}
+		uint32_t getPointConnectedTetrahedronIndex(size_t pt_index, size_t tetra_local_index) const;
+
+		pxr::GfVec3f getTetrahedronRestCentroid(const Tetrahedron& t) const;
+		pxr::GfVec3f getTetrahedronRestCentroid(size_t idx) const;
+
+		void barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& z) const;
+		void barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& z) const;
+
+		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const;
+		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const;
 
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default()) const;
 
