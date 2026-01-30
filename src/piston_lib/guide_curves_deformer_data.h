@@ -3,6 +3,7 @@
 
 #include "serializable_data.h"
 #include "phantom_trimesh.h"
+#include "float24.h"
 
 #include <memory>
 #include <limits>
@@ -26,15 +27,40 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		};
 
 		struct PointBindData {
+			union EncodedID{
+				uint32_t raw_data;
+
+				struct {
+					uint32_t element_id : 30; // it's either tetra or triface id
+					uint32_t is_24bit : 1;
+					uint32_t is_tetra : 1;
+				} mode_space;
+
+				struct {
+					uint32_t guide_id : 24;
+					uint32_t segment_id : 8;
+				} mode_angle;
+			};
+
 			static constexpr uint32_t kInvalid = std::numeric_limits<uint32_t>::max();
-			uint32_t encoded_id;
-			pxr::GfVec3f vec; // ntb coords
+			EncodedID 				encoded_id;		// encoding depends on a binding mode. IMPORTANT: msb is reserved as a flag !!!
+			std::array<float, 3> 	data; 			
 			PointBindData(): encoded_id(kInvalid) {};
+			inline size_t hash() const { return static_cast<size_t>(encoded_id) + static_cast<size_t>(data[0]) + static_cast<size_t>(data[1]) + static_cast<size_t>(data[2]); }
 
-			inline size_t hash() const { return static_cast<size_t>(encoded_id) + static_cast<size_t>(vec[0] + vec[1] + vec[2]); }
+			inline void setData(const pxr::GfVec3f& v) { data[0] = v[0]; data[1] = v[1]; data[2] = v[2]; }
+			inline void setData(float x, float y, float z) { assert(!encoded_id.is_24bit); data = {x, y, z}; }
+			inline void setData(float x, float y, float z, float w) { encoded_id.is_24bit = 1; data = {x, y, z}; }
 
-			static uint32_t encodeID_modeANGLE(uint32_t guide_id, uint8_t guide_vertex_id);
-			static void decodeID_modeANGLE(uint32_t encoded_id, uint32_t& guide_id, uint8_t& guide_vertex_id);
+			inline const std::array<float, 3>& getData() const { return data; }
+			inline const void getData(std::array<float24_s, 4>& a) const { assert(encoded_id.is_24bit); }
+			inline void getData(pxr::GfVec3f& v) const { assert(!encoded_id.is_24bit); v[0] = data[0]; v[1] = data[1]; v[2] = data[2]; }
+
+			inline void encodeID_modeSPACE(uint32_t id, bool is_tetra, bool is_enclosed);
+			inline void decodeID_modeSPACE(uint32_t& id, bool& is_tetra, bool is_enclosed);
+
+			inline void encodeID_modeANGLE(uint32_t guide_id, uint8_t guide_vertex_id);
+			inline void decodeID_modeANGLE(uint32_t& guide_id, uint8_t& guide_vertex_id);
 		};
 
 		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }

@@ -3,6 +3,8 @@
 
 #include <cmath>
 
+#include "float24.h"
+
 namespace Piston {
 
 inline bool floatsAreEqualRelative(float a, float b, float epsilon = 1e-5f) {

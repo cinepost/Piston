@@ -327,7 +327,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
 					const pxr::GfVec3f& p2 = meshRestPositions[face.indices[2]];
 
 					const auto& face_normal = face.getRestNormal();
-					const Plane face_plane(meshRestPositions[face.indices[0]], face_normal);
+					const Plane face_plane(p0, face_normal);
 					const float face_distance = distance(face_plane, curr_pt);
 
 					const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane

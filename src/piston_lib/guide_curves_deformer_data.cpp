@@ -67,18 +67,26 @@ void GuideCurvesDeformerData::setBindMode(const GuideCurvesDeformerData::BindMod
 }
 
 uint32_t GuideCurvesDeformerData::PointBindData::encodeID_modeANGLE(uint32_t guide_id, uint8_t guide_vertex_id) {
-	// We use 24 bits for guide curve id and 8 bits for guide curve vertex
+	// We use 23 bits for guide curve id and 8 bits for guide curve vertex
 
-	static const uint32_t kMaxGuideID = 16777215;
+	static const uint32_t kMaxGuideID = 8388607; // 23 bit
 
 	assert(guide_id <= kMaxGuideID);
 
-	return (guide_id << 8) | (uint32_t)guide_vertex_id; 
+	return ((guide_id & 0x007FFFFF) << 8) | (uint32_t)guide_vertex_id; 
 }
 
 void GuideCurvesDeformerData::PointBindData::decodeID_modeANGLE(uint32_t encoded_id, uint32_t& guide_id, uint8_t& guide_vertex_id) {
-	guide_id = encoded_id >> 8;
+	guide_id = (encoded_id >> 8) & 0x007FFFFF;
 	guide_vertex_id = encoded_id & 0x000000FF;
+}
+
+uint32_t GuideCurvesDeformerData::PointBindData::encodeID_modeSPACE(uint32_t id,) {
+	return id & 0x7FFFFFFF;
+}
+
+void GuideCurvesDeformerData::PointBindData::decodeID_modeSPACE(uint32_t encoded_id, uint32_t& id) {
+	id = encoded_id & 0x7FFFFFFFF;
 }
 
 void GuideCurvesDeformerData::setSkinPrimPath(const std::string& prim_path) {

@@ -49,6 +49,7 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
     using PointType = Point<CoordinateType, number_of_dimensions>;
     using KDTreeType = KDTree<CoordinateType, number_of_dimensions>;
     using ReturnType = std::pair<std::size_t, CoordinateType>; // Index + Distance
+    static constexpr size_t kInvalidIndex = std::numeric_limits<std::size_t>::max();
 
   public:
     KDTree &operator=(const KDTreeType &other) = delete;

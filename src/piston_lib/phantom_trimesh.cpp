@@ -193,17 +193,28 @@ void PhantomTrimesh::barycentricTetrahedronRestCoords(const Tetrahedron& t, cons
     v = vb6*v6;
     w = vc6*v6;
     x = vd6*v6;
-
+/*
     float _x = 1.0f - (u + v + w);
 
     if(!floatsAreEqualRelative(x, _x)) {
     	std::cout << "x " << x << " _x " << _x << std::endl;
     }
+*/
 }
 
 void PhantomTrimesh::barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const {
 	assert(idx < mTetrahedrons.size());
 	barycentricTetrahedronRestCoords(mTetrahedrons[idx], p, u, v, w, x);
+}
+
+void PhantomTrimesh::barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w) const {
+	float _temp_x;
+	barycentricTetrahedronRestCoords(t, p, u, v, w, _temp_x);
+}
+
+void PhantomTrimesh::barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w) const {
+	assert(idx < mTetrahedrons.size());
+	barycentricTetrahedronRestCoords(mTetrahedrons[idx], p, u, v, w);
 }
 
 pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const {
@@ -216,7 +227,12 @@ pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoord
 	assert(t.indices[2] < live_positions.size());
 	assert(t.indices[3] < live_positions.size());
 
-	return live_positions[t.indices[0]] * u + live_positions[t.indices[1]] * v, live_positions[t.indices[2]] * w + live_positions[t.indices[3]] * x;
+	const pxr::GfVec3f& a = live_positions[t.indices[0]];
+	const pxr::GfVec3f& b = live_positions[t.indices[1]];
+	const pxr::GfVec3f& c = live_positions[t.indices[2]];
+	const pxr::GfVec3f& d = live_positions[t.indices[3]];
+
+    return {u * a[0] + v * b[0] + w * c[0] + x * d[0], u * a[1] + v * b[1] + w * c[1] + x * d[1], u * a[2] + v * b[2] + w * c[2] + x * d[2]};
 }
 
 pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const {
@@ -263,7 +279,8 @@ uint32_t PhantomTrimesh::getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrI
 	return kInvalidTriFaceID;
 }
 
-uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, PhantomTrimesh::PxrIndexType b, PhantomTrimesh::PxrIndexType c) {	
+uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, PhantomTrimesh::PxrIndexType b, PhantomTrimesh::PxrIndexType c) {
+	assert((a != b) && (a != c) && (b != c));	
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
 
@@ -292,6 +309,10 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, Phant
 	mFaceMap[indices] = idx;
 
 	return idx;
+}
+
+uint32_t PhantomTrimesh::getOrCreateFaceID(const std::array<PxrIndexType, 3>& a) {
+	return getOrCreateFaceID(a[0], a[1], a[2]);
 }
 
 bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const {

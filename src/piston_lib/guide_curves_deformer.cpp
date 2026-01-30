@@ -220,7 +220,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 	};
 
 	neighbour_search::KDTree<float, 3> centroids_kdtree = buildTetrahedronsRestCentroidsKDTree(multi_threaded);
-	neighbour_search::KDTree<float, 3> restpoints_kdtree = buildRestPositionsKDTree(multi_threaded);
+	neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = buildRestPositionsKDTree(multi_threaded);
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
@@ -239,8 +239,12 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
     		dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *thread_index);
     	}
 
-    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> sorted_tetra_centorids; // sorted tetrahedron centroids for brute force search
-    	sorted_tetra_centorids.reserve(tetrahedrons.size());
+    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> sorted_tetra_centroids; // sorted tetrahedron centroids for brute force search
+    	sorted_tetra_centroids.reserve(tetrahedrons.size());
+
+    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
+
+    	const auto& faces = pPhantomTrimesh->getFaces();
 
 		for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
     		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx);
@@ -249,6 +253,8 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
         	const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_idx);
         	const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_idx);
+
+        	float u, v, w, x;
 
         	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
         		total_points++;
@@ -263,37 +269,40 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         		//findKNearestNeighboursWithinRadiusSquared(const PointType &target, std::size_t k, CoordinateType radius_squared, std::vector<ReturnType> &result)
 
         		// First try to find tetrahedron is connected to cleset point in point cloud
-        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = restpoints_kdtree.findNearestNeighbour(curr_pt);
+        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = deformer_restpoints_kdtree.findNearestNeighbour(curr_pt);
         		const size_t point_connected_tetras_count = pPhantomTrimesh->getPointConnectedTetrahedronsCount(nearest_pt.first);
 
         		for(size_t lti = 0; lti < point_connected_tetras_count; ++lti) {
         			uint32_t tetra_index = pPhantomTrimesh->getPointConnectedTetrahedronIndex(nearest_pt.first, lti);
 
-        			float x;
-        			pPhantomTrimesh->barycentricTetrahedronRestCoords(tetra_index, curr_pt, bind.vec[0], bind.vec[1], bind.vec[2], x);
+        			pPhantomTrimesh->barycentricTetrahedronRestCoords(tetra_index, curr_pt, u, v, w, x);
 
-        			if(bind.vec[0] < 0.0f || bind.vec[1] < 0.0f || bind.vec[2] < 0.0f || x < 0.0f ||
-        			   bind.vec[0] > 1.0f || bind.vec[1] > 1.0f || bind.vec[2] > 1.0f || x > 1.0f ) {
+        			if(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+        			   u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f ) {
         				// neighbour test failed;
         				continue;
         			}
 
         			// bound by nerest point cloud vertex;
-        			bind.encoded_id = tetra_index;
+        			bind.setData(u, v, w);
+        			bind.encoded_id = PointBindData::encodeID_modeSPACE(tetra_index, true /* is tetra id */);
         			bound_points++;
         			break;
         		}
 
+        		neighbour_search::KDTree<float, 3>::ReturnType closest_tetra_centroid;
+        		closest_tetra_centroid.first = neighbour_search::KDTree<float, 3>::kInvalidIndex;
+
         		// If point os not boud by previous method we test it against closest tetraheron centroid
         		if(bind.encoded_id == PointBindData::kInvalid) {
-        			const neighbour_search::KDTree<float, 3>::ReturnType nearest_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
+        			closest_tetra_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
 					
-					float x;
-					pPhantomTrimesh->barycentricTetrahedronRestCoords(nearest_centroid.first, curr_pt, bind.vec[0], bind.vec[1], bind.vec[2], x);
-        			if(!(bind.vec[0] < 0.0f || bind.vec[1] < 0.0f || bind.vec[2] < 0.0f || x < 0.0f ||
-        			   	bind.vec[0] > 1.0f || bind.vec[1] > 1.0f || bind.vec[2] > 1.0f || x > 1.0f )) {
+					pPhantomTrimesh->barycentricTetrahedronRestCoords(closest_tetra_centroid.first, curr_pt, u, v, w, x);
+        			if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+        			   	 u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f )) {
         				// bound by nearest tetra centroid
-        				bind.encoded_id = nearest_centroid.first;
+        				bind.setData(u, v, w);
+        				bind.encoded_id = PointBindData::encodeID_modeSPACE(closest_tetra_centroid.first, true /* tetra id */);
         				bound_points++;
         			}
         		}
@@ -301,22 +310,69 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         		// Brute force search for contaning centroid
         		if(bind.encoded_id == PointBindData::kInvalid) {
         			const bool sort = false;
-        			centroids_kdtree.findAllNearestNeighboursWithinRadiusSquared(curr_pt, sorted_tetra_centorids, sort);
+        			centroids_kdtree.findAllNearestNeighboursWithinRadiusSquared(curr_pt, sorted_tetra_centroids, sort);
 					
 					float x;
-        			for(const auto& centroid: sorted_tetra_centorids) {
-						pPhantomTrimesh->barycentricTetrahedronRestCoords(centroid.first, curr_pt, bind.vec[0], bind.vec[1], bind.vec[2], x);
-        				if(!(bind.vec[0] < 0.0f || bind.vec[1] < 0.0f || bind.vec[2] < 0.0f || x < 0.0f ||
-        			   	    bind.vec[0] > 1.0f || bind.vec[1] > 1.0f || bind.vec[2] > 1.0f || x > 1.0f)) {
+        			for(const auto& centroid: sorted_tetra_centroids) {
+						pPhantomTrimesh->barycentricTetrahedronRestCoords(centroid.first, curr_pt, u, v, w, x);
+        				if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+        			   	     u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f)) {
         				   	// bound by brute force search
-        					bind.encoded_id = centroid.first;
+        				   	bind.setData(u, v, w);
+        					bind.encoded_id = PointBindData::encodeID_modeSPACE(centroid.first, true /* tetra id*/);
         					bound_points++;
         					break;
         				}
         			}
         		}
 
+        		// Now for any unbound point we bind it to closest triface or tetra (depends on user choice)
+
+        		const bool bindMissingToTriface = true;
+        		
         		if(bind.encoded_id == PointBindData::kInvalid) {
+        			if(bindMissingToTriface) {
+        				deformer_restpoints_kdtree.findKNearestNeighbours(curr_pt, 3, closest_deformer_points);
+
+        				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(closest_deformer_points[0].first, closest_deformer_points[1].first, closest_deformer_points[2].first);
+
+        				const auto& face = faces[face_id];
+
+						const pxr::GfVec3f& p0 = pPhantomTrimesh->getRestPointPosition(face.indices[0]);
+						const pxr::GfVec3f& p1 = pPhantomTrimesh->getRestPointPosition(face.indices[1]);
+						const pxr::GfVec3f& p2 = pPhantomTrimesh->getRestPointPosition(face.indices[2]);
+
+						const auto& face_normal = face.getRestNormal();
+						const Plane face_plane(p0, face_normal);
+						const float face_distance = distance(face_plane, curr_pt);
+
+						const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
+
+						const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
+						float d00 = pxr::GfDot(v0, v0);
+						float d01 = pxr::GfDot(v0, v1);
+						float d11 = pxr::GfDot(v1, v1);
+						float d20 = pxr::GfDot(v2, v0);
+						float d21 = pxr::GfDot(v2, v1);
+						float denom = d00 * d11 - d01 * d01;
+
+						bind.vec[0] = (d11 * d20 - d01 * d21) / denom;
+						bind.vec[1] = (d00 * d21 - d01 * d20) / denom;
+						bind.vec[2] = face_distance;
+						bind.encoded_id = PointBindData::encodeID_modeSPACE(face_id, false /* face id*/);
+        				bound_points++;
+        			} else {
+        				bind.encoded_id = PointBindData::encodeID_modeSPACE(closest_tetra_centroid.first, true /* tetra id */);
+        				pPhantomTrimesh->barycentricTetrahedronRestCoords(closest_tetra_centroid.first, curr_pt, u, v, w, x);
+        				bind.setData(u, v, w, x);
+        				bound_points++;
+        			}
+        			
+        		}
+
+        		if(bind.encoded_id == PointBindData::kInvalid) {
+        			// We should not be here
+        			assert((1 == 2) && "What the f..ck !?");
         			unboud_points++;
         		}
         	}

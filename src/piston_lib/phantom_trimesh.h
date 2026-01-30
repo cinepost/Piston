@@ -104,9 +104,12 @@ class PhantomTrimesh {
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
-		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
-		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions.AsConst(); }
+		inline size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
+		inline const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
+		inline const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions.AsConst(); }
+
+		inline const pxr::GfVec3f& getRestPointPosition(size_t i) const { assert(i < mUsdMeshRestPositions.size()); return mUsdMeshRestPositions[i]; }
+		inline const pxr::GfVec3f& getLivePointPosition(size_t i) const { assert(i < mUsdMeshLivePositions.size()); return mUsdMeshLivePositions[i]; }
 
 		std::vector<TriFace::Flags>& getFaceFlags() { return mFaceFlags; }
 		const std::vector<TriFace::Flags>& getFaceFlags() const { return mFaceFlags; }
@@ -116,6 +119,7 @@ class PhantomTrimesh {
 
 		uint32_t getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
 		uint32_t getOrCreateFaceID(PxrIndexType a, PxrIndexType b, PxrIndexType c);
+		uint32_t getOrCreateFaceID(const std::array<PxrIndexType, 3>& a);
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(const uint32_t id) const { return mFaces[id]; }
@@ -151,8 +155,11 @@ class PhantomTrimesh {
 		pxr::GfVec3f getTetrahedronRestCentroid(const Tetrahedron& t) const;
 		pxr::GfVec3f getTetrahedronRestCentroid(size_t idx) const;
 
-		void barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& z) const;
-		void barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& z) const;
+		void barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const;
+		void barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const;
+
+		void barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w) const;
+		void barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w) const;
 
 		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const;
 		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const;
