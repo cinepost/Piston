@@ -25,14 +25,14 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 
 		size_t getCurvesCount() const { return mCurvesCount; }
 		const pxr::VtArray<int>& getCurveVertexCounts() const { return mCurveVertexCounts.AsConst(); } 
-		size_t getCurveVertexCount(size_t idx) const { assert(idx < mCurveVertexCounts.size()); return getCurveVertexCounts()[idx]; } 
+		size_t getCurveVertexCount(size_t curve_id) const { assert(curve_id < mCurveVertexCounts.size()); return mCurveVertexCounts.AsConst()[curve_id]; } 
 
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints.AsConst(); }
 		const pxr::VtArray<pxr::GfVec3f>& getLiveCurvePoints() const { return mLiveCurvePoints.AsConst(); }
 
 		const std::vector<uint32_t>& getCurveOffsets() const { return mCurveOffsets; }
-		size_t getCurveVertexOffset(size_t idx) const { assert(idx < mCurveOffsets.size()); return mCurveOffsets[idx]; }
+		size_t getCurveVertexOffset(size_t curve_id) const { assert(curve_id < mCurveOffsets.size()); return mCurveOffsets[curve_id]; }
 
 		const pxr::GfVec3f& getGuideRestPoint(uint32_t guide_id, uint32_t vertex_id) const;
 		const pxr::GfVec3f& getGuideLivePoint(uint32_t guide_id, uint32_t vertex_id) const;

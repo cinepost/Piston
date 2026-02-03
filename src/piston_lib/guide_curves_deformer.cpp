@@ -105,22 +105,33 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 
 bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
+	const size_t guide_curves_count = mpGuideCurvesContainer->getCurvesCount();
+	const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
+	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
 
 		uint32_t guide_id;
 		uint8_t segment_id;
-		const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
+		pxr::GfVec3f vec;
 
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
 
 			bind.decodeID_modeANGLE(guide_id, segment_id);
-			const std::array<float, 3>& vec = bind.getData();
+			assert(guide_id < guide_curves_count);
+			assert((size_t)segment_id < (mpGuideCurvesContainer->getCurveVertexCount(guide_id) - 1));
+			bind.getData(vec);
+			const size_t guide_segment_start_vtx = mpGuideCurvesContainer->getCurveVertexOffset(guide_id) + segment_id;
 
-			//const pxr::GfVec3f& guide_segment_start_pt = 
-			//points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.encoded_id.mode_space.element_id, u, v) + (face_normal * w);
+			// TODO: precalculate rest vectors. Maybe use CurvesContainter class instead as it's already in vectors form.... 
+			const pxr::GfVec3f rest_segment_vector_n = pxr::GfGetNormalized(guides_rest_points[guide_segment_start_vtx + 1] - guides_rest_points[guide_segment_start_vtx]);
+			const pxr::GfVec3f live_segment_vector_n = pxr::GfGetNormalized(guides_live_points[guide_segment_start_vtx + 1] - guides_live_points[guide_segment_start_vtx]);
+
+			const pxr::GfMatrix3f m = rotateAlign(rest_segment_vector_n, live_segment_vector_n);
+
+			points[i] = guides_live_points[guide_segment_start_vtx] + (m * vec);
 		}
 	};
 
@@ -208,7 +219,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 		return false;
 	}
 
-	if(guideIDSPrimVar.GetAttr().Get(&mGuideIndices, rest_time_code)) {
+	if(!guideIDSPrimVar.GetAttr().Get(&mGuideIndices, rest_time_code)) {
 		std::cerr << "Error getting curves " << mCurvesGeoPrimHandle.getPath() << " \"" << mGuideIDPrimAttrName << "\" guide indices !" << std::endl;
 		return false;
 	}
@@ -512,7 +523,7 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
         	const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
 			
 			const uint32_t guide_vertex_id = nearest_pt.first;
-			const uint32_t segment_id = std::min(guide_vertex_id, (uint32_t)guide_vertex_count - 1u);
+			const uint32_t segment_id = std::min(guide_vertex_id, (uint32_t)guide_vertex_count - 2u); // exclude last vertex index
 
 			const pxr::GfVec3f& guide_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, segment_id);
 			
@@ -530,6 +541,8 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
             func(i);
         }
     }
+
+    return true;
 }
 
 bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {

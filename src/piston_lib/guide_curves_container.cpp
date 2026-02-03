@@ -41,7 +41,7 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	} else {
 		// Curve rest points
 		if(!geom_curves.GetPointsAttr().Get(&mRestCurvePoints, rest_time_code)) {
-			std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
+			std::cerr << "Error getting curves \"rest\" points from " << prim_handle.getName() << " !" << std::endl;
 			return false;
 		}
 	}
@@ -67,16 +67,32 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 
 bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
 	assert(!mExternalLivePointDataSource);
+	assert(prim_handle.isBasisCurvesGeoPrim());
 
+	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
+	if(!geom_curves) {
+		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
+		return false;
+	}
+
+	// Curve live points
+	if(!geom_curves.GetPointsAttr().Get(&mLiveCurvePoints, time_code)) {
+		std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
+		return false;
+	}
+
+	if(mLiveCurvePoints.size() != mRestCurvePoints.size()) {
+		std::cerr << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !" << std::endl;
+		return false;
+	}
 	return true;
 }
 
 const pxr::GfVec3f& GuideCurvesContainer::getGuideRestPoint(uint32_t guide_id, uint32_t vertex_id) const {
 	assert(guide_id < mCurveVertexCounts.size() && guide_id < mCurveOffsets.size());
-	assert(vertex_id < mCurveVertexCounts[guide_id] && vertex_id < mCurveOffsets[guide_id]);
+	assert(vertex_id < mCurveVertexCounts[guide_id]);
 
 	const size_t global_vtx_id = mCurveOffsets[guide_id] + vertex_id;
-
 	const auto& rest_points = mRestCurvePoints.AsConst();
 	assert(global_vtx_id < rest_points.size());
 
@@ -85,10 +101,9 @@ const pxr::GfVec3f& GuideCurvesContainer::getGuideRestPoint(uint32_t guide_id, u
 
 const pxr::GfVec3f& GuideCurvesContainer::getGuideLivePoint(uint32_t guide_id, uint32_t vertex_id) const {
 	assert(guide_id < mCurveVertexCounts.size() && guide_id < mCurveOffsets.size());
-	assert(vertex_id < mCurveVertexCounts[guide_id] && vertex_id < mCurveOffsets[guide_id]);
+	assert(vertex_id < mCurveVertexCounts[guide_id]);
 
 	const size_t global_vtx_id = mCurveOffsets[guide_id] + vertex_id;
-
 	const auto& live_points = mRestCurvePoints.AsConst();
 	assert(global_vtx_id < live_points.size());
 
