@@ -19,19 +19,23 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 	public:
 		static UniquePtr create();
 
-		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code);
+		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt = nullptr, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt = nullptr);
+
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);
 
 		size_t getCurvesCount() const { return mCurvesCount; }
-		const pxr::VtArray<int>& getCurveVertexCounts() const { return mCurveVertexCounts; } 
+		const pxr::VtArray<int>& getCurveVertexCounts() const { return mCurveVertexCounts.AsConst(); } 
+		size_t getCurveVertexCount(size_t idx) const { assert(idx < mCurveVertexCounts.size()); return getCurveVertexCounts()[idx]; } 
 
-		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints; }
-		const pxr::VtArray<pxr::GfVec3f>& getLiveCurvePoints() const { return mLiveCurvePoints; }
+
+		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints.AsConst(); }
+		const pxr::VtArray<pxr::GfVec3f>& getLiveCurvePoints() const { return mLiveCurvePoints.AsConst(); }
 
 		const std::vector<uint32_t>& getCurveOffsets() const { return mCurveOffsets; }
+		size_t getCurveVertexOffset(size_t idx) const { assert(idx < mCurveOffsets.size()); return mCurveOffsets[idx]; }
 
-		const pxr::GfVec3f& getGuideRestPoint(uint32_t guide_id, uint32_t vertex_id);
-		const pxr::GfVec3f& getGuideLivePoint(uint32_t guide_id, uint32_t vertex_id);
+		const pxr::GfVec3f& getGuideRestPoint(uint32_t guide_id, uint32_t vertex_id) const;
+		const pxr::GfVec3f& getGuideLivePoint(uint32_t guide_id, uint32_t vertex_id) const;
 
 	protected:
 		GuideCurvesContainer();
@@ -43,6 +47,8 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 
 		pxr::VtArray<pxr::GfVec3f>              mRestCurvePoints;
 		pxr::VtArray<pxr::GfVec3f>              mLiveCurvePoints;
+		bool                                    mExternalRestPointDataSource = false;
+		bool                                    mExternalLivePointDataSource = false;
 };
 
 } // namespace Piston

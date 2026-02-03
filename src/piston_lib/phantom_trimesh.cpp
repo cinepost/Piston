@@ -21,7 +21,7 @@ PhantomTrimesh::UniquePtr PhantomTrimesh::create() {
 	return std::make_unique<PhantomTrimesh>();
 }
 
-PhantomTrimesh::PhantomTrimesh() : mValid(false) {
+PhantomTrimesh::PhantomTrimesh() : mValid(false), mExternalDataSource(false) {
 	static const size_t reserve_size = 1024;
 
 	mFaceMap.reserve(reserve_size);
@@ -52,6 +52,20 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	std::cout << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions" << std::endl;
 
 	mValid = true;
+	return mValid;
+}
+
+bool PhantomTrimesh::init(const pxr::VtArray<pxr::GfVec3f>& restPointsExt, const pxr::VtArray<pxr::GfVec3f>& livePointsExt) {
+	mExternalDataSource = mValid = false;
+
+	if(restPointsExt.size() != livePointsExt.size()) {
+		std::cerr << "Error initalizing PhantomTrimesh with external data. Rest and live point arrays sizes are not equal !!!" << std::endl;
+	} else {
+		mUsdMeshRestPositions = restPointsExt; // should share underlying structure
+		mUsdMeshLivePositions = livePointsExt; // should share underlying structure
+		mExternalDataSource = mValid = true;
+	}
+
 	return mValid;
 }
 
@@ -232,7 +246,9 @@ pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoord
 	const pxr::GfVec3f& c = live_positions[t.indices[2]];
 	const pxr::GfVec3f& d = live_positions[t.indices[3]];
 
-    return {u * a[0] + v * b[0] + w * c[0] + x * d[0], u * a[1] + v * b[1] + w * c[1] + x * d[1], u * a[2] + v * b[2] + w * c[2] + x * d[2]};
+    return {u * a[0] + v * b[0] + w * c[0] + x * d[0], 
+    		u * a[1] + v * b[1] + w * c[1] + x * d[1], 
+    		u * a[2] + v * b[2] + w * c[2] + x * d[2]};
 }
 
 pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const {
@@ -271,9 +287,15 @@ uint32_t PhantomTrimesh::getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrI
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
 
-	auto it = mFaceMap.find(indices);
-	if(it != mFaceMap.end()) {
-		return static_cast<uint32_t>(it->second);
+	{
+
+		std::scoped_lock lock(mFaceMapMutex);
+
+		auto it = mFaceMap.find(indices);
+		if(it != mFaceMap.end()) {
+			return static_cast<uint32_t>(it->second);
+		}
+
 	}
 
 	return kInvalidTriFaceID;
@@ -283,6 +305,8 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, Phant
 	assert((a != b) && (a != c) && (b != c));	
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
+
+	std::scoped_lock lock(mFaceMapMutex);
 
 	auto it = mFaceMap.find(indices);
 	if(it != mFaceMap.end()) {
@@ -381,6 +405,7 @@ pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(const uint32_t face_id) const {
 }
 
 bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const {
+	assert(!mExternalDataSource);
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	pxr::UsdGeomPointBased mesh(prim_handle.getPrim());

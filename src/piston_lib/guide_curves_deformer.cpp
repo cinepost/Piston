@@ -93,12 +93,45 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 	switch(bind_mode) {
 		case BindMode::SPACE:
 			return deformImpl_SpaceMode(multi_threaded, points, time_code);
+		case BindMode::ANGLE:
+			return deformImpl_AngleMode(multi_threaded, points, time_code);
 		default:
 			std::cerr << "Unimplemented bind mode " << to_string(bind_mode) << " !!!" << std::endl;
 			break;
 	}
 
 	return false;
+}
+
+bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+
+		uint32_t guide_id;
+		uint8_t segment_id;
+		const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
+
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = pointBinds[i];
+			if(bind.encoded_id == PointBindData::kInvalid) continue;
+
+			bind.decodeID_modeANGLE(guide_id, segment_id);
+			const std::array<float, 3>& vec = bind.getData();
+
+			//const pxr::GfVec3f& guide_segment_start_pt = 
+			//points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.encoded_id.mode_space.element_id, u, v) + (face_normal * w);
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, pointBinds.size(), func);
+		mPool.wait();
+	} else {
+		func(0u, pointBinds.size());
+	}
+
+	return true;
 }
 
 bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
@@ -112,12 +145,32 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
 	auto func = [&](const std::size_t start, const std::size_t end) {
+
+		float u, v, w, x;
+
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
 
-			const auto& tetra = pPhantomTrimesh->getTetrahedron(bind.encoded_id);
-			points[i] = pPhantomTrimesh->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, bind.vec[0], bind.vec[1], bind.vec[2], (1 - (bind.vec[0] + bind.vec[1] + bind.vec[2])));
+			if(bind.encoded_id.mode_space.is_tetra) {
+				// bound to tetra
+				const auto& tetra = pPhantomTrimesh->getTetrahedron(bind.encoded_id.mode_space.element_id);
+
+				if(bind.encoded_id.mode_space.is_24bit) {
+					bind.getData(u, v, w, x);
+					dbg_printf("24bit\n");
+					continue;
+				} else {
+					bind.getData(u, v, w);
+					x = 1.f - (u + v + w);
+				}
+				points[i] = pPhantomTrimesh->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, u, v, w, x);
+			} else {
+				// bound to triface
+				const pxr::GfVec3f face_normal = pPhantomTrimesh->getFaceLiveNormal(bind.encoded_id.mode_space.element_id);
+				bind.getData(u, v, w);
+				points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.encoded_id.mode_space.element_id, u, v) + (face_normal * w);
+			}
 		}
 	};
 
@@ -284,8 +337,8 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         			}
 
         			// bound by nerest point cloud vertex;
+        			bind.encodeID_modeSPACE(tetra_index, true /* is tetra id */, false /* data is 3x32bit floats */);
         			bind.setData(u, v, w);
-        			bind.encoded_id = PointBindData::encodeID_modeSPACE(tetra_index, true /* is tetra id */);
         			bound_points++;
         			break;
         		}
@@ -301,8 +354,8 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         			if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
         			   	 u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f )) {
         				// bound by nearest tetra centroid
+        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
         				bind.setData(u, v, w);
-        				bind.encoded_id = PointBindData::encodeID_modeSPACE(closest_tetra_centroid.first, true /* tetra id */);
         				bound_points++;
         			}
         		}
@@ -318,8 +371,8 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         				if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
         			   	     u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f)) {
         				   	// bound by brute force search
+        				   	bind.encodeID_modeSPACE(centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
         				   	bind.setData(u, v, w);
-        					bind.encoded_id = PointBindData::encodeID_modeSPACE(centroid.first, true /* tetra id*/);
         					bound_points++;
         					break;
         				}
@@ -332,10 +385,12 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         		
         		if(bind.encoded_id == PointBindData::kInvalid) {
         			if(bindMissingToTriface) {
+
+        				// TODO: make separate point clouds (root and tip guide points) to avoid binding to same guide points
+
         				deformer_restpoints_kdtree.findKNearestNeighbours(curr_pt, 3, closest_deformer_points);
 
         				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(closest_deformer_points[0].first, closest_deformer_points[1].first, closest_deformer_points[2].first);
-
         				const auto& face = faces[face_id];
 
 						const pxr::GfVec3f& p0 = pPhantomTrimesh->getRestPointPosition(face.indices[0]);
@@ -356,14 +411,18 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 						float d21 = pxr::GfDot(v2, v1);
 						float denom = d00 * d11 - d01 * d01;
 
-						bind.vec[0] = (d11 * d20 - d01 * d21) / denom;
-						bind.vec[1] = (d00 * d21 - d01 * d20) / denom;
-						bind.vec[2] = face_distance;
-						bind.encoded_id = PointBindData::encodeID_modeSPACE(face_id, false /* face id*/);
+						u = (d11 * d20 - d01 * d21) / denom;
+						v = (d00 * d21 - d01 * d20) / denom;
+						w = face_distance;
+						bind.encodeID_modeSPACE(face_id, false /* not a tetra id */, false /* data is 3x32bit floats */);
+						bind.setData(u, v, w);
         				bound_points++;
         			} else {
-        				bind.encoded_id = PointBindData::encodeID_modeSPACE(closest_tetra_centroid.first, true /* tetra id */);
+        				
+        				// TODO: this needs to be checked. (weird shit happens)
+
         				pPhantomTrimesh->barycentricTetrahedronRestCoords(closest_tetra_centroid.first, curr_pt, u, v, w, x);
+        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, true /* data is 4x24bit floats */);
         				bind.setData(u, v, w, x);
         				bound_points++;
         			}
@@ -414,6 +473,8 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
+	assert(curves_count == mGuideIndices.size());
+
 	auto& pointBinds = mpGuideCurvesDeformerData->mPointBinds;
 	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
@@ -423,11 +484,15 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
     	assert(guide_id < guides_count);
         const neighbour_search::KDTree<float, 3>* pKDTree;
         
+        const size_t guide_vertex_count = mpGuideCurvesContainer->getCurveVertexCount(guide_id);
+
         {
         	// build guide kdtree if needed
         	const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
         	if(!kdtrees[guide_id]) {
-        		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(mpGuideCurvesContainer->getRestCurvePoints(), false /*threaded*/);
+        		const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
+        		const size_t guide_vertex_offset = mpGuideCurvesContainer->getCurveVertexOffset(guide_id);
+        		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(mpGuideCurvesContainer->getRestCurvePoints(), guide_vertex_offset, guide_vertex_count, false /*threaded*/);
         	}
         	pKDTree = kdtrees[guide_id].get();
         }
@@ -447,10 +512,12 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
         	const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
 			
 			const uint32_t guide_vertex_id = nearest_pt.first;
+			const uint32_t segment_id = std::min(guide_vertex_id, (uint32_t)guide_vertex_count - 1u);
 
-			const pxr::GfVec3f guide_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, guide_vertex_id);
-			bind.vec = curr_pt - guide_pt;
-			bind.encoded_id = GuideCurvesDeformerData::PointBindData::encodeID_modeANGLE(guide_id, guide_vertex_id);
+			const pxr::GfVec3f& guide_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, segment_id);
+			
+			bind.encodeID_modeANGLE(guide_id, segment_id);
+        	bind.setData(guide_pt - curr_pt);
         }
 
     };

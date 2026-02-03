@@ -66,29 +66,6 @@ void GuideCurvesDeformerData::setBindMode(const GuideCurvesDeformerData::BindMod
 	clear();
 }
 
-uint32_t GuideCurvesDeformerData::PointBindData::encodeID_modeANGLE(uint32_t guide_id, uint8_t guide_vertex_id) {
-	// We use 23 bits for guide curve id and 8 bits for guide curve vertex
-
-	static const uint32_t kMaxGuideID = 8388607; // 23 bit
-
-	assert(guide_id <= kMaxGuideID);
-
-	return ((guide_id & 0x007FFFFF) << 8) | (uint32_t)guide_vertex_id; 
-}
-
-void GuideCurvesDeformerData::PointBindData::decodeID_modeANGLE(uint32_t encoded_id, uint32_t& guide_id, uint8_t& guide_vertex_id) {
-	guide_id = (encoded_id >> 8) & 0x007FFFFF;
-	guide_vertex_id = encoded_id & 0x000000FF;
-}
-
-uint32_t GuideCurvesDeformerData::PointBindData::encodeID_modeSPACE(uint32_t id,) {
-	return id & 0x7FFFFFFF;
-}
-
-void GuideCurvesDeformerData::PointBindData::decodeID_modeSPACE(uint32_t encoded_id, uint32_t& id) {
-	id = encoded_id & 0x7FFFFFFFF;
-}
-
 void GuideCurvesDeformerData::setSkinPrimPath(const std::string& prim_path) {
 	if(mSkinPrimPath == prim_path) return;
 	mSkinPrimPath = prim_path;
@@ -109,12 +86,12 @@ const SerializableDeformerDataBase::DataVersion& GuideCurvesDeformerData::jsonDa
 }
 
 void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {
-	j = {bind.encoded_id, bind.vec[0], bind.vec[1], bind.vec[2]};
+	j = {bind.encoded_id.raw_data, bind.data[0], bind.data[1], bind.data[2]};
 }
 
 void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind) {
-	bind.encoded_id = j.at(0).template get<uint32_t>();
-	bind.vec = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
+	bind.encoded_id.raw_data = j.at(0).template get<uint32_t>();
+	bind.data = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
 }
 
 } // namespace Piston

@@ -103,6 +103,7 @@ class PhantomTrimesh {
 		static PhantomTrimesh::UniquePtr create();
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool init(const pxr::VtArray<pxr::GfVec3f>& restPointsExt, const pxr::VtArray<pxr::GfVec3f>& livePointsExt);
 
 		inline size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
 		inline const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
@@ -172,10 +173,13 @@ class PhantomTrimesh {
 		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
 		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
 
+		bool                                                    mExternalDataSource = false;
+
 		// TriFaces part
 		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;
 		std::vector<TriFace> 									mFaces;
 		std::vector<TriFace::Flags>								mFaceFlags;
+		mutable std::mutex										mFaceMapMutex;
 
 		// Tetrahedrons part
 		std::vector<Tetrahedron> 								mTetrahedrons;
