@@ -37,6 +37,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 				} mode_space;
 
 				struct {
+					// TODO: maybe we should just store one point bind index ? Do we still need guide_od/segment_id separation ?
 					uint32_t guide_id : 24;
 					uint32_t segment_id : 8;
 				} mode_angle;

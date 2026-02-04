@@ -120,10 +120,19 @@ bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& 
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
 
 			bind.decodeID_modeANGLE(guide_id, segment_id);
+
+//			if(guide_id == 0) {
+//				dbg_printf("vtx: %i\n", (int)segment_id);
+//			}
+
+//			dbg_printf("guide: %i\n", (int)guide_id);
+
 			assert(guide_id < guide_curves_count);
 			assert((size_t)segment_id < (mpGuideCurvesContainer->getCurveVertexCount(guide_id) - 1));
 			bind.getData(vec);
 			const size_t guide_segment_start_vtx = mpGuideCurvesContainer->getCurveVertexOffset(guide_id) + segment_id;
+
+//			dbg_printf("guide_segment_start_vtx: %i\n", guide_segment_start_vtx);
 
 			// TODO: precalculate rest vectors. Maybe use CurvesContainter class instead as it's already in vectors form.... 
 			const pxr::GfVec3f rest_segment_vector_n = pxr::GfGetNormalized(guides_rest_points[guide_segment_start_vtx + 1] - guides_rest_points[guide_segment_start_vtx]);
@@ -495,15 +504,15 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
     	assert(guide_id < guides_count);
         const neighbour_search::KDTree<float, 3>* pKDTree;
         
+        const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
         const size_t guide_vertex_count = mpGuideCurvesContainer->getCurveVertexCount(guide_id);
+        const size_t guide_vertex_offset = mpGuideCurvesContainer->getCurveVertexOffset(guide_id);
 
         {
         	// build guide kdtree if needed
         	const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
         	if(!kdtrees[guide_id]) {
-        		const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
-        		const size_t guide_vertex_offset = mpGuideCurvesContainer->getCurveVertexOffset(guide_id);
-        		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(mpGuideCurvesContainer->getRestCurvePoints(), guide_vertex_offset, guide_vertex_count, false /*threaded*/);
+        		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(guides_rest_points, guide_vertex_offset, guide_vertex_count, false /* no threads */);
         	}
         	pKDTree = kdtrees[guide_id].get();
         }
@@ -522,13 +531,13 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 
         	const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
 			
-			const uint32_t guide_vertex_id = nearest_pt.first;
+			const uint32_t guide_vertex_id = nearest_pt.first - guide_vertex_offset; // we have global point indices in kdtree. by substracting we a re making them local to the specific guide curve
 			const uint32_t segment_id = std::min(guide_vertex_id, (uint32_t)guide_vertex_count - 2u); // exclude last vertex index
 
 			const pxr::GfVec3f& guide_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, segment_id);
 			
 			bind.encodeID_modeANGLE(guide_id, segment_id);
-        	bind.setData(guide_pt - curr_pt);
+        	bind.setData(curr_pt - guide_pt);
         }
 
     };

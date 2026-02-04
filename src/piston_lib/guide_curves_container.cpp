@@ -47,7 +47,7 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	}
 
 	if(pLivePointsDataExt) {
-		mLiveCurvePoints = * pLivePointsDataExt;
+		mLiveCurvePoints = *pLivePointsDataExt;
 		mExternalLivePointDataSource = true;
 	}
 
@@ -57,7 +57,6 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	for(size_t i = 0; i < mCurvesCount; ++i) {
 		mCurveOffsets[i] = total_vertex_count;
 		total_vertex_count += mCurveVertexCounts[i];
-
 	}
 
 	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
