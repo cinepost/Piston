@@ -236,4 +236,56 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
     }
 }
 
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame> v) {
+    v.resize(curve_points_count);
+    buildRotationMinimizingFrames(pCurveRootPt, curve_points_count, root_tangent, root_normal, v.begin(), v.end());
+}
+
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end) {
+    assert(pCurveRootPt);
+    assert(curve_points_count > 0);
+    assert(std::distance(it_begin, it_end) == curve_points_count);
+
+    static const float kZeroLength = 1e-7; // pxr epsilon is 1e-10
+
+    // root frame
+    const pxr::GfVec3f root_binormal = pxr::GfCross(pxr::GfGetNormalized(root_tangent), root_normal);
+    it_begin->set(root_normal, root_tangent, root_binormal);
+
+    // Generate tangents
+    auto it = it_begin;
+    const pxr::GfVec3f* pCurrPt = pCurveRootPt;
+    for(size_t i = 1; i < (curve_points_count - 1); ++i){
+        pxr::GfVec3f t = *(pCurrPt+1) - *pCurrPt;
+        if(t.GetLength() < kZeroLength) {
+            // for extremely short tangents we just keep using previous one
+            it->t = (it - 1)->t;
+        } else {
+            it->t = t;
+        }
+        pCurrPt++;
+        it++;
+    }
+
+    // Double reflection method: compute rotation minimizing frames
+    for(auto it = it_begin; it != (it_end - 1); ++it){
+        const auto& ni = it->n;
+        const auto& ti = it->t; 
+
+        const auto& tj = (it + 1)->t;
+
+        pxr::GfVec3f v1 = ti; //point[i+1] - point[i]; 
+        float c1 = pxr::GfDot(v1,v1);
+        pxr::GfVec3f nLi = ni - (2.0 / c1) * pxr::GfDot(v1, ni) * v1;
+        pxr::GfVec3f tLi = ti - (2.0 / c1) * pxr::GfDot(v1, ti) * v1;
+        pxr::GfVec3f v2 = tj - tLi;
+        float c2 = pxr::GfDot(v2,v2);
+
+        NTBFrame* pNext = &(*(it+1));
+
+        pNext->n = pxr::GfGetNormalized(nLi - (2.0 / c2) * pxr::GfDot(v2, nLi) * v2);
+        pNext->b = pxr::GfCross(tj,pNext->n);
+    }
+}
+
 } // namespace Piston

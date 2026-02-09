@@ -7,6 +7,7 @@ static const SerializableDeformerDataBase::DataVersion kGuidesBindingDataVersion
 
 void GuideCurvesDeformerData::clearData() {
 	mPointBinds.clear();
+	mRootTrifaceBinds.clear();
 	mSkinPrimPath = "";
 }
 
@@ -18,17 +19,25 @@ size_t GuideCurvesDeformerData::calcHash() const {
 	}
 	hash += mPointBinds.size();
 
+	for(uint32_t id: mRootTrifaceBinds) {
+		hash +=id;
+	}
+	hash += mRootTrifaceBinds.size();
+
 	return hash;
 }
 
 static constexpr const char* kJMode = "mode";
 static constexpr const char* kJPointBinds = "pointbinds";
+static constexpr const char* kJRootTrifaceBinds = "rootbinds";
 static constexpr const char* kJDataHash = "data_hash";
 static constexpr const char* kJSkinPrimPath = "skin_prim_path";
 
 bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
+	static const std::vector<uint32_t> kEmptyRootBinds;
 	j[kJMode] = static_cast<uint8_t>(mBindMode);
 	j[kJPointBinds] = mPointBinds;
+	j[kJRootTrifaceBinds] = (mBindMode == BindMode::NTB) ? mRootTrifaceBinds : kEmptyRootBinds;
 	j[kJSkinPrimPath] = mSkinPrimPath;
 	j[kJDataHash] = calcHash();
 
@@ -36,6 +45,8 @@ bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 }
 
 bool GuideCurvesDeformerData::readFromJSON(const json& j) {
+	clearData();
+
 	const BindMode bind_mode = static_cast<GuideCurvesDeformerData::BindMode>(j[kJMode].template get<uint8_t>());
 
 	if(bind_mode != mBindMode) {
@@ -50,6 +61,10 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 	}
 
 	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
+
+	if(mBindMode == BindMode::NTB) {
+		mRootTrifaceBinds = j[kJRootTrifaceBinds].template get<std::vector<uint32_t>>();
+	}
 
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		std::cerr << typeName() << " json data hash mismatch !";

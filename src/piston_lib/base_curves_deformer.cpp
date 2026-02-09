@@ -130,7 +130,6 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 	}
 
 	auto deformPoints = [this](bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
-		dbg_printf("lambda deformPoints\n");
 		switch(multi_threaded) {
 			case true:
 				return deformMtImpl(points, time_code);

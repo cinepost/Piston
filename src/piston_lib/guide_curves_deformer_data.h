@@ -43,9 +43,8 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 				} mode_angle;
 
 				struct {
-					uint32_t guide_id : 22;
-					uint32_t segment_id : 8;
-					uint32_t axis_is: 2;
+					uint32_t frame_id : 30;
+					uint32_t axis_id: 2;
 				} mode_ntb;
 
 				EncodedID() { raw_data = kInvalid; }
@@ -113,9 +112,19 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 				guide_id = encoded_id.mode_angle.guide_id;
 				segment_id = (uint8_t)encoded_id.mode_angle.segment_id;
 			}
+
+			inline void encodeID_modeNTB(uint32_t frame_id, uint8_t axis_id) {
+				encoded_id.mode_ntb.frame_id = frame_id;
+				encoded_id.mode_ntb.axis_id = (uint32_t)axis_id;
+			}
+			inline void decodeID_modeNTB(uint32_t& frame_id, uint8_t& axis_id) const {
+				frame_id = encoded_id.mode_ntb.frame_id;
+				axis_id = (uint8_t)encoded_id.mode_ntb.axis_id;
+			}
 		};
 
 		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
+		const std::vector<uint32_t>& 		getRootTrifaceBinds() const { return mRootTrifaceBinds; }
 		BindMode        					getBindMode() const { return mBindMode; }
 		void  								setBindMode(const BindMode& mode);
 
@@ -130,12 +139,14 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		virtual void clearData() override;
 
 		std::vector<PointBindData>& 	pointBinds() { return mPointBinds; }
+		std::vector<uint32_t>& 			rootTrifaceBinds() { return mRootTrifaceBinds; }
 		void setSkinPrimPath(const std::string& prim_path);
 
 	private:
 		size_t calcHash() const;
 
 		std::vector<PointBindData> 	mPointBinds;
+		std::vector<uint32_t> 		mRootTrifaceBinds;
 		BindMode                    mBindMode = BindMode::NTB;
 		std::string                 mSkinPrimPath;
 

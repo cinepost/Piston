@@ -95,6 +95,8 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 			return deformImpl_SpaceMode(multi_threaded, points, time_code);
 		case BindMode::ANGLE:
 			return deformImpl_AngleMode(multi_threaded, points, time_code);
+		case BindMode::NTB:
+			return deformImpl_NTBMode(multi_threaded, points, time_code);
 		default:
 			std::cerr << "Unimplemented bind mode " << to_string(bind_mode) << " !!!" << std::endl;
 			break;
@@ -120,19 +122,10 @@ bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& 
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
 
 			bind.decodeID_modeANGLE(guide_id, segment_id);
-
-//			if(guide_id == 0) {
-//				dbg_printf("vtx: %i\n", (int)segment_id);
-//			}
-
-//			dbg_printf("guide: %i\n", (int)guide_id);
-
 			assert(guide_id < guide_curves_count);
 			assert((size_t)segment_id < (mpGuideCurvesContainer->getCurveVertexCount(guide_id) - 1));
 			bind.getData(vec);
 			const size_t guide_segment_start_vtx = mpGuideCurvesContainer->getCurveVertexOffset(guide_id) + segment_id;
-
-//			dbg_printf("guide_segment_start_vtx: %i\n", guide_segment_start_vtx);
 
 			// TODO: precalculate rest vectors. Maybe use CurvesContainter class instead as it's already in vectors form.... 
 			const pxr::GfVec3f rest_segment_vector_n = pxr::GfGetNormalized(guides_rest_points[guide_segment_start_vtx + 1] - guides_rest_points[guide_segment_start_vtx]);
@@ -148,6 +141,77 @@ bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& 
 		mPool.detach_blocks(0u, pointBinds.size(), func);
 		mPool.wait();
 	} else {
+		func(0u, pointBinds.size());
+	}
+
+	return true;
+}
+
+bool GuideCurvesDeformer::hasSkinPrimitiveData() const {
+	if(!mGuidesSkinGeoPrimHandle.isValid()) return false;
+	return mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid();
+}
+
+bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+	assert(mpGuideCurvesDeformerData);
+	assert(mpGuideCurvesContainer);
+
+	assert(hasSkinPrimitiveData()); // for now we only work with skin geometry
+	PhantomTrimesh* pSkinPhantomTrimesh = hasSkinPrimitiveData() ? mpSkinPhantomTrimeshData->getTrimesh() : nullptr;
+
+	const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
+	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
+
+	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
+	const std::vector<uint32_t>& root_triface_binds = mpGuideCurvesDeformerData->getRootTrifaceBinds();
+
+	std::vector<NTBFrame> live_guide_frames(points.size());
+
+	auto frame_func = [&](const std::size_t start, const std::size_t end) {
+		const pxr::VtArray<pxr::GfVec3f>& skin_live_points = pSkinPhantomTrimesh->getLivePositions();
+
+		for(auto guide_id = start; guide_id < end; ++guide_id) {
+			assert(guide_id < total_guides_count);
+
+			const size_t guide_vertex_offset = mpGuideCurvesContainer->getCurveVertexOffset(guide_id);
+			const size_t curve_points_count = mpGuideCurvesContainer->getCurveVertexCount(guide_id);
+			const pxr::GfVec3f* pCurveRootPt = guides_live_points.data() + guide_vertex_offset;
+			const pxr::GfVec3f& root_tangent = *(pCurveRootPt + 1) - *pCurveRootPt; 
+
+			const uint32_t face_id = root_triface_binds[guide_id];
+			const PhantomTrimesh::TriFace& face = pSkinPhantomTrimesh->getFace(face_id);
+
+			const pxr::GfVec3f up_vector = pxr::GfGetNormalized(skin_live_points[face.indices[0]] - skin_live_points[face.indices[1]]);
+			// TODO: build proper root normal form this up vector
+
+			std::vector<NTBFrame>::iterator it_begin = live_guide_frames.begin() + guide_vertex_offset;
+			std::vector<NTBFrame>::iterator it_end = it_begin + curve_points_count;
+			buildRotationMinimizingFrames(pCurveRootPt, curve_points_count, root_tangent, up_vector, it_begin, it_end);
+		}
+	};
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = pointBinds[i];
+			if(bind.encoded_id == PointBindData::kInvalid) continue;
+
+			uint32_t frame_id;
+			uint8_t axis_id;
+			bind.decodeID_modeNTB(frame_id, axis_id);
+			assert(frame_id < live_guide_frames.size());
+			const std::array<float, 3>& barycentricCoord = bind.getData();
+
+			points[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * barycentricCoord;
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, total_guides_count, frame_func);
+		mPool.wait();
+		mPool.detach_blocks(0u, pointBinds.size(), func);
+		mPool.wait();
+	} else {
+		frame_func(0u, total_guides_count);
 		func(0u, pointBinds.size());
 	}
 
@@ -303,7 +367,6 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
 	std::atomic<size_t> total_points = 0;
 	std::atomic<size_t> bound_points = 0;
-	std::atomic<size_t> proximity_bound_points = 0;
 	std::atomic<size_t> unboud_points = 0;
 	
 	auto bind_func = [&](const std::size_t start, const std::size_t end) {
@@ -467,7 +530,6 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
 	dbg_printf("Total points: %zu\n", total_points.load());
 	dbg_printf("Bound points: %zu\n", bound_points.load());
-	dbg_printf("Proximity bound points: %zu\n", proximity_bound_points.load());
 	dbg_printf("Unbound points: %zu\n", unboud_points.load());
 
 	return true;
@@ -475,7 +537,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	if(!mGuidesSkinPrimAttrName.empty()) {
-
+		std::cout << "No skin prim attribute provided !" << std::endl;
 	}
 
 	if(mGuidesSkinGeoPrimHandle.isValid()) {
@@ -483,6 +545,8 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	} else {
 		mpGuideCurvesDeformerData->setSkinPrimPath("");
 	}
+
+	return true;
 }
 
 bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {

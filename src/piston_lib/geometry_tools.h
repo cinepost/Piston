@@ -29,6 +29,19 @@ struct Plane {
 	std::array<float, 3> normal;
 };
 
+struct NTBFrame {
+	NTBFrame(): n(1.0, 0.0, 0.0), t(0.0, 0.0, 1.0), b(0.0, 1.0, 0.0) {};
+	NTBFrame(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t, const pxr::GfVec3f& _b): n(_n), t(_t), b(_b) {};
+	NTBFrame(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t): n(_n), t(_t), b(pxr::GfCross(pxr::GfGetNormalized(_t), _n)) {};
+
+	void set(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t, const pxr::GfVec3f& _b) { n = _n; t = _t; b = _b; }
+
+	pxr::GfVec3f operator*(const pxr::GfVec3f& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * v; }
+	pxr::GfVec3f operator*(const std::array<float, 3>& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * pxr::GfVec3f(v[0], v[1], v[2]); }
+
+	pxr::GfVec3f n, t, b;
+};
+
 inline float distance(const glm::vec3& point, const Plane& plane) {
 	return dot(glm::vec3{plane.normal[0], plane.normal[1], plane.normal[2]}, glm::vec3{point[0] - plane.point[0], point[1] - plane.point[1], point[2] - plane.point[2]});
 }
@@ -90,6 +103,9 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v);
 
 void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
+
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame> v);
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end);
 
 } // namespace Piston
 

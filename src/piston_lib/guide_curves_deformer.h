@@ -65,6 +65,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		bool buildSkinPrimData(bool multi_threaded);
+		bool hasSkinPrimitiveData() const;
 
 		bool buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
@@ -72,6 +73,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_AngleMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
