@@ -46,13 +46,13 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		void setGuideIDPrimAttrName(const std::string& name);
 		const std::string& getGuideIDPrimAttrName() const { return mGuideIDPrimAttrName; }
 
-		void setGuidesSkinPrimAttrName(const std::string& name);
-		const std::string& getGuidesSkinPrimAttrName() const { return mGuidesSkinPrimAttrName; }
+		void setGuidesSkinGeoPrimAttrName(const std::string& name);
+		const std::string& getGuidesSkinGeoPrimAttrName() const { return mGuidesSkinPrimAttrName; }
 
-		void setGuidesSkinPrim(const pxr::UsdPrim& geoPrim);
+		void setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim);
 
-		void setGuidesSkinPrimRestAttrName(const std::string& name);
-		const std::string& getGuidesSkinPrimRestAttrName() const { return mGuidesSkinPrimRestAttrName; }
+		void setGuidesSkinGeoPrimRestAttrName(const std::string& name);
+		const std::string& getGuidesSkinGeoPrimRestAttrName() const { return mGuidesSkinPrimRestAttrName; }
 
 	protected:
 		GuideCurvesDeformer(const std::string& name);

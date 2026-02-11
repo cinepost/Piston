@@ -118,11 +118,11 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getBindMode", &GuideCurvesDeformer::getBindMode)
 		.def("setGuideIDPrimAttrName", &GuideCurvesDeformer::setGuideIDPrimAttrName)
 		.def("getGuideIDPrimAttrName", &GuideCurvesDeformer::getGuideIDPrimAttrName, return_value_policy<copy_const_reference>())
-		.def("setGuidesSkinPrimAttrName", &GuideCurvesDeformer::setGuidesSkinPrimAttrName)
-		.def("getGuidesSkinPrimAttrName", &GuideCurvesDeformer::getGuidesSkinPrimAttrName, return_value_policy<copy_const_reference>())
-		.def("setGuidesSkinPrimRestAttrName", &GuideCurvesDeformer::setGuidesSkinPrimRestAttrName)
-		.def("getGuidesSkinPrimRestAttrName", &GuideCurvesDeformer::getGuidesSkinPrimRestAttrName, return_value_policy<copy_const_reference>())
-		.def("setGuidesSkinPrim", &GuideCurvesDeformer::setGuidesSkinPrim)
+		.def("setGuidesSkinGeoPrimAttrName", &GuideCurvesDeformer::setGuidesSkinGeoPrimAttrName)
+		.def("getGuidesSkinGeoPrimAttrName", &GuideCurvesDeformer::getGuidesSkinGeoPrimAttrName, return_value_policy<copy_const_reference>())
+		.def("setGuidesSkinGeoPrimRestAttrName", &GuideCurvesDeformer::setGuidesSkinGeoPrimRestAttrName)
+		.def("getGuidesSkinGeoPrimRestAttrName", &GuideCurvesDeformer::getGuidesSkinGeoPrimRestAttrName, return_value_policy<copy_const_reference>())
+		.def("setGuidesSkinGeoPrim", &GuideCurvesDeformer::setGuidesSkinGeoPrim)
 		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 

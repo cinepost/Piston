@@ -158,7 +158,7 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr:
 template<typename T>
 bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<T>& vec, pxr::UsdTimeCode time_code) const {
 	pxr::VtArray<T> values_array;
-	if(!fetchAttributeValues<T>(attribute_name, &values_array, time_code)) {
+	if(!fetchAttributeValues<T>(attribute_name, values_array, time_code)) {
 		return false;
 	}
 
@@ -175,6 +175,12 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std:
 
 	return true;
 }
+
+template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<int>& array, pxr::UsdTimeCode time_code) const;
+template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<uint32_t>& array, pxr::UsdTimeCode time_code) const;
+
+template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<int>& vec, pxr::UsdTimeCode time_code) const;
+template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<uint32_t>& vec, pxr::UsdTimeCode time_code) const;
 
 void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 	pxr::UsdPrim prim = getPrim();

@@ -42,7 +42,7 @@ void GuideCurvesDeformer::setGuideIDPrimAttrName(const std::string& name) {
 	dbg_printf("Guide ID attribute name is set to: %s\n", name.c_str());
 }
 
-void GuideCurvesDeformer::setGuidesSkinPrimAttrName(const std::string& name) {
+void GuideCurvesDeformer::setGuidesSkinGeoPrimAttrName(const std::string& name) {
 	if(mGuidesSkinPrimAttrName == name) return;
 	mGuidesSkinPrimAttrName = name;
 	makeDirty();
@@ -50,7 +50,7 @@ void GuideCurvesDeformer::setGuidesSkinPrimAttrName(const std::string& name) {
 	dbg_printf("Guide skin prim attribute name is set to: %s\n", name.c_str());
 }
 
-void GuideCurvesDeformer::setGuidesSkinPrimRestAttrName(const std::string& name) {
+void GuideCurvesDeformer::setGuidesSkinGeoPrimRestAttrName(const std::string& name) {
 	if(mGuidesSkinPrimRestAttrName == name) return;
 	mGuidesSkinPrimRestAttrName = name;
 	makeDirty();
@@ -58,7 +58,7 @@ void GuideCurvesDeformer::setGuidesSkinPrimRestAttrName(const std::string& name)
 	dbg_printf("Guide skin prim rest attribute name is set to: %s\n", name.c_str());
 }
 
-void GuideCurvesDeformer::setGuidesSkinPrim(const pxr::UsdPrim& geoPrim) {
+void GuideCurvesDeformer::setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim) {
 	if(mGuidesSkinGeoPrimHandle == geoPrim) return;
 	
 	if(!isMeshGeoPrim(geoPrim)) {
