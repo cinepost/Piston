@@ -7,6 +7,7 @@
 #include "phantom_trimesh.h"
 #include "guide_curves_container.h"
 #include "guide_curves_deformer_data.h"
+#include "geometry_tools.h"
 
 #include <memory>
 #include <limits>
@@ -66,6 +67,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		bool buildSkinPrimData(bool multi_threaded);
 		bool hasSkinPrimitiveData() const;
+
+		bool buildNTBFrames(std::vector<NTBFrame>& guide_frames, bool multi_threaded, bool build_live);
 
 		bool buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);

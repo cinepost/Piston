@@ -54,6 +54,12 @@ class UsdPrimHandle {
 		bool setBsonToPrim(const std::string& identifier, const BSON& v_bson) const;
 		void clearPrimBson(const std::string& identifier) const;
 
+		template<typename T>
+		bool fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+
+		template<typename T>
+		bool fetchAttributeValues(const std::string& attribute_name, std::vector<T>& vec, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
 
 		double getStageFPS() const;

@@ -128,6 +128,54 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 	return getStage()->GetTimeCodesPerSecond();
 }
 
+template<typename T>
+bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code) const {
+	if(!isValid()) {
+		std::cerr << "\"" << getPath() << "\" primitive is invalid!" << std::endl; 
+		return false;
+	}
+
+	if(attribute_name.empty()) {
+		std::cerr << "No attribute name provided !" << std::endl;
+		return false;
+	}
+
+	pxr::UsdGeomPrimvar primVar = getPrimvarsAPI().GetPrimvar(pxr::TfToken(attribute_name));
+
+	if(!primVar) {
+		std::cerr << "Error getting \"" << attribute_name << "\" primvar on " << getPath() << std::endl;
+		return false;
+	}
+
+	if(!primVar.GetAttr().Get(&array, time_code)) {
+		std::cerr << "Error getting " << getPath() << " \"" << attribute_name << "\" values !" << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
+template<typename T>
+bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<T>& vec, pxr::UsdTimeCode time_code) const {
+	pxr::VtArray<T> values_array;
+	if(!fetchAttributeValues<T>(attribute_name, &values_array, time_code)) {
+		return false;
+	}
+
+	// TODO: make sure we can't use memcpy here. If we can then just do it!
+
+	const auto& c_values = values_array.AsConst();
+	if(vec.size() < c_values.size()) {
+		vec.resize(c_values.size());
+	}
+
+	for(size_t i = 0; i < c_values.size(); ++i) {
+		vec[i] = c_values[i];
+	}
+
+	return true;
+}
+
 void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 	pxr::UsdPrim prim = getPrim();
 	const pxr::TfToken token(identifier);
@@ -138,7 +186,6 @@ void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 	}
 
 	prim.ClearCustomDataByKey(token);
-	
 }
 
 bool UsdPrimHandle::getDataFromBson(SerializableDeformerDataBase* pDeformerData) const {

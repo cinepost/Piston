@@ -125,6 +125,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 
 		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
 		const std::vector<uint32_t>& 		getRootTrifaceBinds() const { return mRootTrifaceBinds; }
+		const std::vector<int>& 			getSkinPrimIndices() const { return mSkinPrimIndices; }
 		BindMode        					getBindMode() const { return mBindMode; }
 		void  								setBindMode(const BindMode& mode);
 
@@ -140,6 +141,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 
 		std::vector<PointBindData>& 	pointBinds() { return mPointBinds; }
 		std::vector<uint32_t>& 			rootTrifaceBinds() { return mRootTrifaceBinds; }
+		std::vector<int>&               skinPrimIndices() { return mSkinPrimIndices; }
 		void setSkinPrimPath(const std::string& prim_path);
 
 	private:
@@ -149,6 +151,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		std::vector<uint32_t> 		mRootTrifaceBinds;
 		BindMode                    mBindMode = BindMode::NTB;
 		std::string                 mSkinPrimPath;
+		std::vector<int> 			mSkinPrimIndices;
 
 		friend class GuideCurvesDeformer;
 };

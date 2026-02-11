@@ -1,0 +1,6 @@
+TODOS:
+
+1. PhantomTrimesh. Fall back to rest_time_code point positions capture if no rest attribute name provided or it's wrong.
+2. Unify all attributes fetching (VtArray and std:vector) through PrimHandle interface functions.
+3. Make a proper logger for god sake! With console output color formatting if running in UI mode (check this upon loading Houdini) 
+4. Double and triple check all serializable date to store and read ONLY necessary data only.
