@@ -87,6 +87,12 @@ PxrCurvesContainer::CurveDataPtr PxrCurvesContainer::getCurveDataPtr(size_t curv
 	return {mCurveVertexCounts[curve_idx], &mCurveVectors[mCurveOffsets[curve_idx]]};
 }
 
+PxrCurvesContainer::CurveDataConstPtr PxrCurvesContainer::getCurveDataPtr(size_t curve_idx) const {
+	assert(curve_idx < mCurveOffsets.size());
+
+	return {mCurveVertexCounts[curve_idx], &mCurveVectors[mCurveOffsets[curve_idx]]};
+}
+
 const pxr::GfVec3f& PxrCurvesContainer::getCurveRootPoint(size_t curve_idx) const {
 	assert(curve_idx < mCurveRootPositions.size());
 

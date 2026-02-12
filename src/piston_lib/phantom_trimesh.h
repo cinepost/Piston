@@ -123,7 +123,7 @@ class PhantomTrimesh {
 		uint32_t getOrCreateFaceID(const std::array<PxrIndexType, 3>& a);
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
-		const TriFace& getFace(const uint32_t id) const { return mFaces[id]; }
+		const TriFace& getFace(const uint32_t id) const { assert(id < mFaces.size()); return mFaces[id]; }
 		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 
 		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const;

@@ -87,7 +87,6 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 		return false;
 	}
 
-	assert(points.size() == mpGuideCurvesDeformerData->getPointBinds().size());
 	const auto bind_mode = getBindMode();
 
 	switch(bind_mode) {
@@ -153,22 +152,28 @@ bool GuideCurvesDeformer::hasSkinPrimitiveData() const {
 }
 
 bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+	multi_threaded = false;
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
 
 	assert(hasSkinPrimitiveData()); // for now we only work with skin geometry
 	PhantomTrimesh* pSkinPhantomTrimesh = hasSkinPrimitiveData() ? mpSkinPhantomTrimeshData->getTrimesh() : nullptr;
+	assert(pSkinPhantomTrimesh);
+	pSkinPhantomTrimesh->update(mGuidesSkinGeoPrimHandle ,time_code);
 
 	const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
 	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
 
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
-	std::vector<NTBFrame> live_guide_frames(points.size());
+	std::vector<NTBFrame> live_guide_frames(mpGuideCurvesContainer->getLiveCurvePoints().size());
 
 	static const bool build_live = true;
+
+	dbg_printf("GuideCurvesDeformer::deformImpl_NTBMode buildNTBFrames\n");
 	if(!buildNTBFrames(live_guide_frames, multi_threaded, build_live)) {
 		return false;
 	}
+	dbg_printf("GuideCurvesDeformer::deformImpl_NTBMode buildNTBFrames done\n");
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
 		for(size_t i = start; i < end; ++i) {
@@ -177,11 +182,12 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 
 			uint32_t frame_id;
 			uint8_t axis_id;
-			bind.decodeID_modeNTB(frame_id, axis_id);
+			bind.decodeID_modeNTB(frame_id);
+			assert(frame_id < guides_live_points.size());
 			assert(frame_id < live_guide_frames.size());
-			const std::array<float, 3>& barycentricCoord = bind.getData();
+			const std::array<float, 3>& ntbCoord = bind.getData();
 
-			points[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * barycentricCoord;
+			points[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * ntbCoord;
 		}
 	};
 
@@ -527,7 +533,7 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 	const auto& guide_points = build_live ? mpGuideCurvesContainer->getLiveCurvePoints() : mpGuideCurvesContainer->getRestCurvePoints();
 	const pxr::VtArray<pxr::GfVec3f>& skin_points = build_live ? pSkinPhantomTrimesh->getLivePositions() : pSkinPhantomTrimesh->getRestPositions();
 
-	const std::vector<uint32_t>& root_triface_binds = mpGuideCurvesDeformerData->getRootTrifaceBinds();
+	const auto& guide_origins = mpGuideCurvesDeformerData->getGuideOrigins();
 
 	auto frame_func = [&](const std::size_t start, const std::size_t end) {
 
@@ -539,15 +545,28 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 			const pxr::GfVec3f* pCurveRootPt = guide_points.data() + guide_vertex_offset;
 			const pxr::GfVec3f& root_tangent = *(pCurveRootPt + 1) - *pCurveRootPt; 
 
-			const uint32_t face_id = root_triface_binds[guide_id];
+			uint32_t face_id = GuideCurvesDeformerData::GuideOrigin::kInvalidFaceID;
+			uint32_t axis_id = GuideCurvesDeformerData::GuideOrigin::kInvalidAxisID;
+
+			assert(guide_id < guide_origins.size());
+			guide_origins[guide_id].decode(face_id, axis_id);
+
+			dbg_printf("face_id:%zu\n", (size_t)face_id);
+
 			const PhantomTrimesh::TriFace& face = pSkinPhantomTrimesh->getFace(face_id);
 
+			dbg_printf("vtx0:%zu\n", (size_t)face.indices[0]);
+			dbg_printf("vtx1:%zu\n", (size_t)face.indices[1]);
+			dbg_printf("skin pts cnt:%zu\n", (size_t)skin_points.size());
 			const pxr::GfVec3f up_vector = pxr::GfGetNormalized(skin_points[face.indices[0]] - skin_points[face.indices[1]]);
 			// TODO: build proper root normal form this up vector
 
 			std::vector<NTBFrame>::iterator it_begin = guide_frames.begin() + guide_vertex_offset;
 			std::vector<NTBFrame>::iterator it_end = it_begin + curve_points_count;
+
+			dbg_printf("buildRotationMinimizingFrames\n");
 			buildRotationMinimizingFrames(pCurveRootPt, curve_points_count, root_tangent, up_vector, it_begin, it_end);
+			dbg_printf("buildRotationMinimizingFrames done\n");
 		}
 	};
 
@@ -561,7 +580,81 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 	return true;
 }
 
+bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
+	assert(mpGuideCurvesContainer);
+	assert(mpGuideCurvesDeformerData);
+	assert(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid());
+	assert(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid());
+
+	const UsdGeomMeshFaceAdjacency* pSkinGeoAdjacency = mpSkinAdjacencyData->getAdjacency();
+	PhantomTrimesh* pSkinGeoPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
+
+	const size_t guide_curves_count = mpGuideCurvesContainer->getCurvesCount();
+	const std::vector<int>& skin_prim_indices =	mpGuideCurvesDeformerData->getSkinPrimIndices();
+
+	if(skin_prim_indices.size() != guide_curves_count) {
+		return false;
+	}
+
+	auto& guide_origins = mpGuideCurvesDeformerData->guideOrigins();
+	guide_origins.resize(guide_curves_count);
+	const pxr::VtArray<pxr::GfVec3f>& skin_geo_rest_points = pSkinGeoPhantomTrimesh->getRestPositions();
+
+	std::vector<std::mutex> kdtrees_mutexes(guide_curves_count);  // protects kdree initialisation
+	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guide_curves_count);
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
+
+		for(size_t guide_id = start; guide_id < end; ++guide_id) {
+			const neighbour_search::KDTree<float, 3>* pKDTree;
+
+			const int skin_prim_id = skin_prim_indices[guide_id];
+			assert(skin_prim_id >= 0 && ((uint32_t)skin_prim_id < pSkinGeoAdjacency->getFaceCount()));
+			const uint32_t skin_prim_vtx_offset = pSkinGeoAdjacency->getFaceVertexOffset(skin_prim_id);
+
+			// build guide kdtree if needed
+        	const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
+        	if(!kdtrees[guide_id]) {
+				const uint32_t skin_prim_vtx_count = pSkinGeoAdjacency->getFaceVertexCount(skin_prim_id);
+
+				pxr::VtArray<pxr::GfVec3f> prim_points;
+				for(uint32_t i = 0; i < skin_prim_vtx_count; ++i){
+					prim_points.push_back(skin_geo_rest_points[pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + i)]);
+				}
+
+        		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(prim_points, false /* no threads */);
+        	}
+        	pKDTree = kdtrees[guide_id].get();
+
+			const pxr::GfVec3f& root_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, 0 /* root vtx */);
+        	pKDTree->findKNearestNeighbours(root_pt, 3, closest_deformer_points);
+
+        	const PhantomTrimesh::PxrIndexType a = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[0].first);
+        	const PhantomTrimesh::PxrIndexType b = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[1].first);
+        	const PhantomTrimesh::PxrIndexType c = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[2].first);
+
+			const uint32_t face_id = pSkinGeoPhantomTrimesh->getOrCreateFaceID(a, b, c);
+
+			uint32_t axis_id = 0; // TODO: find a proper axis id !
+			guide_origins[guide_id].encode(face_id, axis_id);
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, guide_curves_count, func);
+		mPool.wait();
+	} else {
+		func(0u, guide_curves_count);
+	}
+
+	return true;
+}
+
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	multi_threaded = false;
+	dbg_printf("0\n");
+
 	if(!buildSkinPrimData(multi_threaded)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
 		mpGuideCurvesDeformerData->setSkinPrimPath("");
@@ -569,16 +662,25 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 		return false;
 	}	
 
+	dbg_printf("1\n");
+
 	if(!mDeformerGeoPrimHandle.fetchAttributeValues<int>(mGuidesSkinPrimAttrName, mpGuideCurvesDeformerData->skinPrimIndices(), rest_time_code)) {
 		std::cerr << "Error getting skin prim indices !" << std::endl;
 		return false;
 	}
 
+	dbg_printf("2\n");
+
+	if(!buildGuideOrigins(multi_threaded)) {
+		std::cerr << "NTB frames calulation without skin geometry primitive indices is NOT supported yet !" << std::endl;
+		return false;
+	}
+
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 	assert(curves_count == mGuideIndices.size());
-
 	const size_t curve_points_count = mpCurvesContainer->getTotalVertexCount();
-	std::vector<NTBFrame> rest_guide_frames(curve_points_count);
+
+	std::vector<NTBFrame> rest_guide_frames(mpGuideCurvesContainer->getRestCurvePoints().size());
 
 	static const bool build_live = false;
 	if(!buildNTBFrames(rest_guide_frames, multi_threaded, build_live)) {
@@ -586,9 +688,49 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	}
 
 	auto& pointBinds = mpGuideCurvesDeformerData->pointBinds();
-	auto func = [&](const std::size_t start, const std::size_t end) {
-		for(size_t curve_id = start; curve_id < end; ++curve_id) {
+	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
+	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
+	const size_t guide_curves_count = mpGuideCurvesContainer->getCurvesCount();
+
+	std::vector<std::mutex> kdtrees_mutexes(guide_curves_count);  // protects kdree initialisation
+	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guide_curves_count);
+	const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t curve_index = start; curve_index < end; ++curve_index) {
+			const uint32_t guide_id = (uint32_t)mGuideIndices[curve_index];
+			assert(guide_id < guide_curves_count);
+			const size_t guide_vertex_count = mpGuideCurvesContainer->getCurveVertexCount(guide_id);
+			const size_t guide_vertex_offset = mpGuideCurvesContainer->getCurveVertexOffset(guide_id);
+
+        	const neighbour_search::KDTree<float, 3>* pKDTree;
+
+			PxrCurvesContainer::CurveDataConstPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_index);
+        	const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+
+			{
+				// build guide kdtree if needed
+				const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
+				if(!kdtrees[guide_id]) {
+					kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(guides_rest_points, guide_vertex_offset, guide_vertex_count, false /* no threads */);
+				}
+				pKDTree = kdtrees[guide_id].get();
+			}
+
+			const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+			const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_index);
+			for(uint32_t i = 0; i < curve_vertices_count; ++i) {
+				auto& bind = pointBinds[curve_vertex_offset + i];
+
+				const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
+
+        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
+        		const uint32_t frame_id = nearest_pt.first;
+								
+				bind.encodeID_modeNTB(frame_id);
+				bind.setData({0.0, 0.0, 0.0});
+        	}
 		}
 	};
 
@@ -599,14 +741,16 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 		func(0u, curves_count);
 	}
 
+	dbg_printf("bind done\n");
+
 	return true;
 }
 
 bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	const size_t guides_count = mpGuideCurvesContainer->getCurvesCount();
+	const size_t guide_curves_count = mpGuideCurvesContainer->getCurvesCount();
 
-	std::vector<std::mutex> kdtrees_mutexes(guides_count);  // protects kdree initialisation
-	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guides_count);
+	std::vector<std::mutex> kdtrees_mutexes(guide_curves_count);  // protects kdree initialisation
+	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guide_curves_count);
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
@@ -618,21 +762,21 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 	auto func = [&](const size_t curve_index) {
 		assert(mGuideIndices[curve_index] >= 0);
     	const uint32_t guide_id = (uint32_t)mGuideIndices[curve_index];
-    	assert(guide_id < guides_count);
+    	assert(guide_id < guide_curves_count);
         const neighbour_search::KDTree<float, 3>* pKDTree;
         
         const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
         const size_t guide_vertex_count = mpGuideCurvesContainer->getCurveVertexCount(guide_id);
         const size_t guide_vertex_offset = mpGuideCurvesContainer->getCurveVertexOffset(guide_id);
 
-        {
-        	// build guide kdtree if needed
-        	const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
-        	if(!kdtrees[guide_id]) {
-        		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(guides_rest_points, guide_vertex_offset, guide_vertex_count, false /* no threads */);
-        	}
-        	pKDTree = kdtrees[guide_id].get();
-        }
+		{
+			// build guide kdtree if needed
+			const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
+			if(!kdtrees[guide_id]) {
+				kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(guides_rest_points, guide_vertex_offset, guide_vertex_count, false /* no threads */);
+			}
+			pKDTree = kdtrees[guide_id].get();
+		}
 
         PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 

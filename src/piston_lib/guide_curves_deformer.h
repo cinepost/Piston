@@ -68,6 +68,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool buildSkinPrimData(bool multi_threaded);
 		bool hasSkinPrimitiveData() const;
 
+		bool buildGuideOrigins(bool multi_threaded);
 		bool buildNTBFrames(std::vector<NTBFrame>& guide_frames, bool multi_threaded, bool build_live);
 
 		bool buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);

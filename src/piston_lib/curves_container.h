@@ -24,6 +24,7 @@ class PxrCurvesContainer {
 	public:
 		using UniquePtr = std::unique_ptr<PxrCurvesContainer>;
 		using CurveDataPtr = std::pair<int, pxr::GfVec3f*>;  // curve <count, ptr> pair
+		using CurveDataConstPtr = std::pair<int, const pxr::GfVec3f*>;  // curve <count, ptr> pair
 
 		static UniquePtr create();
 		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
@@ -39,6 +40,7 @@ class PxrCurvesContainer {
 		int 		getCurveVertexCount(size_t curve_idx) const { return mCurveVertexCounts[curve_idx]; }
 
 		CurveDataPtr getCurveDataPtr(size_t curve_idx);
+		CurveDataConstPtr getCurveDataPtr(size_t curve_idx) const;
 
 		const pxr::GfVec3f& getCurveRootPoint(size_t curve_idx) const;
 

@@ -5,9 +5,26 @@ namespace Piston {
 
 static const SerializableDeformerDataBase::DataVersion kGuidesBindingDataVersion( 0u, 0u, 0u);
 
+inline void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {
+	j = {bind.encoded_id.raw_data, bind.data[0], bind.data[1], bind.data[2]};
+}
+
+inline void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind) {
+	bind.encoded_id.raw_data = j.at(0).template get<uint32_t>();
+	bind.data = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
+}
+
+inline void to_json(json& j, const GuideCurvesDeformerData::GuideOrigin& o) {
+	j = o.raw_data;
+}
+
+inline void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
+	o.raw_data = j.at(0).template get<uint32_t>();
+}
+
 void GuideCurvesDeformerData::clearData() {
 	mPointBinds.clear();
-	mRootTrifaceBinds.clear();
+	mGuideOrigins.clear();
 	mSkinPrimPath = "";
 }
 
@@ -19,25 +36,25 @@ size_t GuideCurvesDeformerData::calcHash() const {
 	}
 	hash += mPointBinds.size();
 
-	for(uint32_t id: mRootTrifaceBinds) {
+	for(uint32_t id: mGuideOrigins) {
 		hash +=id;
 	}
-	hash += mRootTrifaceBinds.size();
+	hash += mGuideOrigins.size();
 
 	return hash;
 }
 
 static constexpr const char* kJMode = "mode";
 static constexpr const char* kJPointBinds = "pointbinds";
-static constexpr const char* kJRootTrifaceBinds = "rootbinds";
+static constexpr const char* kJGuideOrigins = "guideorigs";
 static constexpr const char* kJDataHash = "data_hash";
 static constexpr const char* kJSkinPrimPath = "skin_prim_path";
 
 bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
-	static const std::vector<uint32_t> kEmptyRootBinds;
+	static const std::vector<GuideOrigin> kEmptyGuideOrigins;
 	j[kJMode] = static_cast<uint8_t>(mBindMode);
 	j[kJPointBinds] = mPointBinds;
-	j[kJRootTrifaceBinds] = (mBindMode == BindMode::NTB) ? mRootTrifaceBinds : kEmptyRootBinds;
+	j[kJGuideOrigins] = (mBindMode == BindMode::NTB) ? mGuideOrigins : kEmptyGuideOrigins;
 	j[kJSkinPrimPath] = mSkinPrimPath;
 	j[kJDataHash] = calcHash();
 
@@ -63,7 +80,7 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
 
 	if(mBindMode == BindMode::NTB) {
-		mRootTrifaceBinds = j[kJRootTrifaceBinds].template get<std::vector<uint32_t>>();
+		mGuideOrigins = j[kJGuideOrigins].template get<std::vector<GuideOrigin>>();
 	}
 
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
@@ -98,15 +115,6 @@ const std::string& GuideCurvesDeformerData::jsonDataKey() const {
 
 const SerializableDeformerDataBase::DataVersion& GuideCurvesDeformerData::jsonDataVersion() const {
 	return kGuidesBindingDataVersion;
-}
-
-void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {
-	j = {bind.encoded_id.raw_data, bind.data[0], bind.data[1], bind.data[2]};
-}
-
-void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind) {
-	bind.encoded_id.raw_data = j.at(0).template get<uint32_t>();
-	bind.data = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
 }
 
 } // namespace Piston

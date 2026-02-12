@@ -43,8 +43,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 				} mode_angle;
 
 				struct {
-					uint32_t frame_id : 30;
-					uint32_t axis_id: 2;
+					uint32_t frame_id : 32;
 				} mode_ntb;
 
 				EncodedID() { raw_data = kInvalid; }
@@ -113,18 +112,39 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 				segment_id = (uint8_t)encoded_id.mode_angle.segment_id;
 			}
 
-			inline void encodeID_modeNTB(uint32_t frame_id, uint8_t axis_id) {
+			inline void encodeID_modeNTB(uint32_t frame_id) {
 				encoded_id.mode_ntb.frame_id = frame_id;
-				encoded_id.mode_ntb.axis_id = (uint32_t)axis_id;
 			}
-			inline void decodeID_modeNTB(uint32_t& frame_id, uint8_t& axis_id) const {
+			inline void decodeID_modeNTB(uint32_t& frame_id) const {
 				frame_id = encoded_id.mode_ntb.frame_id;
-				axis_id = (uint8_t)encoded_id.mode_ntb.axis_id;
 			}
 		};
 
+		// Struct used to determine guide root ntb frame calculation
+		struct GuideOrigin{
+			static const uint32_t kInvalid = 0xFFFFFFFF;
+			static const uint32_t kInvalidFaceID = 0x3FFFFFFF;
+			static const uint32_t kInvalidAxisID = 3;
+
+			uint32_t raw_data;
+
+			GuideOrigin(): raw_data(kInvalid) {}
+			GuideOrigin(uint32_t face_id, uint32_t axis_id){ encode(face_id, axis_id); }
+
+			void encode(uint32_t face_id, uint32_t axis_id) {
+				raw_data = (face_id & kInvalidFaceID) | (axis_id << 30);
+			}
+
+			void decode(uint32_t& face_id, uint32_t& axis_id) const {
+				face_id = raw_data & kInvalidFaceID;
+				axis_id = raw_data >> 30;
+			}
+
+			operator uint32_t() const { return raw_data; }
+		};
+
 		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
-		const std::vector<uint32_t>& 		getRootTrifaceBinds() const { return mRootTrifaceBinds; }
+		const std::vector<GuideOrigin>& 	getGuideOrigins() const { return mGuideOrigins; }
 		const std::vector<int>& 			getSkinPrimIndices() const { return mSkinPrimIndices; }
 		BindMode        					getBindMode() const { return mBindMode; }
 		void  								setBindMode(const BindMode& mode);
@@ -140,7 +160,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		virtual void clearData() override;
 
 		std::vector<PointBindData>& 	pointBinds() { return mPointBinds; }
-		std::vector<uint32_t>& 			rootTrifaceBinds() { return mRootTrifaceBinds; }
+		std::vector<GuideOrigin>& 		guideOrigins() { return mGuideOrigins; }
 		std::vector<int>&               skinPrimIndices() { return mSkinPrimIndices; }
 		void setSkinPrimPath(const std::string& prim_path);
 
@@ -148,7 +168,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		size_t calcHash() const;
 
 		std::vector<PointBindData> 	mPointBinds;
-		std::vector<uint32_t> 		mRootTrifaceBinds;
+		std::vector<GuideOrigin> 	mGuideOrigins;
 		BindMode                    mBindMode = BindMode::NTB;
 		std::string                 mSkinPrimPath;
 		std::vector<int> 			mSkinPrimIndices;
@@ -156,8 +176,22 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		friend class GuideCurvesDeformer;
 };
 
-void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind);
-void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind);
+//void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {
+//	j = {bind.encoded_id.raw_data, bind.data[0], bind.data[1], bind.data[2]};
+//}
+
+//void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind) {
+//	bind.encoded_id.raw_data = j.at(0).template get<uint32_t>();
+//	bind.data = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
+//}
+
+//void to_json(json& j, const GuideCurvesDeformerData::GuideOrigin& o) {
+//	j = o.raw_data;
+//}
+
+//void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
+//	o.raw_data = j.at(0).template get<uint32_t>();
+//}
 
 inline std::string to_string(const GuideCurvesDeformerData::BindMode& mode) {
 	std::string str;
