@@ -285,7 +285,6 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 
 		for(size_t j = 0; j < curve_data_ptr.first; ++j) {
 			*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j) + root_pos_offset);
-			//*(curve_data_ptr.second + j) = m.Transform(*(curve_data_ptr.second + j) + root_pos_offset);
 		}
 	}
 }
@@ -401,27 +400,21 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code)
 
 	// Strategy: 1
 	// First we try to bind curves using skin prim ids
-	if(!mСurvesSkinPrimAttrName.empty()) {
-		pxr::UsdGeomPrimvar skinPrimVar = curvesPrimvarsApi.GetPrimvar(pxr::TfToken(mСurvesSkinPrimAttrName));
-		if(!skinPrimVar) {
-			std::cerr << "Curves " << mCurvesGeoPrimHandle.getPath() << " has no valid primvar \"" << mСurvesSkinPrimAttrName << "\" !" << std::endl;
-		} else {
-			pxr::VtArray<int> skinPrimIndices;
-			if(skinPrimVar.GetAttr().Get(&skinPrimIndices, rest_time_code)) {
-				assert(skinPrimIndices.size() == total_curves_count);
-				std::vector<float> squared_distances(pAdjacency->getMaxFaceVertexCount());
 
-				for(uint32_t curve_index = 0; curve_index < total_curves_count; ++curve_index) {
-					if(skinPrimIndices[curve_index] < 0) continue; // pixar uses negative indices as invalid
+	pxr::VtArray<int> skin_prim_indices;
 
-					auto& bind = curveBinds[curve_index];
-					const uint32_t skin_prim_id = static_cast<uint32_t>(skinPrimIndices[curve_index]);
+	if(mCurvesGeoPrimHandle.fetchAttributeValues(mSkinPrimAttrName, skin_prim_indices, rest_time_code)) {
+		assert(skin_prim_indices.size() == total_curves_count);
+		std::vector<float> squared_distances(pAdjacency->getMaxFaceVertexCount());
+
+		for(uint32_t curve_index = 0; curve_index < total_curves_count; ++curve_index) {
+			if(skin_prim_indices[curve_index] < 0) continue; // pixar uses negative indices as invalid
+
+			auto& bind = curveBinds[curve_index];
+			const uint32_t skin_prim_id = static_cast<uint32_t>(skin_prim_indices[curve_index]);
 					
-					if(bindCurveToPrim(curve_index, bind, skin_prim_id)) {
-						skin_bound_curves_count++;
-						//dbg_printf("skin bound\n");
-					}
-				}
+			if(bindCurveToPrim(curve_index, bind, skin_prim_id)) {
+				skin_bound_curves_count++;
 			}
 		}
 	}

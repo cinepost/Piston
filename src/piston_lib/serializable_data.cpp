@@ -54,6 +54,7 @@ bool SerializableDeformerDataBase::deserialize(const BSON& v_bson) {
 }
 
 void SerializableDeformerDataBase::clear() {
+	const std::lock_guard<std::mutex> lock(mMutex);
 	clearData();
 	mIsPopulated = false;
 }

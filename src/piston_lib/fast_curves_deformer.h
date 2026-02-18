@@ -19,6 +19,10 @@
 
 namespace Piston {
 
+namespace {
+	const std::string kSkinPrimAttrName = "skinprim";
+}
+
 class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_from_this<BaseMeshCurvesDeformer, FastCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<FastCurvesDeformer>;

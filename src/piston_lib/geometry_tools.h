@@ -39,6 +39,8 @@ struct NTBFrame {
 	pxr::GfVec3f operator*(const pxr::GfVec3f& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * v; }
 	pxr::GfVec3f operator*(const std::array<float, 3>& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * pxr::GfVec3f(v[0], v[1], v[2]); }
 
+	inline pxr::GfMatrix3f getMatrix3f() const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]); }
+
 	pxr::GfVec3f n, t, b;
 };
 
@@ -104,8 +106,8 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 
 void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 
-void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame> v);
-void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end);
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame> v);
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end);
 
 } // namespace Piston
 

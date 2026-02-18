@@ -11,12 +11,14 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <memory>
+#include <mutex>
 
 using json = nlohmann::json;
 
 namespace Piston {
 
-class SerializableDeformerDataBase {
+class SerializableDeformerDataBase: public std::enable_shared_from_this<SerializableDeformerDataBase>{
 	public:
 		static const size_t kDefaultReserveElements = 1024;
 
@@ -53,6 +55,8 @@ class SerializableDeformerDataBase {
 		virtual bool dumpToJSON(json& j) const = 0;
 		virtual bool readFromJSON(const json& j) = 0;
 		virtual void clearData() = 0;
+
+		std::mutex mMutex;
 
 	private:
 		bool mIsPopulated;

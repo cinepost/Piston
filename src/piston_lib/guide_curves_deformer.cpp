@@ -34,6 +34,12 @@ const std::string& GuideCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
+void GuideCurvesDeformer::setFastPointBind(bool fast) {
+	if(mFastPointBind == fast) return;
+	mFastPointBind = fast;
+	makeDirty();
+}
+
 void GuideCurvesDeformer::setGuideIDPrimAttrName(const std::string& name) {
 	if(mGuideIDPrimAttrName == name) return;
 	mGuideIDPrimAttrName = name;
@@ -88,7 +94,8 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 	}
 
 	const auto bind_mode = getBindMode();
-
+	dbg_printf("GuideCurvesDeformer::__deform__() mode %s %s\n", to_string(bind_mode), multi_threaded ? "multi_threaded" : "single thread");
+	
 	switch(bind_mode) {
 		case BindMode::SPACE:
 			return deformImpl_SpaceMode(multi_threaded, points, time_code);
@@ -152,7 +159,6 @@ bool GuideCurvesDeformer::hasSkinPrimitiveData() const {
 }
 
 bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
-	multi_threaded = false;
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
 
@@ -169,19 +175,16 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 
 	static const bool build_live = true;
 
-	dbg_printf("GuideCurvesDeformer::deformImpl_NTBMode buildNTBFrames\n");
 	if(!buildNTBFrames(live_guide_frames, multi_threaded, build_live)) {
 		return false;
 	}
-	dbg_printf("GuideCurvesDeformer::deformImpl_NTBMode buildNTBFrames done\n");
-
+	
 	auto func = [&](const std::size_t start, const std::size_t end) {
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
 
 			uint32_t frame_id;
-			uint8_t axis_id;
 			bind.decodeID_modeNTB(frame_id);
 			assert(frame_id < guides_live_points.size());
 			assert(frame_id < live_guide_frames.size());
@@ -225,8 +228,6 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 
 				if(bind.encoded_id.mode_space.is_24bit) {
 					bind.getData(u, v, w, x);
-					dbg_printf("24bit\n");
-					continue;
 				} else {
 					bind.getData(u, v, w);
 					x = 1.f - (u + v + w);
@@ -551,22 +552,15 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 			assert(guide_id < guide_origins.size());
 			guide_origins[guide_id].decode(face_id, axis_id);
 
-			dbg_printf("face_id:%zu\n", (size_t)face_id);
-
 			const PhantomTrimesh::TriFace& face = pSkinPhantomTrimesh->getFace(face_id);
 
-			dbg_printf("vtx0:%zu\n", (size_t)face.indices[0]);
-			dbg_printf("vtx1:%zu\n", (size_t)face.indices[1]);
-			dbg_printf("skin pts cnt:%zu\n", (size_t)skin_points.size());
 			const pxr::GfVec3f up_vector = pxr::GfGetNormalized(skin_points[face.indices[0]] - skin_points[face.indices[1]]);
 			// TODO: build proper root normal form this up vector
 
 			std::vector<NTBFrame>::iterator it_begin = guide_frames.begin() + guide_vertex_offset;
 			std::vector<NTBFrame>::iterator it_end = it_begin + curve_points_count;
 
-			dbg_printf("buildRotationMinimizingFrames\n");
 			buildRotationMinimizingFrames(pCurveRootPt, curve_points_count, root_tangent, up_vector, it_begin, it_end);
-			dbg_printf("buildRotationMinimizingFrames done\n");
 		}
 	};
 
@@ -653,7 +647,6 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	multi_threaded = false;
-	dbg_printf("0\n");
 
 	if(!buildSkinPrimData(multi_threaded)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
@@ -662,14 +655,10 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 		return false;
 	}	
 
-	dbg_printf("1\n");
-
 	if(!mDeformerGeoPrimHandle.fetchAttributeValues<int>(mGuidesSkinPrimAttrName, mpGuideCurvesDeformerData->skinPrimIndices(), rest_time_code)) {
 		std::cerr << "Error getting skin prim indices !" << std::endl;
 		return false;
 	}
-
-	dbg_printf("2\n");
 
 	if(!buildGuideOrigins(multi_threaded)) {
 		std::cerr << "NTB frames calulation without skin geometry primitive indices is NOT supported yet !" << std::endl;
@@ -687,6 +676,12 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 		return false;
 	}
 
+	// inverse frames
+	std::vector<pxr::GfMatrix3f> matrices(rest_guide_frames.size());
+	for(size_t i = 0; i < rest_guide_frames.size(); ++i) {
+		matrices[i] = rest_guide_frames[i].getMatrix3f().GetInverse();
+	}
+
 	auto& pointBinds = mpGuideCurvesDeformerData->pointBinds();
 	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
 	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
@@ -697,7 +692,12 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guide_curves_count);
 	const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
 
+	const bool fast_bind = isFastPointBind();
+
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		std::vector<std::pair<size_t, size_t>> guide_segment_vetrices_pairs(256); // our limit is 256 vertices per guide curve
+		std::vector<float> guide_segment_squared_distances(256);
+
 		for(size_t curve_index = start; curve_index < end; ++curve_index) {
 			const uint32_t guide_id = (uint32_t)mGuideIndices[curve_index];
 			assert(guide_id < guide_curves_count);
@@ -709,27 +709,57 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 			PxrCurvesContainer::CurveDataConstPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_index);
         	const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
 
-			{
+			if(fast_bind) {
 				// build guide kdtree if needed
 				const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
 				if(!kdtrees[guide_id]) {
 					kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(guides_rest_points, guide_vertex_offset, guide_vertex_count, false /* no threads */);
 				}
 				pKDTree = kdtrees[guide_id].get();
+			} else {
+				// accurate binding mode
+				size_t ii = 0;
+				for(size_t i = guide_vertex_offset; i < (guide_vertex_offset + guide_vertex_count - 1); ++i) {
+					guide_segment_vetrices_pairs[ii++] = {i, i + 1};
+				}
 			}
 
 			const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
 			const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_index);
+		
 			for(uint32_t i = 0; i < curve_vertices_count; ++i) {
 				auto& bind = pointBinds[curve_vertex_offset + i];
-
 				const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
+				uint32_t frame_id = PointBindData::kInvalid;
 
-        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
-        		const uint32_t frame_id = nearest_pt.first;
-								
+				if(fast_bind) {
+					const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curr_pt);
+					if(nearest_pt.first == guide_vertex_offset || nearest_pt.first == (guide_vertex_offset + guide_vertex_count - 1)) {
+						// guide curve edge vertices
+						frame_id = nearest_pt.first;
+					} else {
+						// rest of guide curve vertices
+						const float sd1 = distanceSquared(curr_pt, guides_rest_points[nearest_pt.first], guides_rest_points[nearest_pt.first - 1]);
+						const float sd2 = distanceSquared(curr_pt, guides_rest_points[nearest_pt.first], guides_rest_points[nearest_pt.first + 1]);
+						if(sd1 < sd2) {
+							frame_id = nearest_pt.first - 1;
+						} else {
+							frame_id = nearest_pt.first;
+						}
+					}
+				} else {
+					for(auto i = 0; i < guide_vertex_count; ++i) {
+						const auto& pair = guide_segment_vetrices_pairs[i];
+						guide_segment_squared_distances[i] = distanceSquared(curr_pt, guides_rest_points[pair.first], guides_rest_points[pair.second]);
+					}
+					std::vector<float>::iterator min_val_it = std::min_element(std::begin(guide_segment_squared_distances), std::begin(guide_segment_squared_distances) + guide_vertex_count);
+					frame_id = guide_vertex_offset + std::distance(std::begin(guide_segment_squared_distances), min_val_it);
+				}
+
 				bind.encodeID_modeNTB(frame_id);
-				bind.setData({0.0, 0.0, 0.0});
+
+				assert(frame_id < matrices.size());
+				bind.setData(matrices[frame_id] * (curr_pt - guides_rest_points[frame_id]));
         	}
 		}
 	};
@@ -740,8 +770,6 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	} else {
 		func(0u, curves_count);
 	}
-
-	dbg_printf("bind done\n");
 
 	return true;
 }

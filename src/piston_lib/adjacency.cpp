@@ -283,6 +283,9 @@ const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacen
 
 bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& prim_handle) {
 	assert(prim_handle.isMeshGeoPrim());
+
+	const std::lock_guard<std::mutex> lock(mMutex);
+	
 	clearData();
 
 	if(!mpAdjacency) {

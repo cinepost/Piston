@@ -86,8 +86,8 @@ BOOST_PYTHON_MODULE(_piston) {
 	;
 
 	class_<BaseMeshCurvesDeformer, BaseMeshCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("BaseMeshCurvesDeformer",  no_init)
-		.def("setСurvesSkinPrimAttrName", &BaseMeshCurvesDeformer::setСurvesSkinPrimAttrName)
-		.def("getСurvesSkinPrimAttrName", &BaseMeshCurvesDeformer::getСurvesSkinPrimAttrName, return_value_policy<copy_const_reference>())
+		.def("setSkinPrimAttrName", &BaseMeshCurvesDeformer::setSkinPrimAttrName)
+		.def("getSkinPrimAttrName", &BaseMeshCurvesDeformer::getSkinPrimAttrName, return_value_policy<copy_const_reference>())
 
 		.def("setReadJsonDataFromPrim", &BaseMeshCurvesDeformer::setReadJsonDataFromPrim)
 		.def("writeJsonDataToPrim", &BaseMeshCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
@@ -123,6 +123,8 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setGuidesSkinGeoPrimRestAttrName", &GuideCurvesDeformer::setGuidesSkinGeoPrimRestAttrName)
 		.def("getGuidesSkinGeoPrimRestAttrName", &GuideCurvesDeformer::getGuidesSkinGeoPrimRestAttrName, return_value_policy<copy_const_reference>())
 		.def("setGuidesSkinGeoPrim", &GuideCurvesDeformer::setGuidesSkinGeoPrim)
+		.def("setFastPointBind", &GuideCurvesDeformer::setFastPointBind)
+		.def("isFastPointBind", &GuideCurvesDeformer::isFastPointBind)
 		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 

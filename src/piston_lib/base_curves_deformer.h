@@ -17,6 +17,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <mutex>
 
 
 namespace Piston {
@@ -97,6 +98,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		BS::thread_pool<BS::tp::none> mPool;
 		DeformerStats mStats;
+
+		std::mutex      mPrmMutex;
 
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false) = 0;

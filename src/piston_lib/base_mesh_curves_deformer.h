@@ -20,8 +20,8 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 	public:
 		virtual ~BaseMeshCurvesDeformer() {}
 
-		void setСurvesSkinPrimAttrName(const std::string& name);
-		const std::string& getСurvesSkinPrimAttrName() const { return mСurvesSkinPrimAttrName; }
+		void setSkinPrimAttrName(const std::string& name);
+		const std::string& getSkinPrimAttrName() const { return mSkinPrimAttrName; }
 
 		virtual const std::string& toString() const override; 
 
@@ -34,7 +34,7 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		SerializableUsdGeomMeshFaceAdjacency::UniquePtr 	mpAdjacencyData;
 		SerializablePhantomTrimesh::UniquePtr				mpPhantomTrimeshData;
 
-		std::string   mСurvesSkinPrimAttrName = kСurvesSkinPrimAttrName;
+		std::string 										mSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);

@@ -54,6 +54,9 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		void setGuidesSkinGeoPrimRestAttrName(const std::string& name);
 		const std::string& getGuidesSkinGeoPrimRestAttrName() const { return mGuidesSkinPrimRestAttrName; }
 
+		void setFastPointBind(bool fast);
+		bool isFastPointBind() const { return mFastPointBind; }
+
 	protected:
 		GuideCurvesDeformer(const std::string& name);
 
@@ -82,22 +85,24 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
-		std::unique_ptr<GuideCurvesDeformerData>   		mpGuideCurvesDeformerData;
-		GuideCurvesContainer::UniquePtr 				mpGuideCurvesContainer;
+		std::unique_ptr<GuideCurvesDeformerData>   				mpGuideCurvesDeformerData;
+		GuideCurvesContainer::UniquePtr 						mpGuideCurvesContainer;
 		
-		UsdPrimHandle 									mGuidesSkinGeoPrimHandle;
-		SerializableUsdGeomMeshFaceAdjacency::UniquePtr mpSkinAdjacencyData;
-		SerializablePhantomTrimesh::UniquePtr			mpSkinPhantomTrimeshData;
+		UsdPrimHandle 											mGuidesSkinGeoPrimHandle;
 
-		SerializablePhantomTrimesh::UniquePtr			mpGuidesPhantomTrimeshData;
+		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpSkinAdjacencyData;
+		std::shared_ptr<SerializablePhantomTrimesh>				mpSkinPhantomTrimeshData;
 
+		std::shared_ptr<SerializablePhantomTrimesh>				mpGuidesPhantomTrimeshData;
 
-		std::string 									mGuideIDPrimAttrName = kGuideIDPrimAttrName;
-		std::string 									mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;
-		std::string                                     mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
-		pxr::VtArray<int> 								mGuideIndices;
+		bool                                            		mFastPointBind = true;
 
-		float                                       	mFalloff = .0f;
+		std::string 											mGuideIDPrimAttrName = kGuideIDPrimAttrName;
+		std::string 											mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;
+		std::string                                     		mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
+		pxr::VtArray<int> 										mGuideIndices;
+
+		float                                       			mFalloff = .0f;
 };
 
 } // namespace Piston

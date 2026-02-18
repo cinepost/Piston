@@ -200,8 +200,10 @@ inline std::string to_string(const GuideCurvesDeformerData::BindMode& mode) {
 			return "NTB";
 		case GuideCurvesDeformerData::BindMode::ANGLE:
 			return "ANGLE";
-		default:
+		case GuideCurvesDeformerData::BindMode::SPACE:
 			return "SPACE";
+		default:
+			return "Unknown";
 	}
 }
 

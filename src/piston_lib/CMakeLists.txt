@@ -50,6 +50,7 @@ file( GLOB SOURCES
     ./phantom_trimesh.cpp
     ./geometry_tools.cpp
     ./serializable_data.cpp
+    ./deformer_data_cache.cpp
     ./base_curves_deformer.cpp
     ./base_mesh_curves_deformer.cpp
     ./fast_curves_deformer.cpp

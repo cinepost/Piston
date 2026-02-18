@@ -236,26 +236,29 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
     }
 }
 
-void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame> v) {
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame> v) {
     v.resize(curve_points_count);
-    buildRotationMinimizingFrames(pCurveRootPt, curve_points_count, root_tangent, root_normal, v.begin(), v.end());
+    buildRotationMinimizingFrames(pCurveRootPt, curve_points_count, root_tangent, root_up_vector, v.begin(), v.end());
 }
 
-void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_normal, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end) {
+void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end) {
     assert(pCurveRootPt);
-    assert(curve_points_count > 0);
+    assert(curve_points_count > 1);
     assert(std::distance(it_begin, it_end) == curve_points_count);
 
     static const float kZeroLength = 1e-7; // pxr epsilon is 1e-10
 
     // root frame
-    const pxr::GfVec3f root_binormal = pxr::GfCross(pxr::GfGetNormalized(root_tangent), root_normal);
-    it_begin->set(root_normal, root_tangent, root_binormal);
+    const pxr::GfVec3f root_Tn = pxr::GfGetNormalized(root_tangent);
+    const pxr::GfVec3f root_Bn = pxr::GfCross(root_Tn, root_up_vector);
+    const pxr::GfVec3f root_Nn = pxr::GfCross(root_Bn, root_Tn);
+
+    it_begin->set(root_Nn, root_tangent, root_Bn);
 
     // Generate tangents
     auto it = it_begin;
     const pxr::GfVec3f* pCurrPt = pCurveRootPt;
-    for(size_t i = 1; i < (curve_points_count - 1); ++i){
+    for(size_t i = 1; i < curve_points_count; ++i){
         pxr::GfVec3f t = *(pCurrPt+1) - *pCurrPt;
         if(t.GetLength() < kZeroLength) {
             // for extremely short tangents we just keep using previous one
@@ -266,13 +269,16 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
         pCurrPt++;
         it++;
     }
+    it->t = (it - 1)->t; // last point tangent is equal to the last segment tangent
 
     // Double reflection method: compute rotation minimizing frames
-    for(auto it = it_begin; it != (it_end - 1); ++it){
+    for(auto it = it_begin; it != (it_end - 1); it++){
+        auto it_next = it + 1;
+        assert(it_next != it_end);
         const auto& ni = it->n;
         const auto& ti = it->t; 
 
-        const auto& tj = (it + 1)->t;
+        const auto& tj = it_next->t;
 
         pxr::GfVec3f v1 = ti; //point[i+1] - point[i]; 
         float c1 = pxr::GfDot(v1,v1);
@@ -281,10 +287,8 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
         pxr::GfVec3f v2 = tj - tLi;
         float c2 = pxr::GfDot(v2,v2);
 
-        NTBFrame* pNext = &(*(it+1));
-
-        pNext->n = pxr::GfGetNormalized(nLi - (2.0 / c2) * pxr::GfDot(v2, nLi) * v2);
-        pNext->b = pxr::GfCross(tj,pNext->n);
+        it_next->n = pxr::GfGetNormalized(nLi - (2.0 / c2) * pxr::GfDot(v2, nLi) * v2);
+        it_next->b = pxr::GfGetNormalized(pxr::GfCross(tj,it_next->n));
     }
 }
 

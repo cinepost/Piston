@@ -71,8 +71,8 @@ void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
 
 void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
 	if(mReadJsonDeformerData == state) return;
-	mDirty = true;
 	mReadJsonDeformerData = state;
+	makeDirty();
 }
 
 bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {

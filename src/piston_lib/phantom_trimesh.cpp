@@ -520,6 +520,8 @@ SerializablePhantomTrimesh::SerializablePhantomTrimesh() {
 
 bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
+
+	const std::lock_guard<std::mutex> lock(mMutex);
 	clearData();
 
 	if(!mpTrimesh) {
