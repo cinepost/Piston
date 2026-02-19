@@ -1,4 +1,6 @@
 #include "deformer_data_cache.h"
+#include "adjacency.h"
+#include "phantom_trimesh.h"
 
 namespace Piston {
 
@@ -15,27 +17,34 @@ DeformerDataCache& DeformerDataCache::getInstance() {
 }
 
 template< class T>
-std::shared_ptr<T> DeformerDataCache::getOrCreateData(const Key& key) {
+std::shared_ptr<T> DeformerDataCache::getOrCreateData(const pxr::SdfPath& path) {
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
-	if(!key.IsAbsolutePath()) {
+	if(!path.IsAbsolutePath()) {
 		std::cerr << "DeformerDataCache relative keys are not supported !" << std::endl;
 		return nullptr;
 	}
 
+	const DeformerDataCache::Key key(std::type_index(typeid(T)), path);
+
 	const std::lock_guard<std::mutex> lock(mMutex);
 	auto it = mDataMap.find(key);
-	
-	if (it == mDataMap.end()) {
-		mDataMap[key] = std::make_shared<T>();
+	if (it != mDataMap.end()) {
+		return std::dynamic_pointer_cast<T>(it->second);
 	}
 
-	return *it;
+	auto result = mDataMap.emplace(key, std::make_shared<T>());
+	return std::dynamic_pointer_cast<T>(result.first->second);
 }
 
 template< class T>
 std::shared_ptr<T> DeformerDataCache::getOrCreateData(const std::string& name) {
 	return getOrCreateData<T>(pxr::SdfPath(name));
+}
+
+template< class T>
+std::shared_ptr<T> DeformerDataCache::getOrCreateData(const UsdPrimHandle& handle) {
+	return getOrCreateData<T>(handle.getPath());
 }
 
 void DeformerDataCache::clear() {
@@ -50,6 +59,13 @@ DeformerDataCache::DeformerDataCache() {
 
 }
 
+template std::shared_ptr<SerializablePhantomTrimesh> DeformerDataCache::getOrCreateData(const pxr::SdfPath& path);
+template std::shared_ptr<SerializablePhantomTrimesh> DeformerDataCache::getOrCreateData(const std::string& name);
+template std::shared_ptr<SerializablePhantomTrimesh> DeformerDataCache::getOrCreateData(const UsdPrimHandle& handle);
+
+template std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> DeformerDataCache::getOrCreateData(const pxr::SdfPath& path);
+template std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> DeformerDataCache::getOrCreateData(const std::string& name);
+template std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> DeformerDataCache::getOrCreateData(const UsdPrimHandle& handle);
 
 } // namespace Piston
 

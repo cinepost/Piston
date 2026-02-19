@@ -2,6 +2,7 @@
 #include "base_mesh_curves_deformer.h"
 #include "geometry_tools.h"
 #include "pxr_points_lru_cache.h"
+#include "deformer_data_cache.h"
 
 #include <thread>
 
@@ -30,8 +31,10 @@ bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 }
 
 bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded) {
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+
 	if(!mpAdjacencyData) {
-		mpAdjacencyData = std::make_unique<SerializableUsdGeomMeshFaceAdjacency>();
+		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mDeformerGeoPrimHandle);
 	}
 
 	// Get primitive adjacency json data if present
@@ -44,7 +47,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	}
 
 	if(!mpPhantomTrimeshData) {
-		mpPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
+		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mDeformerGeoPrimHandle);
 	}
 
 	// Get phantom mesh json data if present

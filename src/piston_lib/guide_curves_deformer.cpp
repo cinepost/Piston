@@ -1,5 +1,6 @@
 #include "simple_profiler.h"
 #include "guide_curves_deformer.h"
+#include "deformer_data_cache.h"
 
 #include "common.h"
 #include "kdtree.hpp"
@@ -849,6 +850,8 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 		return false;
 	}
 
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+
 	if(!mDirty && mpSkinAdjacencyData && mpSkinPhantomTrimeshData && 
 		mpSkinAdjacencyData->isValid() && 
 		mpSkinPhantomTrimeshData->isValid()) {
@@ -856,8 +859,9 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 	}
 
 	if(!mpSkinAdjacencyData) {
-		mpSkinAdjacencyData = std::make_unique<SerializableUsdGeomMeshFaceAdjacency>();
+		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mGuidesSkinGeoPrimHandle);
 	}
+	assert(mpSkinAdjacencyData);
 
 	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinAdjacencyData.get())) {
 		if(!mpSkinAdjacencyData->buildInPlace(mGuidesSkinGeoPrimHandle)) {
@@ -867,8 +871,9 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 	}
 
 	if(!mpSkinPhantomTrimeshData) {
-		mpSkinPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
+		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mGuidesSkinGeoPrimHandle);
 	}
+	assert(mpSkinPhantomTrimeshData);
 
 	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinPhantomTrimeshData.get())) {
 		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName)) {

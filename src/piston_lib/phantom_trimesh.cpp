@@ -522,6 +522,8 @@ bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, 
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	const std::lock_guard<std::mutex> lock(mMutex);
+	if(isPopulated()) return true;
+
 	clearData();
 
 	if(!mpTrimesh) {
@@ -554,7 +556,6 @@ bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 	j[kJFaceMap] = mpTrimesh->mFaceMap;
 	j[kJFaceFlags] = mpTrimesh->mFaceFlags;
 	j[kJVertices] = mpTrimesh->mVertices;
-
 	j[kJDataHash] = mpTrimesh->calcHash();
 
 	return true;

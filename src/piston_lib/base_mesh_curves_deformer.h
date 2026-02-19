@@ -5,6 +5,8 @@
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 
+#include <memory>
+
 
 namespace Piston {
 
@@ -31,10 +33,10 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
 		
 	protected:
-		SerializableUsdGeomMeshFaceAdjacency::UniquePtr 	mpAdjacencyData;
-		SerializablePhantomTrimesh::UniquePtr				mpPhantomTrimeshData;
+		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpAdjacencyData;
+		std::shared_ptr<SerializablePhantomTrimesh>				mpPhantomTrimeshData;
 
-		std::string 										mSkinPrimAttrName = kСurvesSkinPrimAttrName;
+		std::string 											mSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);

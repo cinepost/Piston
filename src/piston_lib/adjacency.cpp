@@ -285,6 +285,7 @@ bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& pri
 	assert(prim_handle.isMeshGeoPrim());
 
 	const std::lock_guard<std::mutex> lock(mMutex);
+	if(isPopulated()) return true;
 	
 	clearData();
 

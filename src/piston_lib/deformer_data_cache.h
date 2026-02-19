@@ -11,16 +11,33 @@
 #include <map>
 #include <mutex>
 
-namespace Piston {
 
-static const bool kDefaultCacheState = false;
+namespace Piston {
 
 /*
  * Factory singleton class
  */
 class DeformerDataCache {
 	public:
-	using Key = pxr::SdfPath;
+	struct Key {
+		std::type_index type_idx;
+		pxr::SdfPath 	path;
+
+		bool operator==(const Key &other) const { 
+			return (type_idx == other.type_idx && path == other.path);
+		}
+
+		bool operator<(const Key &other) const {
+			if(type_idx < other.type_idx) return true;
+			if(type_idx == other.type_idx) {
+				if(path < other.path) return true;
+			}
+			return false;
+		}
+
+		Key(const std::type_index& _type_idx, const pxr::SdfPath& _path):type_idx(_type_idx), path(_path) {}	
+	};
+
 	using MapType = std::map<Key, std::shared_ptr<SerializableDeformerDataBase>>; // we dont's expect large number of entries here. Also we might opt fo std::string as a key so we use std::map for now  
 
 	public:
@@ -36,7 +53,10 @@ class DeformerDataCache {
 		std::shared_ptr<T> getOrCreateData(const std::string& name);
 
 		template< class T>
-		std::shared_ptr<T> getOrCreateData(const Key& key);
+		std::shared_ptr<T> getOrCreateData(const UsdPrimHandle& handle);
+
+		template< class T>
+		std::shared_ptr<T> getOrCreateData(const pxr::SdfPath& path);
 
 	protected:
 		void clear();
