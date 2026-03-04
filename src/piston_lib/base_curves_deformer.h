@@ -25,6 +25,7 @@ namespace Piston {
 namespace {
 	const std::string kVelocitiAttrName = "velocities";
 	const std::string kDeformerRestPositionAttrName = "rest_p";
+	const std::string kСurvesSkinPrimAttrName = "skinprim";
 }
 
 class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeformer> {
@@ -54,6 +55,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		const std::string& getDeformerRestAttrName() const { return mDeformerRestAttrName; }
 		void setCurvesRestAttrName(const std::string& name);
 		const std::string& getCurvesRestAttrName() const { return mCurvesRestAttrName; }
+		void setSkinPrimAttrName(const std::string& name);
+		const std::string& getSkinPrimAttrName() const { return mSkinPrimAttrName; }
 
 		void setReadJsonDataFromPrim(bool state);
 		bool getReadJsonDataState() const { return mReadJsonDeformerData; }
@@ -90,6 +93,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		UsdPrimHandle 	mCurvesGeoPrimHandle;
 
 		std::string 	mDeformerRestAttrName = kDeformerRestPositionAttrName;
+		std::string 	mSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		std::string 	mCurvesRestAttrName;
 
 		std::string   	mVelocityAttrName = kVelocitiAttrName;

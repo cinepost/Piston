@@ -12,7 +12,6 @@ namespace Piston {
 
 namespace {
 	const std::string kMeshRestPositionAttrName = "rest_p";
-	const std::string kСurvesSkinPrimAttrName = "skinprim";
 }
 
 class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
@@ -21,10 +20,6 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 	
 	public:
 		virtual ~BaseMeshCurvesDeformer() {}
-
-		void setSkinPrimAttrName(const std::string& name);
-		const std::string& getSkinPrimAttrName() const { return mSkinPrimAttrName; }
-
 		virtual const std::string& toString() const override; 
 
 	protected:
@@ -35,8 +30,6 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 	protected:
 		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpAdjacencyData;
 		std::shared_ptr<SerializablePhantomTrimesh>				mpPhantomTrimeshData;
-
-		std::string 											mSkinPrimAttrName = kСurvesSkinPrimAttrName;
 		
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);

@@ -150,19 +150,20 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 #endif // CHECK_CULLING
     float invDet = 1.f / det;
 
+    bool result = true;
     pxr::GfVec3f tvec = orig - v0;
     u = pxr::GfDot(tvec, pvec) * invDet;
     if ((u < 0.f) || (u > 1.f)) {
-        return false;
+        result = false;
     }
 
     pxr::GfVec3f qvec = pxr::GfCross(tvec, v0v1);
     v = pxr::GfDot(dir, qvec) * invDet;
     if ((v < 0.f) || ((u + v) > 1.f)) {
-        return false;
+        result = false;
     }
 
-    return true;
+    return result;
 }
 
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v) {
@@ -183,20 +184,21 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 #endif // CHECK_CULLING
     float invDet = 1.f / det;
 
+    bool result = true;
     pxr::GfVec3f tvec = orig - v0;
     u = pxr::GfDot(tvec, pvec) * invDet;
     if ((u < 0.f) || (u > 1.f)) {
-        return false;
+        result = false;
     }
 
     pxr::GfVec3f qvec = pxr::GfCross(tvec, v0v1);
     v = pxr::GfDot(dir, qvec) * invDet;
     if ((v < 0.f) || ((u + v) > 1.f)) {
-        return false;
+        result = false;
     }
 
     dist = pxr::GfDot(v0v2, qvec) * invDet;
-    return true;
+    return result;
 }
 
 void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool) {

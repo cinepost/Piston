@@ -73,6 +73,9 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
 		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
 
+		.def("setSkinPrimAttrName", &BaseCurvesDeformer::setSkinPrimAttrName)
+		.def("getSkinPrimAttrName", &BaseCurvesDeformer::getSkinPrimAttrName, return_value_policy<copy_const_reference>())
+
 		.def("setMotionBlurState", &BaseCurvesDeformer::setMotionBlurState)
 		.def("getMotionBlurState", &BaseCurvesDeformer::getMotionBlurState)
 
@@ -86,9 +89,6 @@ BOOST_PYTHON_MODULE(_piston) {
 	;
 
 	class_<BaseMeshCurvesDeformer, BaseMeshCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("BaseMeshCurvesDeformer",  no_init)
-		.def("setSkinPrimAttrName", &BaseMeshCurvesDeformer::setSkinPrimAttrName)
-		.def("getSkinPrimAttrName", &BaseMeshCurvesDeformer::getSkinPrimAttrName, return_value_policy<copy_const_reference>())
-
 		.def("setReadJsonDataFromPrim", &BaseMeshCurvesDeformer::setReadJsonDataFromPrim)
 		.def("writeJsonDataToPrim", &BaseMeshCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
 
@@ -114,6 +114,8 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<GuideCurvesDeformer, GuideCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("GuideCurvesDeformer", no_init)
 		.def("create", &GuideCurvesDeformer::create)
 		.staticmethod("create")
+		.def("setBindRootsToSkinSurface", &GuideCurvesDeformer::setBindRootsToSkinSurface)
+		.def("getBindRootsToSkinSurface", &GuideCurvesDeformer::getBindRootsToSkinSurface)
 		.def("setBindMode", &GuideCurvesDeformer::setBindMode)
 		.def("getBindMode", &GuideCurvesDeformer::getBindMode)
 		.def("setGuideIDPrimAttrName", &GuideCurvesDeformer::setGuideIDPrimAttrName)

@@ -54,6 +54,9 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		void setGuidesSkinGeoPrimRestAttrName(const std::string& name);
 		const std::string& getGuidesSkinGeoPrimRestAttrName() const { return mGuidesSkinPrimRestAttrName; }
 
+		void setBindRootsToSkinSurface(bool bind);
+		bool getBindRootsToSkinSurface() const { return mBindRootsToSkinSurface; }
+
 		void setFastPointBind(bool fast);
 		bool isFastPointBind() const { return mFastPointBind; }
 
@@ -74,6 +77,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool buildGuideOrigins(bool multi_threaded);
 		bool buildNTBFrames(std::vector<NTBFrame>& guide_frames, bool multi_threaded, bool build_live);
 
+		bool buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
@@ -81,6 +85,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_AngleMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+		bool moveSkinBoundPoints(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
@@ -96,6 +101,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		std::shared_ptr<SerializablePhantomTrimesh>				mpGuidesPhantomTrimeshData;
 
 		bool                                            		mFastPointBind = true;
+		bool 													mBindRootsToSkinSurface = false;
 
 		std::string 											mGuideIDPrimAttrName = kGuideIDPrimAttrName;
 		std::string 											mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;
@@ -103,6 +109,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		pxr::VtArray<int> 										mGuideIndices;
 
 		float                                       			mFalloff = .0f;
+
+		std::vector<pxr::GfVec3f>               				mTempSkinFaceLiveNormals; // temporary to save on per-frame reallocations
 };
 
 } // namespace Piston

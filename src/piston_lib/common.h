@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <sstream>
+#include <iostream>
 #include <vector>
 
 
@@ -70,6 +71,11 @@ class UsdPrimHandle {
 
 		bool operator==(const pxr::UsdPrim& prim) const;
 		explicit operator bool() const { return mPrim.IsValid(); };
+
+		friend std::ostream& operator<<( std::ostream& os, const UsdPrimHandle& prim_handle ) {
+        	os << prim_handle.getPath();
+        	return os;
+  		}
 
 	private:
 		pxr::UsdPrim            mPrim;

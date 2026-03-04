@@ -95,21 +95,63 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 	}
 
 	const auto bind_mode = getBindMode();
-	dbg_printf("GuideCurvesDeformer::__deform__() mode %s %s\n", to_string(bind_mode), multi_threaded ? "multi_threaded" : "single thread");
+	dbg_printf("GuideCurvesDeformer::__deform__() mode %s %s\n", to_string(bind_mode).c_str(), multi_threaded ? "multi_threaded" : "single thread");
 	
+	bool result = false;
+
 	switch(bind_mode) {
 		case BindMode::SPACE:
-			return deformImpl_SpaceMode(multi_threaded, points, time_code);
+			result = deformImpl_SpaceMode(multi_threaded, points, time_code);
 		case BindMode::ANGLE:
-			return deformImpl_AngleMode(multi_threaded, points, time_code);
+			result = deformImpl_AngleMode(multi_threaded, points, time_code);
 		case BindMode::NTB:
-			return deformImpl_NTBMode(multi_threaded, points, time_code);
+			result = deformImpl_NTBMode(multi_threaded, points, time_code);
 		default:
 			std::cerr << "Unimplemented bind mode " << to_string(bind_mode) << " !!!" << std::endl;
 			break;
 	}
 
-	return false;
+	if(getBindRootsToSkinSurface() && !mpGuideCurvesDeformerData->getPointSurfaceBinds().empty()) {
+		result = moveSkinBoundPoints(multi_threaded, points, time_code);
+	}
+
+	return result;
+}
+
+bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+	if(!hasSkinPrimitiveData()) {
+		return true;
+	}
+
+	assert(mpSkinPhantomTrimeshData);
+	PhantomTrimesh* pSkinPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
+	assert(pSkinPhantomTrimesh);
+	pSkinPhantomTrimesh->update(mGuidesSkinGeoPrimHandle ,time_code);
+
+	mTempSkinFaceLiveNormals.resize(pSkinPhantomTrimesh->getFaceCount());
+	std::cout << "TODO: precalculate skin live face normals first !!!" << std::endl;
+
+	const auto& pointBinds = mpGuideCurvesDeformerData->getPointSurfaceBinds();
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = pointBinds[i];
+			assert(bind.point_id < points.size());
+
+			const pxr::GfVec3f face_normal = pSkinPhantomTrimesh->getFaceLiveNormal(bind.face_id);
+			auto pos = pSkinPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v) + face_normal * bind.dist;
+			points[bind.point_id] = pos * bind.weight + points[bind.point_id] * (1.f - bind.weight);
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, pointBinds.size(), func);
+		mPool.wait();
+	} else {
+		func(0u, pointBinds.size());
+	}
+
+	return true;
 }
 
 bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
@@ -236,6 +278,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 				points[i] = pPhantomTrimesh->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, u, v, w, x);
 			} else {
 				// bound to triface
+				std::cout << "TODO: precalculate skin live face normals first for SPACE mode !!!" << std::endl;
 				const pxr::GfVec3f face_normal = pPhantomTrimesh->getFaceLiveNormal(bind.encoded_id.mode_space.element_id);
 				bind.getData(u, v, w);
 				points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.encoded_id.mode_space.element_id, u, v) + (face_normal * w);
@@ -253,6 +296,29 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
     return true;
 }
 
+bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	assert(mpGuideCurvesDeformerData);
+	assert(mpCurvesContainer);
+
+	std::vector<int> skin_prim_indices;
+
+	if(!mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code)) {
+		return false;
+	}
+
+	const bool is_per_vertex_attr = mpCurvesContainer->getTotalVertexCount() == skin_prim_indices.size();
+	const bool is_per_curve_attr = mpCurvesContainer->getCurvesCount() == skin_prim_indices.size();
+
+	if(is_per_vertex_attr == is_per_curve_attr == false) {
+		std::cerr << "Wrong values count for " << getSkinPrimAttrName() << " attribute on " << mCurvesGeoPrimHandle << std::endl; 
+		return false;
+	}
+
+	auto& point_surface_binds = mpGuideCurvesDeformerData->pointSurfaceBinds();
+
+	return true;
+}
+
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
@@ -265,20 +331,19 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
 	const auto total_curves_count = mpCurvesContainer->getCurvesCount();
 
+	if(getBindRootsToSkinSurface()) {
+		if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
+			std::cerr << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << std::endl;
+			return false;
+		}
+	}
+
 	if(mGuideIDPrimAttrName.empty() || getBindMode() == BindMode::SPACE) {
 		return buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
 	} 
 
-	pxr::UsdGeomPrimvarsAPI curvesPrimvarsApi = mCurvesGeoPrimHandle.getPrimvarsAPI();
-	pxr::UsdGeomPrimvar guideIDSPrimVar = curvesPrimvarsApi.GetPrimvar(pxr::TfToken(mGuideIDPrimAttrName));
-
-	if(!guideIDSPrimVar) {
-		std::cerr << "Error getting guide(clump) id prmitive attribute \"" << mGuideIDPrimAttrName << "\" !" << std::endl;
-		return false;
-	}
-
-	if(!guideIDSPrimVar.GetAttr().Get(&mGuideIndices, rest_time_code)) {
-		std::cerr << "Error getting curves " << mCurvesGeoPrimHandle.getPath() << " \"" << mGuideIDPrimAttrName << "\" guide indices !" << std::endl;
+	if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
+		std::cerr << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !" << std::endl;
 		return false;
 	}
 	assert(mGuideIndices.size() == total_curves_count);
@@ -290,7 +355,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	}
 
 	if(max_guide_index >= total_guides_count) {
-		std::cerr << "Curves " << mCurvesGeoPrimHandle.getPath() << " guide indices are out of range !" << std::endl; 
+		std::cerr << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !" << std::endl; 
 		return false;
 	}
 
@@ -907,6 +972,12 @@ bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 	}
 
 	return true;
+}
+
+void GuideCurvesDeformer::setBindRootsToSkinSurface(bool bind) {
+	if( mBindRootsToSkinSurface == bind) return;
+	mBindRootsToSkinSurface = bind;
+	makeDirty();
 }
 
 void GuideCurvesDeformer::setBindMode(GuideCurvesDeformer::BindMode mode) {

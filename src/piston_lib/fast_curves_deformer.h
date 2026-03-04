@@ -47,7 +47,7 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
-		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code);
+		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		void calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pPhantomTrimesh, const std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 		void calcPerBindTangentsAndBiNormals(const PhantomTrimesh* pPhantomTrimesh, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 
@@ -58,8 +58,8 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		std::unique_ptr<FastCurvesDeformerData>             mpFastCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
-		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memeory to save on per-frame reallocations
-		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindLiveTBs; // we keep memeory to save on per-frame reallocations
+		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memory to save on per-frame reallocations
+		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindLiveTBs; // we keep memory to save on per-frame reallocations
 };
 
 } // namespace Piston

@@ -229,12 +229,22 @@ void BaseCurvesDeformer::setMotionBlurState(bool state) {
 	}
 }
 
-
 void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
 	if(mVelocityAttrName == name) return;
 	mVelocityAttrName = name;
 	makeDirty();
+
+	dbg_printf("Velocity attribute name is set to: %s\n", mVelocityAttrName.c_str());
 }
+
+void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
+	if(mSkinPrimAttrName == name) return;
+	mSkinPrimAttrName = name;
+	makeDirty();
+
+	dbg_printf("Skin prim ID attribute name is set to: %s\n", mSkinPrimAttrName.c_str());
+}
+
 
 void BaseCurvesDeformer::makeDirty() {
 	mStats.clear();

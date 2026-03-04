@@ -50,7 +50,7 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 	private:
 		size_t calcHash() const;
 
-		BindMode                                mBindMode = BindMode::SPACE;
+		BindMode                                mBindMode = BindMode::DIST;
 		
 		std::vector<PointBindData>              mPointBinds;
 

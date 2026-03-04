@@ -62,15 +62,6 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	return true;
 }
 
-void BaseMeshCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
-	if(mSkinPrimAttrName == name) return;
-	mSkinPrimAttrName = name;
-	makeDirty();
-
-	dbg_printf("Skin prim ID attribute name is set to: %s\n", mSkinPrimAttrName.c_str());
-}
-
-
 const std::string& BaseMeshCurvesDeformer::toString() const {
 	static const std::string kBaseMeshDeformerString = "BaseMeshCurvesDeformer";
 	return kBaseMeshDeformerString;

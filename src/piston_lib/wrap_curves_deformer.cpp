@@ -248,10 +248,10 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		// Build bind data
 		switch(mpWrapCurvesDeformerData->getBindMode()) {
 			case BindMode::SPACE:
-				result = buildDeformerData_SpaceMode(rest_vertex_normals, rest_time_code);
+				result = buildDeformerData_SpaceMode(multi_threaded, rest_vertex_normals, rest_time_code);
 				break;
 			default:
-				result = buildDeformerData_DistMode(rest_vertex_normals, rest_time_code);
+				result = buildDeformerData_DistMode(multi_threaded, rest_vertex_normals, rest_time_code);
 				break;
 		}
 
@@ -281,7 +281,7 @@ static neighbour_search::KDTree<float, 3> buildTrimeshCentroidsKDTree(const Phan
 	return neighbour_search::KDTree<float, 3>(trimesh_centroids, threaded_kdtree_creation);
 }
 
-bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
+bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
 	PROFILE("WrapCurvesDeformer::buildDeformerData_DistMode");
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
@@ -296,8 +296,9 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
 	neighbour_search::KDTree<float, 3> kdtree = buildTrimeshCentroidsKDTree(pPhantomTrimesh, true);
 
     auto func = [&](const std::size_t start, const std::size_t end) {
-    	const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
-    	dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *thread_index);
+		if(multi_threaded) {
+			dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *BS::this_thread::get_index());
+		}
 
     	const auto& meshRestPositions = pPhantomTrimesh->getRestPositions();
     	const auto& faces = pPhantomTrimesh->getFaces();
@@ -353,16 +354,19 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(const std::vector<pxr::GfVec
     	}
     };
 
-	mPool.detach_blocks(0, curves_count, func);
-	mPool.wait();
-	//func(0, curves_count);
+    if(multi_threaded) {
+		mPool.detach_blocks(0, curves_count, func);
+		mPool.wait();
+	} else {
+		func(0, curves_count);
+	}
 
     dbg_printf("WrapCurvesDeformer::buildDeformerData_DistMode() done.\n");
 
 	return true;
 }
 
-bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
+bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
 	PROFILE("WrapCurvesDeformer::buildDeformerData_SpaceMode");
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
@@ -380,8 +384,9 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVe
 
 
     auto func = [&](const std::size_t start, const std::size_t end) {
-    	const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
-    	dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *thread_index);
+    	if(multi_threaded) {
+			dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *BS::this_thread::get_index());
+		}
 
     	const auto& meshRestPositions = pPhantomTrimesh->getRestPositions();
     	const auto& faces = pPhantomTrimesh->getFaces();
@@ -420,9 +425,6 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVe
 					pxr::GfVec3f p2 = meshRestPositions[face.indices[2]];
 
         			const float face_distance = distance(face_plane, curr_pt);
-
-					//if(tmp_curve_distances[i].second)
-
         			const bool point_is_in_plane = abs(face_distance) <= kEpsilon;
         			const bool point_is_below_surface = face_distance < 0.f;
 
@@ -570,9 +572,12 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(const std::vector<pxr::GfVe
         } // curves loop
     };
     
-    mPool.detach_blocks(0, curves_count, func);
-	mPool.wait();
-	//func(0, curves_count);
+    if(multi_threaded) {
+    	mPool.detach_blocks(0, curves_count, func);
+		mPool.wait();
+	} else {
+		func(0, curves_count);
+	}
 
     dbg_printf("Bound curves count: %zu\n", size_t(bound_curves));
     dbg_printf("Partially bound curves count: %zu\n", size_t(partially_bound_curves));

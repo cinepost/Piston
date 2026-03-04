@@ -3,6 +3,7 @@
 
 #include "serializable_data.h"
 #include "phantom_trimesh.h"
+#include "float16.h"
 #include "float24.h"
 
 #include <memory>
@@ -24,6 +25,17 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			NTB,
 			ANGLE,
 			SPACE
+		};
+
+		struct PointSurfaceBindData {
+			uint32_t 	face_id;
+			uint32_t    point_id;
+			
+			float16_t   u;
+			float16_t   v;
+			
+			float16_t   dist;
+			float16_t   weight;
 		};
 
 		struct PointBindData {
@@ -143,11 +155,12 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			operator uint32_t() const { return raw_data; }
 		};
 
-		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
-		const std::vector<GuideOrigin>& 	getGuideOrigins() const { return mGuideOrigins; }
-		const std::vector<int>& 			getSkinPrimIndices() const { return mSkinPrimIndices; }
-		BindMode        					getBindMode() const { return mBindMode; }
-		void  								setBindMode(const BindMode& mode);
+		const std::vector<PointBindData>& 			getPointBinds() const { return mPointBinds; }
+		const std::vector<PointSurfaceBindData>& 	getPointSurfaceBinds() const { return mPointSurfaceBinds; }
+		const std::vector<GuideOrigin>& 			getGuideOrigins() const { return mGuideOrigins; }
+		const std::vector<int>& 					getSkinPrimIndices() const { return mSkinPrimIndices; }
+		BindMode        							getBindMode() const { return mBindMode; }
+		void  										setBindMode(const BindMode& mode);
 
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
@@ -156,42 +169,28 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 	protected:
 		virtual bool dumpToJSON(json& j) const override;
 		virtual bool readFromJSON(const json& j) override;
-
 		virtual void clearData() override;
 
-		std::vector<PointBindData>& 	pointBinds() { return mPointBinds; }
-		std::vector<GuideOrigin>& 		guideOrigins() { return mGuideOrigins; }
-		std::vector<int>&               skinPrimIndices() { return mSkinPrimIndices; }
+		std::vector<PointBindData>& 		pointBinds() { return mPointBinds; }
+		std::vector<PointSurfaceBindData>& 	pointSurfaceBinds() { return mPointSurfaceBinds; }
+		std::vector<GuideOrigin>& 			guideOrigins() { return mGuideOrigins; }
+		std::vector<int>&               	skinPrimIndices() { return mSkinPrimIndices; }
 		void setSkinPrimPath(const std::string& prim_path);
 
 	private:
 		size_t calcHash() const;
 
-		std::vector<PointBindData> 	mPointBinds;
-		std::vector<GuideOrigin> 	mGuideOrigins;
-		BindMode                    mBindMode = BindMode::NTB;
-		std::string                 mSkinPrimPath;
-		std::vector<int> 			mSkinPrimIndices;
+		std::vector<PointBindData> 			mPointBinds;
+		std::vector<GuideOrigin> 			mGuideOrigins;
+		std::vector<PointSurfaceBindData> 	mPointSurfaceBinds;
+		BindMode                    		mBindMode = BindMode::NTB;
+		std::string                 		mSkinPrimPath;
+		std::vector<int> 					mSkinPrimIndices;
+
+		bool                                mKeepRootsOnSurface = true;
 
 		friend class GuideCurvesDeformer;
 };
-
-//void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {
-//	j = {bind.encoded_id.raw_data, bind.data[0], bind.data[1], bind.data[2]};
-//}
-
-//void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bind) {
-//	bind.encoded_id.raw_data = j.at(0).template get<uint32_t>();
-//	bind.data = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
-//}
-
-//void to_json(json& j, const GuideCurvesDeformerData::GuideOrigin& o) {
-//	j = o.raw_data;
-//}
-
-//void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
-//	o.raw_data = j.at(0).template get<uint32_t>();
-//}
 
 inline std::string to_string(const GuideCurvesDeformerData::BindMode& mode) {
 	std::string str;

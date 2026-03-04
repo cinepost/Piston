@@ -9,7 +9,8 @@
  * implied warranty.
  */
 
-#pragma once 
+#ifndef PISTON_LIB_FLOAT24_H_
+#define PISTON_LIB_FLOAT24_H_
 
 #include <stdint.h> // unit8_t
 #include <math.h>   // ldexp
@@ -332,3 +333,5 @@ static float get24sbit (const float24s_cast value)
   }
   return temp.f;
 }
+
+#endif // PISTON_LIB_FLOAT24_H_

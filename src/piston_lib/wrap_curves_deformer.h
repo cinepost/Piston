@@ -52,8 +52,8 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 		
-		bool buildDeformerData_SpaceMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
-		bool buildDeformerData_DistMode(const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
+		bool buildDeformerData_SpaceMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
+		bool buildDeformerData_DistMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
 		std::unique_ptr<WrapCurvesDeformerData> mpWrapCurvesDeformerData;
 
