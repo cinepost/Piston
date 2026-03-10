@@ -102,16 +102,19 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 	switch(bind_mode) {
 		case BindMode::SPACE:
 			result = deformImpl_SpaceMode(multi_threaded, points, time_code);
+			break;
 		case BindMode::ANGLE:
 			result = deformImpl_AngleMode(multi_threaded, points, time_code);
+			break;
 		case BindMode::NTB:
 			result = deformImpl_NTBMode(multi_threaded, points, time_code);
+			break;
 		default:
 			std::cerr << "Unimplemented bind mode " << to_string(bind_mode) << " !!!" << std::endl;
 			break;
 	}
 
-	if(getBindRootsToSkinSurface() && !mpGuideCurvesDeformerData->getPointSurfaceBinds().empty()) {
+	if(result && getBindRootsToSkinSurface() && !mpGuideCurvesDeformerData->getPointSurfaceBinds().empty()) {
 		result = moveSkinBoundPoints(multi_threaded, points, time_code);
 	}
 

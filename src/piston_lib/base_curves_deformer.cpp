@@ -130,17 +130,12 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 	}
 
 	auto deformPoints = [this](bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
-		switch(multi_threaded) {
-			case true:
-				return deformMtImpl(points, time_code);
-			default:
-				return deformImpl(points, time_code);
-		}
+		if(multi_threaded) { return deformMtImpl(points, time_code); }
+
+		return deformImpl(points, time_code);
 	};
 
 	auto getDeformedPoints = [&deformPoints](bool multi_threaded, PxrCurvesContainer* pCurves, PxrPointsLRUCache* pPointsLRUCache, const PxrPointsLRUCache::CompositeKey& key) {
-		dbg_printf("lambda getDeformedPoints\n");
-		
 		static const PointsList* sNull = nullptr;
 
 		const PointsList* _points_list_ptr = pPointsLRUCache->get(key);
@@ -214,6 +209,10 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		dbg_printf("Cache utilization %s%%\n", pPointsLRUCache->getCacheUtilizationString().c_str());
 	}
 
+	if(mShowDebugGeometry) {
+		drawDebugGeometry(time_code);
+	}
+
 	return true;
 }
 
@@ -250,6 +249,11 @@ void BaseCurvesDeformer::makeDirty() {
 	mStats.clear();
 	mDirty = true;
 	mDeformerDataWritten = false;
+}
+
+void BaseCurvesDeformer::showDebugGeometry(bool state) {
+	if(mShowDebugGeometry == state) return;
+	mShowDebugGeometry = state;
 }
 
 const std::string& BaseCurvesDeformer::toString() const {

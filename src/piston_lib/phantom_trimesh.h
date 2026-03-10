@@ -134,6 +134,9 @@ class PhantomTrimesh {
 		pxr::GfVec3f getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const;
 		pxr::GfVec3f getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const;
 
+		pxr::GfVec3f getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v, const float w) const;
+		pxr::GfVec3f getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v, const float w) const;
+
 		pxr::GfVec3f getFaceRestCentroid(const uint32_t face_id) const;
 
 		const pxr::GfVec3f& getFaceRestNormal(const uint32_t face_id) const;

@@ -76,6 +76,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		bool getMotionBlurState() const { return mCalcMotionVectors; }
 
+		void showDebugGeometry(bool state);
+
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
@@ -86,6 +88,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		void makeDirty();
 		
 	protected:
+		bool mShowDebugGeometry = false;
 		bool mDirty = true;
 		bool mDeformerDataWritten = false;
 		
@@ -108,6 +111,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
+
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) {};
 
 	private:
 		bool buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);

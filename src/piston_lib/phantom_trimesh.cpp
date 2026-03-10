@@ -318,8 +318,6 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, Phant
 	mFaces.emplace_back(indices);
 	mFaceFlags.emplace_back(TriFace::Flags::None);
 
-	mTmpVertices.insert(a);
-
 	if(mTmpVertices.insert(a).second == true) mVertices.push_back(a);
 	if(mTmpVertices.insert(b).second == true) mVertices.push_back(b);
 	if(mTmpVertices.insert(c).second == true) mVertices.push_back(c);
@@ -376,23 +374,31 @@ bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& 
 }
 
 pxr::GfVec3f PhantomTrimesh::getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const {
+	return getInterpolatedRestPosition(face_id, u, v, (1.f - u - v));
+};
+
+
+pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const {
+	return getInterpolatedLivePosition(face_id, u, v, (1.f - u - v));
+};
+
+pxr::GfVec3f PhantomTrimesh::getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v, const float w) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& face = mFaces[face_id];
 	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
 
-	return u * usdMeshRestPositions[face.indices[1]] + v * usdMeshRestPositions[face.indices[2]] + (1.f - u - v) * usdMeshRestPositions[face.indices[0]];
-};
+	return u * usdMeshRestPositions[face.indices[1]] + v * usdMeshRestPositions[face.indices[2]] + w * usdMeshRestPositions[face.indices[0]];
+}
 
-
-pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const {
+pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v, const float w) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());
 
 	auto const& face = mFaces[face_id];
 	auto const& usdMeshLivePositions = mUsdMeshLivePositions.AsConst();
 
-	return u * usdMeshLivePositions[face.indices[1]] + v * usdMeshLivePositions[face.indices[2]] + (1.f - u - v) * usdMeshLivePositions[face.indices[0]];
-};
+	return u * usdMeshLivePositions[face.indices[1]] + v * usdMeshLivePositions[face.indices[2]] + w * usdMeshLivePositions[face.indices[0]];
+}
 
 pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(const uint32_t face_id) const {
 	assert(static_cast<size_t>(face_id) < mFaces.size());

@@ -7,6 +7,7 @@
 #include "phantom_trimesh.h"
 #include "curves_container.h"
 #include "fast_curves_deformer_data.h"
+#include "debug_drawing.h"
 
 #include <memory>
 #include <limits>
@@ -41,6 +42,8 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) override;
+
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
@@ -53,13 +56,15 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 
 		void transformCurvesToNTB();
 
-		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind);
+		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind, bool ignore_face_boundaries);
 
 		std::unique_ptr<FastCurvesDeformerData>             mpFastCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
 		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memory to save on per-frame reallocations
 		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindLiveTBs; // we keep memory to save on per-frame reallocations
+
+		DebugGeo::UniquePtr                                 mpDebugGeo;
 };
 
 } // namespace Piston

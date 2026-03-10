@@ -22,7 +22,7 @@ class FastCurvesDeformerData : public SerializableDeformerDataBase {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
 			uint32_t face_id;
 			float u, v;
-			CurveBindData(): face_id(kInvalidFaceID) {};
+			CurveBindData(): face_id(kInvalidFaceID), u(.0f), v(.0f) {};
 		};
 
 		const std::vector<CurveBindData>& 							getCurveBinds() const { return mCurveBinds; }

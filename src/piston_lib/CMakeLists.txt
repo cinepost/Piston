@@ -63,6 +63,7 @@ file( GLOB SOURCES
     ./curves_deformer_factory.cpp
     ./simple_profiler.cpp
     ./deformer_stats.cpp
+    ./debug_drawing.cpp
     ./tests.cpp
 )
 

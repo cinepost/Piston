@@ -10,6 +10,8 @@
 
 #include <random>
 #include <algorithm>
+#include <cmath>
+
 
 static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &p2) {
 	const auto dx = p1[0] - p2[0];
@@ -23,6 +25,8 @@ namespace Piston {
 FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
 	dbg_printf("FastCurvesDeformer::FastCurvesDeformer(%s)\n", name.c_str());
 	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
+
+	mpDebugGeo = DebugGeo::create(name);
 }
 
 FastCurvesDeformer::SharedPtr FastCurvesDeformer::create(const std::string& name) {
@@ -103,7 +107,6 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	} else {
 		func(0u, curveBinds.size());
 	}
-
 	return true;
 }
 
@@ -117,6 +120,88 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 		return false;
 	}
 	return true;
+}
+
+static void CreateQuadMesh(pxr::UsdStageRefPtr stage) {
+    // 1. Define the Mesh prim at a specific path
+    pxr::SdfPath meshPath("/MyMesh");
+    pxr::UsdGeomMesh mesh = pxr::UsdGeomMesh::Define(stage, meshPath);
+
+    // 2. Define the vertices (Points)
+    pxr::VtArray<pxr::GfVec3f> points = {
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}
+    };
+    mesh.GetPointsAttr().Set(points);
+
+    // 3. Define vertex counts per face (e.g., 4 for a quad)
+    pxr::VtArray<int> faceCounts = {4};
+    mesh.GetFaceVertexCountsAttr().Set(faceCounts);
+
+    // 4. Define vertex indices for the face
+    pxr::VtArray<int> faceIndices = {0, 1, 2, 3};
+    mesh.GetFaceVertexIndicesAttr().Set(faceIndices);
+
+    // 5. Add colors
+    pxr::UsdGeomPrimvar colorPrimvar = mesh.CreateDisplayColorPrimvar(pxr::UsdGeomTokens->vertex);
+    pxr::VtArray<pxr::GfVec3f> colors = {
+        {1, 0, 0}, // Red
+        {0, 1, 0}, // Green
+        {0, 0, 1}, // Blue
+        {1, 1, 0}  // Yellow
+    };
+    colorPrimvar.Set(colors);
+}
+
+void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
+	assert(mpPhantomTrimeshData);
+	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	assert(pPhantomTrimesh);
+
+	if(mpDebugGeo) {
+		mpDebugGeo->clear();
+
+		const pxr::VtArray<pxr::GfVec3f>& positions = pPhantomTrimesh->getLivePositions();
+
+		for(const auto face: pPhantomTrimesh->getFaces()) {
+			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]);
+			lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+			lA.setWidth(0.05);
+			DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]);
+			lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+			lB.setWidth(0.05);
+			DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]);
+			lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+			lC.setWidth(0.05);
+
+			mpDebugGeo->addLine(lA);
+			mpDebugGeo->addLine(lB);
+			mpDebugGeo->addLine(lC);
+		}
+
+		const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
+		for(size_t i = 0; i < curveBinds.size(); ++i) {
+			
+			const pxr::GfVec3f& N = mPerBindLiveNormals[i];
+			const pxr::GfVec3f& T = mPerBindLiveTBs[i].first;
+			const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
+
+			const auto& bind = curveBinds[i];
+			auto curve_bind_pos = pPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v);
+
+			DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f);
+			lN.setColor({0.0, 1.0, 0.0});
+			DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f);
+			lT.setColor({1.0, 0.0, 0.0});
+			DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f);
+			lB.setColor({0.0, 0.0, 1.0});
+			
+			mpDebugGeo->addLine(lN);
+			mpDebugGeo->addLine(lT);
+			mpDebugGeo->addLine(lB);
+		}
+
+		mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
+	}
 }
 
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
@@ -187,6 +272,9 @@ void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdj
 	assert(pAdjacency);
 	assert(pPhantomTrimesh);
 
+	static const float flt_0 = 0.0f;
+	static const float flt_1 = 1.0f;
+
 	// Build per bind normals
 	auto& perBindNormals = build_live ? mPerBindLiveNormals : mpFastCurvesDeformerData->mPerBindRestNormals;
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
@@ -197,7 +285,19 @@ void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdj
 		
 		if(bind.face_id != CurveBindData::kInvalidFaceID) {
 			const auto& face = pPhantomTrimesh->getFace(bind.face_id);
-			perBindNormals[i] = pxr::GfGetNormalized(bind.u * vertex_normals[face.indices[1]] + bind.v * vertex_normals[face.indices[2]] + (1.f - bind.u - bind.v) * vertex_normals[face.indices[0]]);
+
+			//const float& u = std::clamp(bind.u, flt_0, flt_1);
+			//const float& v = std::clamp(bind.v, flt_0, flt_1);
+			//const float w = std::clamp(1.f - u - v, flt_0, flt_1);
+
+			const float& u = bind.u;
+			const float& v = bind.v;
+			const float w = 1.f - u - v;
+
+			//std::cout << "bc: " << (u + v + w) << std::endl;
+
+			perBindNormals[i] = pxr::GfGetNormalized(u * vertex_normals[face.indices[1]] + v * vertex_normals[face.indices[2]] + w * vertex_normals[face.indices[0]]);
+    		//perBindNormals[i] = pxr::GfGetNormalized(vertex_normals[face.indices[0]]);
     	}
     };
 
@@ -239,7 +339,10 @@ void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* p
 		if(bind.face_id != CurveBindData::kInvalidFaceID) {
 			const auto& face = faces[bind.face_id];
 			const pxr::GfVec3f root_proj_pos = bind.u * pt_positions[face.indices[0]] + bind.v * pt_positions[face.indices[2]] + (1.f - bind.u - bind.v) * pt_positions[face.indices[1]];
+			
 			const pxr::GfVec3f tmp_binormal = face_center_points[bind.face_id] - root_proj_pos;
+			//const pxr::GfVec3f tmp_binormal = pxr::GfGetNormalized(pt_positions[face.indices[0]] - pt_positions[face.indices[1]]);
+
 			mPerBindTBs[i].first = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], tmp_binormal)); // tangent
 			mPerBindTBs[i].second = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], mPerBindTBs[i].first)); //binormal
     	}
@@ -289,7 +392,7 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 	}
 }
 
-bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind) {
+bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind, bool ignore_face_boundaries) {
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
@@ -319,6 +422,14 @@ bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_
 			bind.face_id = face_id;
 			return true;
 		}
+	}
+
+	// if failed but allowed to ignore face boundaries we bind curve by finding closest to face plane
+	if(ignore_face_boundaries) {
+		assert(false && "ignore_face_boundaries unimplemented!");
+
+
+		return true;
 	}
 
 
@@ -353,13 +464,12 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
-	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float> _tmp_sq_distances) {
+	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float> _tmp_sq_distances, bool ignore_face_boundaries) {
 		bool isBound = false;
 		const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
 		const uint32_t prim_vertex_offset = pAdjacency->getFaceVertexOffset(prim_id);
 
 		// try to bind face corner "ear"
-
 		for(size_t j = 0; j < prim_vertex_count; ++j) {
 			_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), pPhantomTrimesh->getRestPositions()[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
 		}
@@ -373,7 +483,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			pAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
 		);
 
-		if(bindCurveToTriface(curve_index, face_id, bind)) {
+		if(bindCurveToTriface(curve_index, face_id, bind, false)) {
 			isBound = true;
 		} else if ( prim_vertex_count > 3u){
 			// Try to bind using face "fan" triangulation
@@ -384,7 +494,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 					pAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
 				);
 
-				if(bindCurveToTriface(curve_index, face_id, bind)) {
+				if(bindCurveToTriface(curve_index, face_id, bind, ignore_face_boundaries)) {
 					isBound = true;
 					break;
 				} 
@@ -412,36 +522,38 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			if(has_skin_prim_attr) {
 				if(skin_prim_indices[curve_index] < 0) continue; // pixar uses negative indices as invalid
 
-				const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);
-
 				const uint32_t prim_id = static_cast<uint32_t>(skin_prim_indices[curve_index]);
-				const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
-				const uint32_t prim_vertex_offset = pAdjacency->getFaceVertexOffset(prim_id);
+				if(!bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */)) {
+					const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+				
+					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
+					const uint32_t prim_vertex_offset = pAdjacency->getFaceVertexOffset(prim_id);
 
-				if(prim_vertex_count == 3) {
-					bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
-						pAdjacency->getFaceVertex(prim_id, 0), 
-						pAdjacency->getFaceVertex(prim_id, 1),
-						pAdjacency->getFaceVertex(prim_id, 2)
-					);
-				} else {
+					if(prim_vertex_count == 3) {
+						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
+							pAdjacency->getFaceVertex(prim_id, 0), 
+							pAdjacency->getFaceVertex(prim_id, 1),
+							pAdjacency->getFaceVertex(prim_id, 2)
+						);
+					} else {
 
-					for(size_t j = 0; j < prim_vertex_count; ++j) {
-						const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
-						tmp_indexed_squared_distances[j] = { distanceSquared(pt, pPhantomTrimesh->getRestPositions()[vtx]), vtx };
+						for(size_t j = 0; j < prim_vertex_count; ++j) {
+							const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
+							tmp_indexed_squared_distances[j] = { distanceSquared(pt, pPhantomTrimesh->getRestPositions()[vtx]), vtx };
+						}
+						
+						std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
+						
+						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
+							tmp_indexed_squared_distances[0].second,
+							tmp_indexed_squared_distances[1].second,
+							tmp_indexed_squared_distances[2].second
+						);
 					}
-					
-					std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
-					
-					bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
-						tmp_indexed_squared_distances[0].second,
-						tmp_indexed_squared_distances[1].second,
-						tmp_indexed_squared_distances[2].second
-					);
-				}
 
-				assert(bind.face_id != PhantomTrimesh::kInvalidTriFaceID);
-				pPhantomTrimesh->projectPoint(pt, bind.face_id, bind.u, bind.v);
+					assert(bind.face_id != PhantomTrimesh::kInvalidTriFaceID);
+					pPhantomTrimesh->projectPoint(pt, bind.face_id, bind.u, bind.v);
+				}
 
 				skin_bound_curves_count++;
 			}
@@ -468,7 +580,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 				const uint32_t neighbors_offset = pAdjacency->getNeighborsOffset(nearest_vtx);
 				for(uint32_t prim_offset = neighbors_offset; prim_offset < (neighbors_offset + neighbors_count); ++prim_offset){
 					const auto prim_id = pAdjacency->getNeighborPrim(prim_offset);
-					if(bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances)) {
+					if(bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */)) {
 						kdtree_bound_curves_count++;
 						break;
 					}
@@ -479,7 +591,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			// Strategy: 3. Brute force binding
 
 			for(const auto& prim_id: pAdjacency->getPrimData()) {
-				if(bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances)) {
+				if(bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */)) {
 					bforce_bound_curves_count++;
 					break;
 				}
