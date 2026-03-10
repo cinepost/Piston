@@ -47,6 +47,8 @@ venv
 venv/
 env
 env/
+backup
+backup/
 
 third_party/external
 third_party/external/
