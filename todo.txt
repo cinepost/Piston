@@ -6,3 +6,4 @@ TODOS:
 4. Double and triple check all serializable date to store and read ONLY necessary data only.
 5. KD-Tree structure for fast and efficient tetraheron search.
 6. FastDeformer needs a different binding strategy when prim_id is provided. We first have to search for any subdivided triface that have u+v+w=1 coords. If that fails we have to find one with shortest point projection to edge (not centroid) distance.
+7. Simple logger with python callback/interop so we can redirect messages to Houdini's UI.

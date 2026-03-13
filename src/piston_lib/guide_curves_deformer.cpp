@@ -300,21 +300,36 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 }
 
 bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	assert(mpGuideCurvesDeformerData);
-	assert(mpSkinAdjacencyData);
-	assert(mpSkinPhantomTrimeshData);
 	assert(mpCurvesContainer);
-
-	std::vector<int> skin_prim_indices;
-
-	if(!mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code)) {
-		std::cerr << "Skin prim ID is needed to bind curves roots for now !!!" << std::endl;
-		return false;
-	}
+	assert(mpGuideCurvesDeformerData);
+	assert(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid());
+	assert(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid());
 
 	const UsdGeomMeshFaceAdjacency* pSkinAdjacency = mpSkinAdjacencyData->getAdjacency();
 	PhantomTrimesh* pSkinPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
 	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
+
+	const size_t curves_count = pCurvesContainer->getCurvesCount();
+
+	std::vector<int> skin_prim_indices;
+
+	if(!mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code)) {
+
+		// if there is no curves skinprim attr exist we can still try to promote it from guides ...
+		if(mGuideIndices.size() == curves_count) {
+			std::vector<int> guides_skin_prim_indices;
+			if(mDeformerGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), guides_skin_prim_indices, rest_time_code)) {
+				skin_prim_indices.resize(curves_count);
+
+				for(size_t i = 0; i < curves_count; ++i) {
+					skin_prim_indices[i] = guides_skin_prim_indices[mGuideIndices[i]];
+				}
+			}
+		} else {
+			std::cerr << "Skin prim ID is needed to bind curves roots for now !!!" << std::endl;
+			return false;
+		}
+	}
 
 	const bool is_per_vertex_attr = pCurvesContainer->getTotalVertexCount() == skin_prim_indices.size();
 	const bool is_per_curve_attr = pCurvesContainer->getCurvesCount() == skin_prim_indices.size();
@@ -323,10 +338,6 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		std::cerr << "Wrong skin prim ID attribute values count ! Should be per curve or per curve vertex !" << std::endl;
 		return false;
 	}
-
-	const bool has_prim_attr = is_per_vertex_attr == is_per_curve_attr == false;
-
-	const size_t curves_count = pCurvesContainer->getCurvesCount();
 
 	std::mutex binds_mutex;
 	auto& point_surface_binds = mpGuideCurvesDeformerData->pointSurfaceBinds();
@@ -423,6 +434,14 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	return true;
 }
 
+bool GuideCurvesDeformer::guideIndicesNeeded() const {
+	if(getBindRootsToSkinSurface()) return true;
+	if(getBindMode() == BindMode::NTB) return true;
+	if(getBindMode() == BindMode::ANGLE) return true;
+
+	return false;
+}
+
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
@@ -435,35 +454,45 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
 	const auto total_curves_count = mpCurvesContainer->getCurvesCount();
 
+	if(guideIndicesNeeded()) {
+		if(mGuideIDPrimAttrName.empty()) {
+			std::cerr << "No guide id (clump_id) attribute name set but needed !" << std::endl;
+			return false;
+		}
+
+		if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
+			std::cerr << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !" << std::endl;
+			return false;
+		}
+		assert(mGuideIndices.size() == total_curves_count);
+
+		// check guide indices are not out of range
+		int max_guide_index = 0;
+		for(const int idx: mGuideIndices) {
+			max_guide_index = std::max(max_guide_index, idx);
+		}
+
+		if(max_guide_index >= total_guides_count) {
+			std::cerr << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !" << std::endl; 
+			return false;
+		}
+	}
+
 	if(getBindRootsToSkinSurface()) {
+		if(!buildSkinPrimData(multi_threaded)) {
+			std::cerr << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!" << std::endl;
+			return false;
+		}
+
 		if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
 			std::cerr << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << std::endl;
 			return false;
 		}
 	}
 
-	if(mGuideIDPrimAttrName.empty() || getBindMode() == BindMode::SPACE) {
-		return buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
-	} 
-
-	if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
-		std::cerr << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !" << std::endl;
-		return false;
-	}
-	assert(mGuideIndices.size() == total_curves_count);
-
-	// check guide indices are not out of range
-	int max_guide_index = 0;
-	for(const int idx: mGuideIndices) {
-		max_guide_index = std::max(max_guide_index, idx);
-	}
-
-	if(max_guide_index >= total_guides_count) {
-		std::cerr << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !" << std::endl; 
-		return false;
-	}
-
 	switch(getBindMode()) {
+		case BindMode::SPACE:
+			return buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
 		case BindMode::NTB:
 			return buildDeformerDataNTBMode(rest_time_code, multi_threaded);
 		default:

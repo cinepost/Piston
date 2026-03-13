@@ -88,6 +88,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool moveSkinBoundPoints(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
+		bool guideIndicesNeeded() const;
+
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
