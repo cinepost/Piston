@@ -205,8 +205,6 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
     assert(pAdjacency);
     assert(pTrimesh);
 
-    dbg_printf("buildVertexNormals(...) %s\n", pThreadPool ? "multi_threaded" : "single_thread");
-
     vertex_normals.resize(pAdjacency->getVertexCount());
 
     const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? pTrimesh->getLivePositions() : pTrimesh->getRestPositions();
@@ -230,7 +228,7 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
         vertex_normals[vtx] = pxr::GfGetNormalized(vn);
     };
 
-    if(pThreadPool && 1 == 2) {
+    if(pThreadPool) {
         BS::multi_future<void> loop = pThreadPool->submit_loop(0u, vertices.size(), func);
         loop.wait();
     } else {

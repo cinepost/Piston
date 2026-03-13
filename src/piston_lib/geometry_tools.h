@@ -44,6 +44,35 @@ struct NTBFrame {
 	pxr::GfVec3f n, t, b;
 };
 
+inline void barycentrics_basic_clamp(float& u, float& v) {
+    u = std::clamp(u, 0.0f, 1.0f);
+    v = std::clamp(v, 0.0f, 1.0f);
+}
+
+inline void barycentrics_basic_clamp(float& u, float& v, float& w) {
+    barycentrics_basic_clamp(u, v);
+    w = std::clamp(w, 0.0f, 1.0f);
+}
+
+// Correct projection-based clamping for a point 'p' relative to vertices v0, v1, v2
+inline void barycentrics_clamp_to_triangle(float& u, float& v, float& w) {
+    if (u >= 0.f && v >= 0.f && w >= 0.f) return;
+    
+    if (u < v && u < w) {
+        float sum = v + w;
+        u = 0.0f; v = v / sum; w = w / sum;
+    	return;
+    } else if (v < w) {
+        float sum = u + w;
+        u = u / sum; v = 0.0f; w = w / sum;
+    	return;
+    } else {
+        float sum = u + v;
+        u = u / sum; v = v / sum; w = 0.0f;
+    	return;
+    }
+}
+
 inline float distance(const glm::vec3& point, const Plane& plane) {
 	return dot(glm::vec3{plane.normal[0], plane.normal[1], plane.normal[2]}, glm::vec3{point[0] - plane.point[0], point[1] - plane.point[1], point[2] - plane.point[2]});
 }
@@ -72,8 +101,8 @@ inline float lengthSquared(const pxr::GfVec3f &v) {
 }
 
 inline float distanceSquared(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b) {
-	pxr::GfVec3f ab = b - a;
-    pxr::GfVec3f ap = p - a;
+	const pxr::GfVec3f ab = b - a;
+    const pxr::GfVec3f ap = p - a;
 
     float len_squared_ab = lengthSquared(ab);
     
@@ -92,6 +121,55 @@ inline float distanceSquared(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const
     return lengthSquared(p - closestPoint);
 }
 
+inline float pointTriangleDistSquared(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b, const pxr::GfVec3f& c) {
+    const pxr::GfVec3f ab = b - a;
+    const pxr::GfVec3f ac = c - a;
+    const pxr::GfVec3f ap = p - a;
+
+    // Region A
+    float d1 = pxr::GfDot(ab, ap);
+    float d2 = pxr::GfDot(ac, ap);
+    if (d1 <= 0.0f && d2 <= 0.0f) return lengthSquared(p - a);
+
+    // Region B
+    pxr::GfVec3f bp = p - b;
+    float d3 = pxr::GfDot(ab, bp);
+    float d4 = pxr::GfDot(ac, bp);
+    if (d3 >= 0.0f && d4 <= d3) return lengthSquared(p - b);
+
+    // Edge AB
+    float vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+        float v = d1 / (d1 - d3);
+        return lengthSquared(p - (a + ab * v));
+    }
+
+    // Region C
+    pxr::GfVec3f cp = p - c;
+    float d5 = pxr::GfDot(ab, cp);
+    float d6 = pxr::GfDot(ac, cp);
+    if (d6 >= 0.0f && d5 <= d6) return lengthSquared(p - c);
+
+    // Edge AC
+    float vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+        float w = d2 / (d2 - d6);
+        return lengthSquared(p - (a + ac * w));
+    }
+
+    // Edge BC
+    float va = d3 * d6 - d5 * d4;
+    if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+        float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        return lengthSquared(p - (b + (c - b) * w));
+    }
+
+    // Face Region
+    float denom = 1.0f / (va + vb + vc);
+    float v = vb * denom;
+    float w = vc * denom;
+    return lengthSquared(p - (a + ab * v + ac * w));
+};
 
 glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2);
 

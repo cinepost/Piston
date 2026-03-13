@@ -301,23 +301,124 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 
 bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	assert(mpGuideCurvesDeformerData);
+	assert(mpSkinAdjacencyData);
+	assert(mpSkinPhantomTrimeshData);
 	assert(mpCurvesContainer);
 
 	std::vector<int> skin_prim_indices;
 
 	if(!mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code)) {
+		std::cerr << "Skin prim ID is needed to bind curves roots for now !!!" << std::endl;
 		return false;
 	}
 
-	const bool is_per_vertex_attr = mpCurvesContainer->getTotalVertexCount() == skin_prim_indices.size();
-	const bool is_per_curve_attr = mpCurvesContainer->getCurvesCount() == skin_prim_indices.size();
+	const UsdGeomMeshFaceAdjacency* pSkinAdjacency = mpSkinAdjacencyData->getAdjacency();
+	PhantomTrimesh* pSkinPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
+	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
 
-	if(is_per_vertex_attr == is_per_curve_attr == false) {
-		std::cerr << "Wrong values count for " << getSkinPrimAttrName() << " attribute on " << mCurvesGeoPrimHandle << std::endl; 
+	const bool is_per_vertex_attr = pCurvesContainer->getTotalVertexCount() == skin_prim_indices.size();
+	const bool is_per_curve_attr = pCurvesContainer->getCurvesCount() == skin_prim_indices.size();
+
+	if(!is_per_vertex_attr && !is_per_curve_attr) {
+		std::cerr << "Wrong skin prim ID attribute values count ! Should be per curve or per curve vertex !" << std::endl;
 		return false;
 	}
 
+	const bool has_prim_attr = is_per_vertex_attr == is_per_curve_attr == false;
+
+	const size_t curves_count = pCurvesContainer->getCurvesCount();
+
+	std::mutex binds_mutex;
 	auto& point_surface_binds = mpGuideCurvesDeformerData->pointSurfaceBinds();
+	point_surface_binds.clear();
+	point_surface_binds.reserve(curves_count);
+
+	auto bindPointToSkinPrim = [&] (const pxr::GfVec3f& pt, PointSurfaceBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_prim_boundaries = false) {
+		bool isBound = false;
+		const uint32_t prim_vertex_count = pSkinAdjacency->getFaceVertexCount(prim_id);
+		const uint32_t prim_vertex_offset = pSkinAdjacency->getFaceVertexOffset(prim_id);
+
+		float u, v, dist;
+
+		if( prim_vertex_count > 3u){
+			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
+			
+			for(size_t j = 0; j < prim_vertex_count; ++j) {
+				_tmp_sq_distances[j] = distanceSquared(pt, pSkinPhantomTrimesh->getRestPositions()[pSkinAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+			}
+
+			std::vector<float>::iterator it = std::min_element(_tmp_sq_distances.begin(), _tmp_sq_distances.begin() + prim_vertex_count);
+			uint32_t local_index = std::distance(std::begin(_tmp_sq_distances), it);
+
+			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
+				const uint32_t face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
+					pSkinAdjacency->getFaceVertex(prim_id, local_index), 
+					pSkinAdjacency->getFaceVertex(prim_id, (local_index + i) % prim_vertex_count),
+					pSkinAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
+				);
+
+				isBound = pSkinPhantomTrimesh->projectPoint(pt, face_id, u, v, dist);
+				bind.u = u; bind.v = v; bind.dist = dist;
+				
+				if(isBound)	break;
+				
+				{
+					// If outside we push point to triangle squared distance for later closest search
+				}
+			}
+		} else {
+			const uint32_t face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
+				pSkinAdjacency->getFaceVertex(prim_id, 0), 
+				pSkinAdjacency->getFaceVertex(prim_id, 1),
+				pSkinAdjacency->getFaceVertex(prim_id, 2)
+			);
+			isBound = pSkinPhantomTrimesh->projectPoint(pt, face_id, u, v, dist);
+			bind.u = u; bind.v = v; bind.dist = dist;
+		}
+
+		return isBound;
+	};
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		std::vector<float> tmp_squared_distances(pSkinAdjacency->getMaxFaceVertexCount());
+
+		for(size_t curve_index = start; curve_index < end; ++curve_index) {
+			
+			const PxrCurvesContainer::CurveDataConstPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_index);
+			const int curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+			if(curve_vertices_count < 2) continue;
+
+			const uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_index);
+        	const pxr::GfVec3f& curve_root_pt = pCurvesContainer->getCurveRootPoint(curve_index);
+
+			for(uint32_t i = 0; i < curve_vertices_count; ++i) {
+        		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i);
+
+				PointSurfaceBindData bind;
+				bind.point_id = curve_vertex_offset + i;
+				bind.weight = 1.0f;
+
+				const uint32_t prim_id = is_per_vertex_attr ? skin_prim_indices[bind.point_id] : skin_prim_indices[curve_index];
+				assert(prim_id >= 0 && prim_id < pSkinAdjacency->getFaceCount());
+
+				bindPointToSkinPrim(curr_pt, bind, prim_id, tmp_squared_distances, true /* ignore prim boundaries */); 
+
+				if(bind.face_id != PhantomTrimesh::kInvalidTriFaceID) {
+					const std::lock_guard<std::mutex> lock(binds_mutex);
+					point_surface_binds.push_back(bind);
+				}
+			
+				break; // We process only root points for now
+			}
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, curves_count, func);
+		mPool.wait();
+	} else {
+		func(0u, curves_count);
+	}
 
 	return true;
 }

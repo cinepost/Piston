@@ -3,7 +3,7 @@
 
 namespace Piston {
 
-static const SerializableDeformerDataBase::DataVersion kFastBindingDataVersion( 0u, 0u, 0u);
+static const SerializableDeformerDataBase::DataVersion kFastBindingDataVersion( 0u, 0u, 1u);
 
 void FastCurvesDeformerData::clearData() {
 	mCurveBinds.clear();
@@ -87,16 +87,6 @@ const std::string& FastCurvesDeformerData::jsonDataKey() const {
 
 const SerializableDeformerDataBase::DataVersion& FastCurvesDeformerData::jsonDataVersion() const {
 	return kFastBindingDataVersion;
-}
-
-void to_json(json& j, const FastCurvesDeformerData::CurveBindData& bind) {
-	j = {bind.face_id, bind.u, bind.v};
-}
-
-void from_json(const json& j, FastCurvesDeformerData::CurveBindData& bind) {
-	bind.face_id = j.at(0).template get<uint32_t>();
-	bind.u = j.at(1).template get<float>();
-	bind.v = j.at(2).template get<float>();
 }
 
 } // namespace Piston

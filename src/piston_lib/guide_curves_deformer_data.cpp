@@ -14,6 +14,23 @@ inline void from_json(const json& j, GuideCurvesDeformerData::PointBindData& bin
 	bind.data = {j.at(2).template get<float>(), j.at(3).template get<float>(), j.at(4).template get<float>()};
 }
 
+inline void to_json(json& j, const GuideCurvesDeformerData::PointSurfaceBindData& bind) {
+	j = {bind.face_id, bind.point_id, static_cast<uint32_t>(bind.u.toBits()) | (static_cast<uint32_t>(bind.v.toBits()) << 16), static_cast<uint32_t>(bind.dist.toBits()) | (static_cast<uint32_t>(bind.weight.toBits()) << 16)};
+}
+
+inline void from_json(const json& j, GuideCurvesDeformerData::PointSurfaceBindData& bind) {
+	bind.face_id = j.at(0).template get<uint32_t>();
+	bind.point_id = j.at(1).template get<uint32_t>();
+
+	uint32_t uv = j.at(2).template get<uint32_t>();
+	uint32_t dw = j.at(3).template get<uint32_t>();
+
+	bind.u.fromBits(uv & 0x00FF);
+	bind.v.fromBits(uv >> 16);
+	bind.dist.fromBits(dw & 0x00FF);
+	bind.weight.fromBits(dw >> 16);
+}
+
 inline void to_json(json& j, const GuideCurvesDeformerData::GuideOrigin& o) {
 	j = o.raw_data;
 }
@@ -24,6 +41,7 @@ inline void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
 
 void GuideCurvesDeformerData::clearData() {
 	mPointBinds.clear();
+	mPointSurfaceBinds.clear();
 	mGuideOrigins.clear();
 	mSkinPrimPath = "";
 }
@@ -36,6 +54,11 @@ size_t GuideCurvesDeformerData::calcHash() const {
 	}
 	hash += mPointBinds.size();
 
+	for(const auto& bind: mPointSurfaceBinds) {
+		hash += bind.hash();
+	}
+	hash += mPointSurfaceBinds.size();
+
 	for(uint32_t id: mGuideOrigins) {
 		hash +=id;
 	}
@@ -44,16 +67,18 @@ size_t GuideCurvesDeformerData::calcHash() const {
 	return hash;
 }
 
-static constexpr const char* kJMode = "mode";
-static constexpr const char* kJPointBinds = "pointbinds";
-static constexpr const char* kJGuideOrigins = "guideorigs";
-static constexpr const char* kJDataHash = "data_hash";
-static constexpr const char* kJSkinPrimPath = "skin_prim_path";
+static const char* kJMode = "mode";
+static const char* kJPointBinds = "pointbinds";
+static const char* kJPointSurfaceBinds = "pointsurfacebinds";
+static const char* kJGuideOrigins = "guideorigs";
+static const char* kJDataHash = "data_hash";
+static const char* kJSkinPrimPath = "skin_prim_path";
 
 bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 	static const std::vector<GuideOrigin> kEmptyGuideOrigins;
 	j[kJMode] = static_cast<uint8_t>(mBindMode);
 	j[kJPointBinds] = mPointBinds;
+	j[kJPointSurfaceBinds] = mPointSurfaceBinds;
 	j[kJGuideOrigins] = (mBindMode == BindMode::NTB) ? mGuideOrigins : kEmptyGuideOrigins;
 	j[kJSkinPrimPath] = mSkinPrimPath;
 	j[kJDataHash] = calcHash();

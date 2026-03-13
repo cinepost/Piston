@@ -249,6 +249,8 @@ struct float16_t {
     static constexpr float16_t fromBits(uint16_t bits) { return float16_t(bits, FromBits); }
     uint16_t toBits() const { return mBits; }
 
+    float16_t& operator=(const float value) { mBits = float32ToFloat16(value); return *this; }
+
     bool operator==(const float16_t other) const { return mBits == other.mBits; }
     bool operator!=(const float16_t other) const { return mBits != other.mBits; }
     bool operator<(const float16_t other) const { return static_cast<float>(*this) < static_cast<float>(other); }

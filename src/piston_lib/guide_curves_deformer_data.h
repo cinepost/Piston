@@ -36,6 +36,17 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			
 			float16_t   dist;
 			float16_t   weight;
+
+			PointSurfaceBindData(): face_id(PhantomTrimesh::kInvalidTriFaceID) {}
+
+			PointSurfaceBindData(uint32_t _f_id, uint32_t _p_id, float _u, float _v, float _d, float _w): 
+				face_id(_f_id), point_id(_p_id), u(_u), v(_v), dist(_d), weight(_w)  {}
+
+			inline size_t hash() const { 
+				return 	(static_cast<size_t>(face_id) | (static_cast<size_t>(point_id) << 32)) + 
+						(static_cast<size_t>(u.toBits()) | (static_cast<size_t>(v.toBits()) << 16) | 
+						(static_cast<size_t>(dist.toBits()) << 32) | (static_cast<size_t>(weight.toBits()) << 48)); 
+			}
 		};
 
 		struct PointBindData {

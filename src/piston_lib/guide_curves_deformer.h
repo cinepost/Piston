@@ -33,6 +33,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		using BindMode = GuideCurvesDeformerData::BindMode;
 		using PointBindData = GuideCurvesDeformerData::PointBindData;
+		using PointSurfaceBindData = GuideCurvesDeformerData::PointSurfaceBindData;
 
 	public:
 		~GuideCurvesDeformer();

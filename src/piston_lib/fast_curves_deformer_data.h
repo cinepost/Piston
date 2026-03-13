@@ -51,8 +51,15 @@ class FastCurvesDeformerData : public SerializableDeformerDataBase {
 		friend class FastCurvesDeformer;
 };
 
-void to_json(json& j, const FastCurvesDeformerData::CurveBindData& bind);
-void from_json(const json& j, FastCurvesDeformerData::CurveBindData& bind);
+inline void to_json(json& j, const FastCurvesDeformerData::CurveBindData& bind) {
+	j = {bind.face_id, bind.u, bind.v};
+}
+
+inline void from_json(const json& j, FastCurvesDeformerData::CurveBindData& bind) {
+	bind.face_id = j.at(0).template get<uint32_t>();
+	bind.u = j.at(1).template get<float>();
+	bind.v = j.at(2).template get<float>();
+}
 
 } // namespace Piston
 

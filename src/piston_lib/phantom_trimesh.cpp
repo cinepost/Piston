@@ -478,16 +478,6 @@ size_t PhantomTrimesh::calcHash() const {
 	return hash;
 }
 
-//void to_json(json& j, const PhantomTrimesh::TriFace& face) {
-//	j["indices"] = face.indices;
-//	to_json(j["normal"], face.restNormal);
-//}
-
-//void from_json(const json& j, PhantomTrimesh::TriFace& face) {
-//	j.at("indices").get_to(face.indices);
-//	from_json(j["normal"], face.restNormal);
-//}
-
 void to_json(json& j, const std::vector<PhantomTrimesh::TriFace>& trifaces) {
 	for(const auto& f: trifaces) {
     	j.push_back({
