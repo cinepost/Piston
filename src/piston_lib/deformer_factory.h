@@ -1,5 +1,5 @@
-#ifndef PISTON_LIB_CURVES_DEFORMER_FACTORY_H_
-#define PISTON_LIB_CURVES_DEFORMER_FACTORY_H_
+#ifndef PISTON_LIB_DEFORMER_FACTORY_H_
+#define PISTON_LIB_DEFORMER_FACTORY_H_
 
 #include "base_curves_deformer.h"
 #include "fast_curves_deformer.h"
@@ -68,4 +68,4 @@ class CurvesDeformerFactory {
 
 } // namespace Piston
 
-#endif // PISTON_LIB_CURVES_DEFORMER_FACTORY_H_
+#endif // PISTON_LIB_DEFORMER_FACTORY_H_

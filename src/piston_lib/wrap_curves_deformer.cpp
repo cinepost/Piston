@@ -2,6 +2,7 @@
 #include "wrap_curves_deformer.h"
 
 #include "common.h"
+#include "logging.h"
 #include "kdtree.hpp"
 #include "geometry_tools.h"
 
@@ -20,7 +21,7 @@ static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
 WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
-	dbg_printf("WrapCurvesDeformer::WrapCurvesDeformer(%s)\n", name.c_str());
+	LOG_TRC << "WrapCurvesDeformer::WrapCurvesDeformer(" << getName() << ")";
 
 	mpWrapCurvesDeformerData = std::make_unique<WrapCurvesDeformerData>();
 	mpWrapCurvesDeformerData->setBindMode(BindMode::SPACE);
@@ -160,7 +161,7 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 	}
 
 	if(!mCurvesGeoPrimHandle.writeDataToBson(mpWrapCurvesDeformerData.get())) {
-		std::cerr << "Error writing " << mpWrapCurvesDeformerData->typeName() << " deformer data to json !";	
+		LOG_ERR << "Error writing " << mpWrapCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
 	}
 	return true;
@@ -177,7 +178,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	assert(pAdjacency);
 
 	if(!pAdjacency->isValid()) {
-		std::cerr << "No mesh adjacency data !" << std::endl;
+		LOG_ERR << "No mesh adjacency data !";
 		return false;
 	}
 
@@ -203,7 +204,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 			const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
 			
 			if(face_vertex_count < 3 ) {
-				std::cerr << "Source mesh polygon " << face_id << " is invalid !!!" << std::endl;
+				LOG_ERR << "Source mesh polygon " << face_id << " is invalid !!!";
 				continue;
 			}
 			
@@ -361,7 +362,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 		func(0, curves_count);
 	}
 
-    dbg_printf("WrapCurvesDeformer::buildDeformerData_DistMode() done.\n");
+    LOG_TRC << "WrapCurvesDeformer::buildDeformerData_DistMode() done.";
 
 	return true;
 }
@@ -579,9 +580,9 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 		func(0, curves_count);
 	}
 
-    dbg_printf("Bound curves count: %zu\n", size_t(bound_curves));
-    dbg_printf("Partially bound curves count: %zu\n", size_t(partially_bound_curves));
-    dbg_printf("Unbound curves count: %zu\n", curves_count - size_t(bound_curves + partially_bound_curves));
+    LOG_DBG << "Bound curves count: " << size_t(bound_curves);
+    LOG_DBG << "Partially bound curves count: " << size_t(partially_bound_curves);
+    LOG_DBG << "Unbound curves count: " << (curves_count - size_t(bound_curves + partially_bound_curves));
 
 	return true; 
 }

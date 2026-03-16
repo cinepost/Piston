@@ -1,4 +1,5 @@
 #include "adjacency.h"
+#include "logging.h"
 
 namespace Piston {
 
@@ -21,7 +22,7 @@ bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTi
 
 	mFaceCount = static_cast<uint32_t>(mesh.GetFaceCount(rest_time_code));
 	if(mFaceCount == 0) {
-		std::cerr << "Mesh " << mesh.GetPath() << " has no faces !" << std::endl;
+		LOG_ERR << "Mesh " << mesh.GetPath() << " has no faces !";
 		return false;
 	}
 
@@ -29,7 +30,7 @@ bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTi
 	_srcFaceVertexCounts.reserve(mFaceCount);
 
 	if(!mesh.GetFaceVertexCountsAttr().Get(&_srcFaceVertexCounts, rest_time_code)) {
-		std::cerr << "Error getting face vertex counts for mesh " << mesh.GetPath() << " !" << std::endl;
+		LOG_ERR << "Error getting face vertex counts for mesh " << mesh.GetPath() << " !";
 		return false;
 	}
 	mSrcFaceVertexCounts.resize(_srcFaceVertexCounts.size());
@@ -43,9 +44,10 @@ bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTi
 	_srcFaceVertexIndices.reserve(mFaceCount);
 
 	if(!mesh.GetFaceVertexIndicesAttr().Get(&_srcFaceVertexIndices, rest_time_code)) {
-		std::cerr << "Error getting face vertex indices for mesh " << mesh.GetPath() << " !" << std::endl;
+		LOG_ERR << "Error getting face vertex indices for mesh " << mesh.GetPath() << " !";
 		return false;
 	}
+
 	mSrcFaceVertexIndices.resize(_srcFaceVertexIndices.size());
 	for(size_t i = 0; i < _srcFaceVertexIndices.size(); ++i) {
 		mSrcFaceVertexIndices[i] = _srcFaceVertexIndices[i];
@@ -366,7 +368,7 @@ bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
 	mpAdjacency->mHash = calc_adjacency_data_hash;
 	mpAdjacency->mValid = true;
 
-	dbg_printf("Adjacency data read from json payload !\n");
+	LOG_DBG << "Adjacency data read from json payload.";
 
 	return true;
 }

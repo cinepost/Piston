@@ -60,7 +60,8 @@ file( GLOB SOURCES
     ./guide_curves_container.cpp
     ./guide_curves_deformer.cpp
     ./guide_curves_deformer_data.cpp
-    ./curves_deformer_factory.cpp
+    ./deformer_factory.cpp
+    ./logging.cpp
     ./simple_profiler.cpp
     ./deformer_stats.cpp
     ./debug_drawing.cpp

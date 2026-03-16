@@ -1,4 +1,5 @@
-#include "curves_deformer_factory.h"
+#include "deformer_factory.h"
+#include "logging.h"
 
 namespace Piston {
 

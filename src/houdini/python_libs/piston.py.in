@@ -21,6 +21,7 @@ def __getattr__(name):
 setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__WrapDeformer_BindMode)
 setattr(_piston.GuideCurvesDeformer, "BindMode", _piston.__GuideDeformer_BindMode)
 
+
 #
 # Debug stuff
 #

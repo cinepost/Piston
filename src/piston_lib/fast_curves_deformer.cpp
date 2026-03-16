@@ -2,6 +2,7 @@
 #include "fast_curves_deformer.h"
 
 #include "common.h"
+#include "logging.h"
 #include "kdtree.hpp"
 #include "geometry_tools.h"
 //#include "simple_profiler.h"
@@ -23,7 +24,7 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 namespace Piston {
 
 FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
-	dbg_printf("FastCurvesDeformer::FastCurvesDeformer(%s)\n", name.c_str());
+	LOG_TRC << "FastCurvesDeformer::FastCurvesDeformer(" << getName() << ")";
 	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
 
 	mpDebugGeo = DebugGeo::create(name);
@@ -101,7 +102,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	};
 
 	if(multi_threaded) {
-		dbg_printf("FastCurvesDeformer::__deform__ %s\n", multi_threaded ? "multi_threaded" : "single thread");
+		LOG_TRC << "FastCurvesDeformer::__deform__ " << (multi_threaded ? "multi_threaded" : "single thread");
 		mPool.detach_blocks(0u, curveBinds.size(), func);
 		mPool.wait();
 	} else {
@@ -116,7 +117,7 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 	}
 
 	if(!mCurvesGeoPrimHandle.writeDataToBson(mpFastCurvesDeformerData.get())) {
-		std::cerr << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
+		LOG_ERR << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
 	}
 	return true;
@@ -176,7 +177,6 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	PROFILE("FastCurvesDeformer::buildDeformerDataImpl");
-	dbg_printf("FastCurvesDeformer::buildDeformerDataImpl()\n");
 
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
@@ -194,7 +194,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 		assert(pAdjacency);
 		if(!pAdjacency->isValid()) {
-			std::cerr << "No valid mesh adjacency data!" << std::endl;
+			LOG_ERR << "No valid mesh adjacency data!";
 			return false;
 		}
 
@@ -204,7 +204,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 		assert(pPhantomTrimesh);
 		if(!pPhantomTrimesh->isValid()) {
-			std::cerr << "No valid phantom trimesh data!" << std::endl;
+			LOG_ERR << "No valid phantom trimesh data!";
 			return false;
 		}
 
@@ -565,10 +565,10 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 		func(0u, total_curves_count);
 	}
 
-	dbg_printf("Total curves count to bind: %zu\n", size_t(total_curves_count));
-	dbg_printf("Skin bound curves count: %zu\n", size_t(skin_bound_curves_count.load()));
-	dbg_printf("KDtree bound curves count: %zu\n", size_t(kdtree_bound_curves_count.load()));
-	dbg_printf("Brute force bound curves count: %zu\n", size_t(bforce_bound_curves_count.load()));
+	LOG_DBG << "Total curves count to bind: " << size_t(total_curves_count);
+	LOG_DBG << "Skin bound curves count: " << size_t(skin_bound_curves_count.load());
+	LOG_DBG << "KDtree bound curves count: " << size_t(kdtree_bound_curves_count.load());
+	LOG_DBG << "Brute force bound curves count: " << size_t(bforce_bound_curves_count.load());
 
 	return true;
 }

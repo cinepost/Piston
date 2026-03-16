@@ -68,6 +68,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
 		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
+		const std::string& getName() const { return mName; }
+
 		virtual const std::string& toString() const;
 
 		const DeformerStats& getStats() const { return mStats; }

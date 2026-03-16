@@ -16,7 +16,8 @@ namespace boost = hboost;
 #include "../../piston_lib/fast_curves_deformer.h"
 #include "../../piston_lib/wrap_curves_deformer.h"
 #include "../../piston_lib/guide_curves_deformer.h"
-#include "../../piston_lib/curves_deformer_factory.h"
+#include "../../piston_lib/deformer_factory.h"
+#include "../../piston_lib/logging.h"
 #include "../../piston_lib/deformer_stats.h"
 #include "../../piston_lib/simple_profiler.h"
 #include "../../piston_lib/tests.h"
@@ -26,6 +27,10 @@ namespace boost = hboost;
 
 char const* greet() {
 	return "Parovoz Piston python library!";
+}
+
+void setLogLevel(Piston::LogLevel level) {
+	Piston::Logger::getInstance().setLogLevel(level);
 }
 
 
@@ -43,7 +48,7 @@ BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_ov
 
 
 BOOST_PYTHON_MODULE(_piston) {
- 	using namespace boost::python;
+	using namespace boost::python;
 	using namespace Piston;
 
 	class_<SimpleProfiler, boost::noncopyable>("Profiler",  no_init)
@@ -133,16 +138,26 @@ BOOST_PYTHON_MODULE(_piston) {
 	;
 
 	enum_<WrapCurvesDeformer::BindMode>("__WrapDeformer_BindMode")
-    	.value("SPACE", WrapCurvesDeformer::BindMode::SPACE)
-    	.value("DIST", WrapCurvesDeformer::BindMode::DIST)
-    	.export_values()
-    ;
+		.value("SPACE", WrapCurvesDeformer::BindMode::SPACE)
+		.value("DIST", WrapCurvesDeformer::BindMode::DIST)
+		.export_values()
+	;
 
-    enum_<GuideCurvesDeformer::BindMode>("__GuideDeformer_BindMode")
-    	.value("NTB", GuideCurvesDeformer::BindMode::NTB)
-    	.value("ANGLE", GuideCurvesDeformer::BindMode::ANGLE)
-    	.value("SPACE", GuideCurvesDeformer::BindMode::SPACE)
-    	.export_values()
+	enum_<GuideCurvesDeformer::BindMode>("__GuideDeformer_BindMode")
+		.value("NTB", GuideCurvesDeformer::BindMode::NTB)
+		.value("ANGLE", GuideCurvesDeformer::BindMode::ANGLE)
+		.value("SPACE", GuideCurvesDeformer::BindMode::SPACE)
+		.export_values()
+	;
+
+	enum_<LogLevel>("LogLevel")
+		.value("TRACE", LogLevel::TRACE)
+		.value("DEBUG", LogLevel::DEBUG)
+		.value("INFO", LogLevel::INFO)
+		.value("WARNING", LogLevel::WARNING)
+		.value("ERROR", LogLevel::ERROR)
+		.value("FATAL", LogLevel::FATAL)
+		.export_values()
 	;
 
 	class_<DeformerStats, boost::noncopyable>("DeformerStats", no_init)
@@ -151,6 +166,8 @@ BOOST_PYTHON_MODULE(_piston) {
 
 	to_python_converter<Piston::BSON , BSON_to_Python>();
 
+	def("getLogger", &Logger::getInstance, return_value_policy<reference_existing_object>());
+	def("setLogLevel", setLogLevel);
 	def("runTests", &Tests::runTests);	
 	def("greet", greet);
 }

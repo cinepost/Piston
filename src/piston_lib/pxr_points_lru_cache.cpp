@@ -1,13 +1,13 @@
 #include "pxr_points_lru_cache.h"
 #include "common.h"
-
+#include "logging.h"
 
 namespace Piston {
 
 static const size_t kMinEntries = 4; // 1 frame ofo current deformed curve points, 2 more frames for worst case motoin blur and 1 frame for velocities.
 
 PxrPointsLRUCache::PxrPointsLRUCache(const size_t max_mem_size_bytes): mMaxMemSizeBytes(max_mem_size_bytes), mCurrentMemSizeBytes(0), mShrinkLock(false), mMinEntries(kMinEntries) {
-
+	LOG_DBG << "PxrPointsLRUCache with " << std::string(stringifyMemSize(mMaxMemSizeBytes)) << " memory cap created.";
 }
 
 PxrPointsLRUCache::UniquePtr PxrPointsLRUCache::create(const size_t max_mem_size_bytes) {

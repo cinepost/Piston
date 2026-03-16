@@ -3,6 +3,7 @@
 #include "deformer_data_cache.h"
 
 #include "common.h"
+#include "logging.h"
 #include "kdtree.hpp"
 #include "geometry_tools.h"
 
@@ -17,7 +18,7 @@
 namespace Piston {
 
 GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::GUIDES, name) {
-	dbg_printf("GuideCurvesDeformer::GuideCurvesDeformer(%s)\n", name.c_str());
+	LOG_TRC << "GuideCurvesDeformer::GuideCurvesDeformer(" << getName() << ")";
 	mpGuideCurvesDeformerData = std::make_unique<GuideCurvesDeformerData>();
 	mpGuideCurvesContainer = GuideCurvesContainer::create();
 }
@@ -46,7 +47,7 @@ void GuideCurvesDeformer::setGuideIDPrimAttrName(const std::string& name) {
 	mGuideIDPrimAttrName = name;
 	makeDirty();
 
-	dbg_printf("Guide ID attribute name is set to: %s\n", name.c_str());
+	LOG_DBG << "Guide ID attribute name is set to: " << mGuideIDPrimAttrName;
 }
 
 void GuideCurvesDeformer::setGuidesSkinGeoPrimAttrName(const std::string& name) {
@@ -54,7 +55,7 @@ void GuideCurvesDeformer::setGuidesSkinGeoPrimAttrName(const std::string& name) 
 	mGuidesSkinPrimAttrName = name;
 	makeDirty();
 
-	dbg_printf("Guide skin prim attribute name is set to: %s\n", name.c_str());
+	LOG_DBG << "Guide skin prim attribute name is set to: " << mGuidesSkinPrimAttrName;
 }
 
 void GuideCurvesDeformer::setGuidesSkinGeoPrimRestAttrName(const std::string& name) {
@@ -62,7 +63,7 @@ void GuideCurvesDeformer::setGuidesSkinGeoPrimRestAttrName(const std::string& na
 	mGuidesSkinPrimRestAttrName = name;
 	makeDirty();
 
-	dbg_printf("Guide skin prim rest attribute name is set to: %s\n", name.c_str());
+	LOG_DBG << "Guide skin prim rest attribute name is set to: " << mGuidesSkinPrimRestAttrName;
 }
 
 void GuideCurvesDeformer::setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim) {
@@ -70,14 +71,14 @@ void GuideCurvesDeformer::setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim) {
 	
 	if(!isMeshGeoPrim(geoPrim)) {
 		mGuidesSkinGeoPrimHandle.clear();
-		std::cerr << "Invalid guides skin geometry prim " <<  geoPrim.GetPath().GetText() << " type!" << std::endl;
+		LOG_ERR << "Invalid guides skin geometry prim " <<  geoPrim.GetPath().GetText() << " type!";
 		return;
 	}
 
 	mGuidesSkinGeoPrimHandle = UsdPrimHandle(geoPrim);
 	makeDirty();
 
-	dbg_printf("Guides skin geometry prim is set to: %s\n", mGuidesSkinGeoPrimHandle.getPath().GetText());
+	LOG_DBG << "Guides skin geometry prim is set to: " << mGuidesSkinGeoPrimHandle.getPath().GetText();
 }
 
 bool GuideCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
@@ -90,12 +91,12 @@ bool GuideCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time
 
 bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code)) {
-		std::cerr << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !" << std::endl;
+		LOG_ERR << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !";
 		return false;
 	}
 
 	const auto bind_mode = getBindMode();
-	dbg_printf("GuideCurvesDeformer::__deform__() mode %s %s\n", to_string(bind_mode).c_str(), multi_threaded ? "multi_threaded" : "single thread");
+	LOG_TRC << "GuideCurvesDeformer::__deform__() mode " << to_string(bind_mode) << " " << (multi_threaded ? "multi_threaded" : "single thread");
 	
 	bool result = false;
 
@@ -110,7 +111,8 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 			result = deformImpl_NTBMode(multi_threaded, points, time_code);
 			break;
 		default:
-			std::cerr << "Unimplemented bind mode " << to_string(bind_mode) << " !!!" << std::endl;
+			assert(false && "Unimplemented GuideCurvesDeformer::BindMode");
+			LOG_ERR << "Unimplemented bind mode " << to_string(bind_mode) << " !!!";
 			break;
 	}
 
@@ -132,7 +134,7 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 	pSkinPhantomTrimesh->update(mGuidesSkinGeoPrimHandle ,time_code);
 
 	mTempSkinFaceLiveNormals.resize(pSkinPhantomTrimesh->getFaceCount());
-	std::cout << "TODO: precalculate skin live face normals first !!!" << std::endl;
+	LOG_WRN << "TODO: precalculate skin live face normals first !!!";
 
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointSurfaceBinds();
 
@@ -281,7 +283,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 				points[i] = pPhantomTrimesh->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, u, v, w, x);
 			} else {
 				// bound to triface
-				std::cout << "TODO: precalculate skin live face normals first for SPACE mode !!!" << std::endl;
+				LOG_WRN << "TODO: precalculate skin live face normals first for SPACE mode !!!";
 				const pxr::GfVec3f face_normal = pPhantomTrimesh->getFaceLiveNormal(bind.encoded_id.mode_space.element_id);
 				bind.getData(u, v, w);
 				points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.encoded_id.mode_space.element_id, u, v) + (face_normal * w);
@@ -326,7 +328,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 				}
 			}
 		} else {
-			std::cerr << "Skin prim ID is needed to bind curves roots for now !!!" << std::endl;
+			LOG_ERR << "Skin prim ID is needed to bind curves roots for now !!!";
 			return false;
 		}
 	}
@@ -335,7 +337,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	const bool is_per_curve_attr = pCurvesContainer->getCurvesCount() == skin_prim_indices.size();
 
 	if(!is_per_vertex_attr && !is_per_curve_attr) {
-		std::cerr << "Wrong skin prim ID attribute values count ! Should be per curve or per curve vertex !" << std::endl;
+		LOG_ERR << "Wrong skin prim ID attribute values count ! Should be per curve or per curve vertex !";
 		return false;
 	}
 
@@ -447,7 +449,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	assert(mpGuideCurvesContainer);
 
 	if(!mpGuideCurvesContainer->init(mDeformerGeoPrimHandle, rest_time_code)) {
-		std::cerr << "Error initializing guide curves container !" << std::endl;
+		LOG_ERR << "Error initializing guide curves container !";
 		return false;
 	}
 
@@ -456,12 +458,12 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 
 	if(guideIndicesNeeded()) {
 		if(mGuideIDPrimAttrName.empty()) {
-			std::cerr << "No guide id (clump_id) attribute name set but needed !" << std::endl;
+			LOG_ERR << "No guide id (clump_id) attribute name set but needed !";
 			return false;
 		}
 
 		if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
-			std::cerr << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !" << std::endl;
+			LOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
 			return false;
 		}
 		assert(mGuideIndices.size() == total_curves_count);
@@ -473,19 +475,19 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 		}
 
 		if(max_guide_index >= total_guides_count) {
-			std::cerr << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !" << std::endl; 
+			LOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
 			return false;
 		}
 	}
 
 	if(getBindRootsToSkinSurface()) {
 		if(!buildSkinPrimData(multi_threaded)) {
-			std::cerr << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!" << std::endl;
+			LOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
 			return false;
 		}
 
 		if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
-			std::cerr << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << std::endl;
+			LOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
 			return false;
 		}
 	}
@@ -508,7 +510,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(mpGuidesPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
-			std::cerr << "Error building phantom mesh data!" << std::endl;
+			LOG_ERR << "Error building phantom mesh data!";
 			return false;
 		}
 	}
@@ -518,7 +520,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
 	if(!pPhantomTrimesh->hasTetrahedrons()) {
 		if(!pPhantomTrimesh->buildTetrahedrons()) {
-			std::cerr << "Error building tetrahedrons!" << std::endl;
+			LOG_ERR << "Error building tetrahedrons!";
 			return false;
 		}
 	}
@@ -711,9 +713,9 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 		bind_func(0u, curves_count);
 	}
 
-	dbg_printf("Total points: %zu\n", total_points.load());
-	dbg_printf("Bound points: %zu\n", bound_points.load());
-	dbg_printf("Unbound points: %zu\n", unboud_points.load());
+	LOG_DBG << "Total points: " << total_points.load();
+	LOG_DBG << "Bound points: " << bound_points.load();
+	LOG_DBG << "Unbound points: " << unboud_points.load();
 
 	return true;
 }
@@ -722,7 +724,7 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 	assert(mpGuideCurvesContainer);
 
 	if(!mpSkinPhantomTrimeshData || !mpSkinPhantomTrimeshData->isValid()) {
-		std::cerr << "Can't build NTB frames! No skin geometry data." << std::endl;
+		LOG_ERR << "Can't build NTB frames! No skin geometry data.";
 		return false;
 	}
 
@@ -850,17 +852,17 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	if(!buildSkinPrimData(multi_threaded)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
 		mpGuideCurvesDeformerData->setSkinPrimPath("");
-		std::cerr << "Error building skin prim geometry data !" << std::endl;
+		LOG_ERR << "Error building skin prim geometry data !";
 		return false;
 	}	
 
 	if(!mDeformerGeoPrimHandle.fetchAttributeValues<int>(mGuidesSkinPrimAttrName, mpGuideCurvesDeformerData->skinPrimIndices(), rest_time_code)) {
-		std::cerr << "Error getting skin prim indices !" << std::endl;
+		LOG_ERR << "Error getting skin prim indices !";
 		return false;
 	}
 
 	if(!buildGuideOrigins(multi_threaded)) {
-		std::cerr << "NTB frames calulation without skin geometry primitive indices is NOT supported yet !" << std::endl;
+		LOG_ERR << "NTB frames calulation without skin geometry primitive indices is NOT supported yet !";
 		return false;
 	}
 
@@ -1044,7 +1046,7 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 
 bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 	if(!mGuidesSkinGeoPrimHandle.isValid()) {
-		std::cerr << "Unable to build guides skin primtive data. No primitive \"" << mGuidesSkinGeoPrimHandle.getFullName() << "\" found!" << std::endl;
+		LOG_ERR << "Unable to build guides skin primtive data. No primitive \"" << mGuidesSkinGeoPrimHandle.getFullName() << "\" found!";
 		return false;
 	}
 
@@ -1063,7 +1065,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinAdjacencyData.get())) {
 		if(!mpSkinAdjacencyData->buildInPlace(mGuidesSkinGeoPrimHandle)) {
-			std::cerr << "Error building guides skin adjacency data!" << std::endl;
+			LOG_ERR << "Error building guides skin adjacency data!";
 			return false;
 		}
 	}
@@ -1075,7 +1077,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinPhantomTrimeshData.get())) {
 		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName)) {
-			std::cerr << "Error building guides skin trimesh data!" << std::endl;
+			LOG_ERR << "Error building guides skin trimesh data!";
 			return false;
 		}
 	}
@@ -1085,22 +1087,22 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 	if(mpGuidesPhantomTrimeshData && !mDeformerGeoPrimHandle.writeDataToBson(mpGuidesPhantomTrimeshData.get())) {
-		std::cerr << "Error writing " << mpGuidesPhantomTrimeshData->typeName() << " deformer data to json !" << std::endl;
+		LOG_ERR << "Error writing " << mpGuidesPhantomTrimeshData->typeName() << " deformer data to json !";
 		return false;
 	}
 
 	if(mpGuideCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(mpGuideCurvesDeformerData.get())) {
-		std::cerr << "Error writing " << mpGuideCurvesDeformerData->typeName() << " deformer data to json !" << std::endl;
+		LOG_ERR << "Error writing " << mpGuideCurvesDeformerData->typeName() << " deformer data to json !";
 		return false;
 	}
 
 	if(mpSkinAdjacencyData && mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
-		std::cerr << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !" << std::endl;
+		LOG_ERR << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !";
 		return false;
 	}
 
 	if(mpSkinPhantomTrimeshData && !mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
-		std::cerr << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !" << std::endl;
+		LOG_ERR << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !";
 		return false;
 	}
 
