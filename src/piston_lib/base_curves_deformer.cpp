@@ -5,7 +5,9 @@
 #include "logging.h"
 
 #include <thread>
+#include <atomic>
 
+static std::string gLRUCacheStatsLastUsageStr = "-";
 
 namespace Piston {
 
@@ -207,7 +209,11 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 	}
 
 	if(pPointsLRUCache) {
-		LOG_DBG << "Points cache utilization: " <<  pPointsLRUCache->getCacheUtilizationString() << "%";
+		const std::string current_usage_str = pPointsLRUCache->getCacheUtilizationString();
+		if(gLRUCacheStatsLastUsageStr != current_usage_str) {
+			LOG_DBG << "Points cache utilization: " << current_usage_str << "%";
+			gLRUCacheStatsLastUsageStr = current_usage_str;
+		}
 	}
 
 	if(mShowDebugGeometry) {
@@ -250,6 +256,10 @@ void BaseCurvesDeformer::makeDirty() {
 	mStats.clear();
 	mDirty = true;
 	mDeformerDataWritten = false;
+
+	if(PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr()) {
+		pPointsLRUCache->removeByName(uniqueName());
+	}
 }
 
 void BaseCurvesDeformer::showDebugGeometry(bool state) {

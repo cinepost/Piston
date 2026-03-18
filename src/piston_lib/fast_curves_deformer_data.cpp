@@ -1,5 +1,7 @@
 #include "fast_curves_deformer_data.h"
 #include "pxr_json.h"
+#include "logging.h"
+
 
 namespace Piston {
 
@@ -66,11 +68,11 @@ bool FastCurvesDeformerData::readFromJSON(const json& j) {
 	from_json(j[kPerBindrBindRestTBs], mPerBindRestTBs);
 
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
-		std::cerr << typeName() << " json data hash mismatch !";
+		LOG_ERR << typeName() << " json data hash mismatch !";
 		return false;
 	}
 
-	dbg_printf("FastCurvesDeformerData data read from json payload !\n");
+	LOG_DBG << "FastCurvesDeformerData data read from json payload !";
 
 	return true;
 }

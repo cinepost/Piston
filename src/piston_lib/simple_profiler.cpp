@@ -1,7 +1,7 @@
 #include "simple_profiler.h"
+#include "logging.h"
 
 #include <numeric>
-
 
 
 static const size_t kDefaultCallerNameWidth = 16;
@@ -52,12 +52,10 @@ ScopedTimeMeasure::~ScopedTimeMeasure() {
 
 	std::chrono::milliseconds duration = std::chrono::duration_cast<std::chrono::milliseconds>(fp_ms);
 
-	dbg_printf("%s scoped time measurement: %zu ms.\n", mName.c_str(), duration.count());
+	LOG_DBG << mName.c_str() << " scoped time measurement: " << duration.count() << " ms.";
 }
 
 SimpleProfiler::SimpleProfiler( const char* name ): mName(name) {
-	dbg_printf("%s\n", name);
-
 	updateMaximum(mCallerNameWidth, mName.size());
 	mTimeStart = Clock::now();
 }

@@ -1,5 +1,7 @@
 #include "guide_curves_deformer_data.h"
 #include "pxr_json.h"
+#include "logging.h"
+
 
 namespace Piston {
 
@@ -92,13 +94,13 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 	const BindMode bind_mode = static_cast<GuideCurvesDeformerData::BindMode>(j[kJMode].template get<uint8_t>());
 
 	if(bind_mode != mBindMode) {
-		std::cerr << typeName() << " json data bind mode mismatch !";
+		LOG_ERR << typeName() << " json data bind mode mismatch !";
 		return false;
 	}
 
 	const std::string skin_prim_path = j[kJSkinPrimPath].template get<std::string>();
 	if((skin_prim_path != mSkinPrimPath) && (mBindMode == BindMode::NTB)) {
-		std::cerr << typeName() << " json data skin primitive path mismatch !";
+		LOG_ERR << typeName() << " json data skin primitive path mismatch !";
 		return false;
 	}
 
@@ -109,11 +111,11 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 	}
 
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
-		std::cerr << typeName() << " json data hash mismatch !";
+		LOG_ERR << typeName() << " json data hash mismatch !";
 		return false;
 	}
 
-	dbg_printf("GuideCurvesDeformerData data read from json payload !\n");
+	LOG_DBG << "GuideCurvesDeformerData data read from json payload !";
 	return true;
 }
 

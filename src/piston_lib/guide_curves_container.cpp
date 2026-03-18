@@ -1,4 +1,5 @@
 #include "guide_curves_container.h"
+#include "logging.h"
 
 
 namespace Piston {
@@ -18,19 +19,19 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 
 	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
 	if(!geom_curves) {
-		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
+		LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
 		return false;
 	}
 
 	mCurvesCount = geom_curves.GetCurveCount(rest_time_code);
 	if(mCurvesCount == 0) {
-		std::cerr << "No curves exist in primitive " << prim_handle.getName() << " !" << std::endl;
+		LOG_ERR << "No curves exist in primitive " << prim_handle.getName() << " !";
 		return false;
 	}
 
 	// Curves. Counts/offsets
 	if(!geom_curves.GetCurveVertexCountsAttr().Get(&mCurveVertexCounts, rest_time_code)){
-		std::cerr << "Error getting curves vertices counts from " << prim_handle.getName() << "  !" << std::endl;
+		LOG_ERR << "Error getting curves vertices counts from " << prim_handle.getName() << "  !";
 		return false;
 	}
 	assert(mCurveVertexCounts.size() == mCurvesCount);
@@ -41,7 +42,7 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	} else {
 		// Curve rest points
 		if(!geom_curves.GetPointsAttr().Get(&mRestCurvePoints, rest_time_code)) {
-			std::cerr << "Error getting curves \"rest\" points from " << prim_handle.getName() << " !" << std::endl;
+			LOG_ERR << "Error getting curves \"rest\" points from " << prim_handle.getName() << " !";
 			return false;
 		}
 	}
@@ -70,18 +71,18 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
 
 	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
 	if(!geom_curves) {
-		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
+		LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
 		return false;
 	}
 
 	// Curve live points
 	if(!geom_curves.GetPointsAttr().Get(&mLiveCurvePoints, time_code)) {
-		std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
+		LOG_ERR << "Error getting curves points from " << prim_handle.getName() << " !";
 		return false;
 	}
 
 	if(mLiveCurvePoints.size() != mRestCurvePoints.size()) {
-		std::cerr << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !" << std::endl;
+		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !";
 		return false;
 	}
 	return true;

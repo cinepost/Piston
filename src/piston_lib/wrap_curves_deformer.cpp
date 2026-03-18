@@ -232,15 +232,15 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 
 		const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
 
-		dbg_printf("%zu source mesh faces triangulated to %zu triangles\n", (size_t)src_mesh_face_count, tri_face_count);
+		LOG_DBG << src_mesh_face_count << " source mesh faces triangulated to " << tri_face_count << " triangles.";
 
 		std::vector<pxr::GfVec3f> rest_vertex_normals;
 		buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, false, (multi_threaded ? &mPool : nullptr));
 		mLiveVertexNormals.resize(rest_vertex_normals.size());
 
 		// Bind curve points
-		dbg_printf("Binding %zu curves (%zu total vertices).\n", mpCurvesContainer->getCurvesCount(), mpCurvesContainer->getTotalVertexCount());	
-		dbg_printf("Using %s search method.\n", to_string(mpWrapCurvesDeformerData->getBindMode()).c_str());
+		LOG_DBG << "Binding " << mpCurvesContainer->getCurvesCount() << " curves (" << mpCurvesContainer->getTotalVertexCount() << " total vertices).";	
+		LOG_DBG << "Using " << to_string(mpWrapCurvesDeformerData->getBindMode()) << " search method.";
 
 		bool result = false;
 		auto threads_timer = Timer();
@@ -264,7 +264,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		}
 
 		threads_timer.stop();
-		dbg_printf("%zu threads finished in %s\n", mPool.get_thread_count(), threads_timer.toString().c_str());
+		LOG_TRC << mPool.get_thread_count() << " threads finished in " << threads_timer.toString();
 	
 		mpWrapCurvesDeformerData->setPopulated(result);
 	}
@@ -298,7 +298,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 
     auto func = [&](const std::size_t start, const std::size_t end) {
 		if(multi_threaded) {
-			dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *BS::this_thread::get_index());
+			LOG_TRC << "Binding curves from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
 
     	const auto& meshRestPositions = pPhantomTrimesh->getRestPositions();
@@ -386,7 +386,7 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 
     auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
-			dbg_printf("Binding curves from %zu to %zu by thread id #%zu\n", start, end, *BS::this_thread::get_index());
+			LOG_TRC << "Binding curves from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
 
     	const auto& meshRestPositions = pPhantomTrimesh->getRestPositions();

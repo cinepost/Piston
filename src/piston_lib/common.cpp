@@ -1,6 +1,7 @@
 #include "common.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
+#include "logging.h"
 
 #include <pxr/base/tf/token.h>
 #include <pxr/base/vt/value.h>
@@ -131,24 +132,24 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 template<typename T>
 bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code) const {
 	if(!isValid()) {
-		std::cerr << "\"" << getPath() << "\" primitive is invalid!" << std::endl; 
+		LOG_ERR << "\"" << getPath() << "\" primitive is invalid!"; 
 		return false;
 	}
 
 	if(attribute_name.empty()) {
-		std::cerr << "No attribute name provided !" << std::endl;
+		LOG_ERR << "No attribute name provided !";
 		return false;
 	}
 
 	pxr::UsdGeomPrimvar primVar = getPrimvarsAPI().GetPrimvar(pxr::TfToken(attribute_name));
 
 	if(!primVar) {
-		std::cerr << "Error getting \"" << attribute_name << "\" primvar on " << getPath() << std::endl;
+		LOG_ERR << "Error getting \"" << attribute_name << "\" primvar on " << getPath();
 		return false;
 	}
 
 	if(!primVar.GetAttr().Get(&array, time_code)) {
-		std::cerr << "Error getting " << getPath() << " \"" << attribute_name << "\" values !" << std::endl;
+		LOG_ERR << "Error getting " << getPath() << " \"" << attribute_name << "\" values !";
 		return false;
 	}
 
@@ -187,7 +188,7 @@ void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
 	const pxr::TfToken token(identifier);
 
 	if(!prim.HasCustomDataKey(token)) {
-		std::cerr << "No bson payload \"" << identifier << "\" exist in prim " << getPath() << std::endl;
+		LOG_ERR << "No bson payload \"" << identifier << "\" exist in prim " << getPath();
 		return;
 	}
 
@@ -237,14 +238,14 @@ bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, BSON& v_bson)
 
 	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(sHiddenPrimPath);
 	if(!data_prim.IsValid()) {
-		dbg_printf("Stage has no Piston hidden data prim!\n");
+		LOG_DBG << "Stage has no Piston hidden data prim!";
 		return false;
 	}
 
 	const pxr::TfToken key_path(identifier);
 
 	if(!data_prim.HasCustomDataKey(key_path)) {
-		std::cerr << "Error getting bson from prim " << getPath() << ". No custom data \"" << identifier << "\" exist !!! " << std::endl;
+		LOG_ERR << "Error getting bson from prim " << getPath() << ". No custom data \"" << identifier << "\" exist !!!";
 		return false;
 	}
 
@@ -254,14 +255,6 @@ bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, BSON& v_bson)
 }
 
 bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const BSON& v_bson) const {
-	if(v_bson.empty()) {
-		std::cout << identifier << " bson is empty!" << std::endl;
-	}
-
-	if(!isValid()) {
-		std::cout << getPath() << " is not valid!" << std::endl;
-	}
-
 	if(v_bson.empty() || !isValid()) {
 		return false;
 	}
@@ -295,7 +288,6 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	}
 
 	if(mPrim.GetPath() != prim.GetPath()) {
-		dbg_printf("Prim paths are different !!!\n");
 		return false;
 	}
 
@@ -326,7 +318,7 @@ void PointsList::calcSizeInBytes() const {
 }
 
 std::string bson_to_hex_string(const BSON& bson) {
-	dbg_printf("bson_to_hex_string()\n");
+	LOG_TRC << "bson_to_hex_string()";
 
 	ScopedTimeMeasure _t("bson_to_hex_string");
 
@@ -336,7 +328,7 @@ std::string bson_to_hex_string(const BSON& bson) {
 }
 
 void hex_string_to_bson(const std::string& str, BSON& bson) {
-	dbg_printf("hex_string_to_bson()\n");
+	LOG_TRC << "hex_string_to_bson()";
 
 	ScopedTimeMeasure _t("hex_string_to_bson");
 

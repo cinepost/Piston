@@ -242,9 +242,6 @@ void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdj
 	assert(pAdjacency);
 	assert(pPhantomTrimesh);
 
-	static const float flt_0 = 0.0f;
-	static const float flt_1 = 1.0f;
-
 	// Build per bind normals
 	auto& perBindNormals = build_live ? mPerBindLiveNormals : mpFastCurvesDeformerData->mPerBindRestNormals;
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
@@ -256,7 +253,6 @@ void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdj
 		if(bind.face_id != CurveBindData::kInvalidFaceID) {
 			const auto& face = pPhantomTrimesh->getFace(bind.face_id);
 
-			// TODO: proper clamp barycentrics for vertex normals interpolation !
 			float u = bind.u;
 			float v = bind.v;
 			float w = 1.f - u - v;
@@ -483,10 +479,8 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 
 				const uint32_t prim_id = static_cast<uint32_t>(skin_prim_indices[curve_index]);
 				if(!bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */)) {
-					const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);
-				
+					const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);				
 					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
-					const uint32_t prim_vertex_offset = pAdjacency->getFaceVertexOffset(prim_id);
 
 					if(prim_vertex_count == 3) {
 						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(

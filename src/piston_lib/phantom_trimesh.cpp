@@ -3,6 +3,7 @@
 #include "geometry_tools.h"
 #include "simple_profiler.h"
 #include "math.h"
+#include "logging.h"
 
 #ifdef USE_CGAL
 
@@ -38,18 +39,18 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
 		
 	if(!restPositionPrimVar) {
-		std::cerr << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << " !" << std::endl;
+		LOG_ERR << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << " !";
 		return false;
 	}
 
 	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
 	if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
-		std::cerr << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !" << std::endl;
+		LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
 		return false;
 	}
 
-	std::cout << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions" << std::endl;
+	LOG_DBG << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions.";
 
 	mValid = true;
 	return mValid;
@@ -59,7 +60,7 @@ bool PhantomTrimesh::init(const pxr::VtArray<pxr::GfVec3f>& restPointsExt, const
 	mExternalDataSource = mValid = false;
 
 	if(restPointsExt.size() != livePointsExt.size()) {
-		std::cerr << "Error initalizing PhantomTrimesh with external data. Rest and live point arrays sizes are not equal !!!" << std::endl;
+		LOG_ERR << "Error initalizing PhantomTrimesh with external data. Rest and live point arrays sizes are not equal !!!";
 	} else {
 		mUsdMeshRestPositions = restPointsExt; // should share underlying structure
 		mUsdMeshLivePositions = livePointsExt; // should share underlying structure
@@ -87,7 +88,7 @@ bool PhantomTrimesh::buildTetrahedrons() {
 	const size_t points_count = rest_positions.size();
 
 	if(points_count < 4) {
-		std::cerr << "Mesh has less than 4 vertices !" << std::endl;
+		LOG_ERR << "Mesh has less than 4 vertices !";
 		return false;
 	}
 
@@ -99,14 +100,13 @@ bool PhantomTrimesh::buildTetrahedrons() {
 
 	Triangulation T(points.begin(), points.end());
 
-	dbg_printf("T number of cells: %zu\n", (size_t)T.number_of_cells());
-	dbg_printf("T number of finite cells: %zu\n", (size_t)T.number_of_finite_cells());
+	LOG_TRC << "T number of cells: " << (size_t)T.number_of_cells();
+	LOG_TRC << "T number of finite cells: " << (size_t)T.number_of_finite_cells();
 
 	mTetrahedrons.resize(T.number_of_finite_cells());
 
 	size_t i = 0;
 	for(const CGAL_CellHandle& cell_handle: T.finite_cell_handles()) {
-		dbg_printf("cell %zu vertices: %d %d %d %d\n", i, cell_handle->vertex(0)->info(), cell_handle->vertex(1)->info(), cell_handle->vertex(2)->info(), cell_handle->vertex(3)->info());
 		mTetrahedrons[i].indices[0] = cell_handle->vertex(0)->info();
 		mTetrahedrons[i].indices[1] = cell_handle->vertex(1)->info();
 		mTetrahedrons[i].indices[2] = cell_handle->vertex(2)->info();
@@ -143,17 +143,13 @@ bool PhantomTrimesh::buildTetrahedrons() {
 		mTetrahedronIndices[mTetrahedronOffsets[tindices[3]] + mTetrahedronCounts[tindices[3]]++] = i;
 	}
 
-	for(size_t i = 0; i < mTetrahedronCounts.size(); ++i) {
-		dbg_printf("pt %zu tetras count %zu\n", i, (size_t)mTetrahedronCounts[i]);
-	}
-
 	return true;
 }
 
 #else  // no USE_CGAL
 
 bool PhantomTrimesh::buildTetrahedrons() {
-	std::cerr << "PhantomTrimesh::buildTetrahedrons() NOT IMPLEMENTED !!!" << std::endl;
+	LOG_ERR << "PhantomTrimesh::buildTetrahedrons() NOT IMPLEMENTED !!!";
 	return false;
 }
 
@@ -417,12 +413,12 @@ bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode t
 	pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
 
 	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
-		std::cerr << "Error getting point positions from " << prim_handle.getPath() << " !" << std::endl;
+		LOG_ERR << "Error getting point positions from " << prim_handle.getPath() << " !";
 		return false;
 	}
 
 	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
-		std::cerr << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mUsdMeshRestPositions.size() << " vs " << mUsdMeshLivePositions.size() << " ) mismatch !" << std::endl;
+		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mUsdMeshRestPositions.size() << " vs " << mUsdMeshLivePositions.size() << " ) mismatch !";
 		return false;
 	}
 
@@ -575,7 +571,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	}
 
 	if(mpTrimesh->mFaces.size() != mpTrimesh->mFaceFlags.size()) {
-		std::cerr << "Trimesh face and face_flags array sizes mismatch!" << std::endl;
+		LOG_ERR << "Trimesh face and face_flags array sizes mismatch!";
 		return false;
 	}
 
@@ -586,7 +582,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 
 	mpTrimesh->mValid = true;
 
-	dbg_printf("PhantomTrimesh data read from json payload !\n");
+	LOG_DBG << "PhantomTrimesh data read from json payload.";
 
 	return true;
 }

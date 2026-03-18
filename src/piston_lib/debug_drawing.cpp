@@ -3,6 +3,7 @@
 
 namespace Piston {
 
+/*
 static void CreateQuadMesh(pxr::UsdStageRefPtr stage) {
     // 1. Define the Mesh prim at a specific path
     pxr::SdfPath meshPath("/MyMesh");
@@ -32,6 +33,7 @@ static void CreateQuadMesh(pxr::UsdStageRefPtr stage) {
     };
     colorPrimvar.Set(colors);
 }
+*/
 
 static void removePrimIfExist(pxr::UsdStageRefPtr pStage, const pxr::SdfPath& path) {
     if(pStage->GetPrimAtPath(path)) {
@@ -85,6 +87,8 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
             colorPrimvar.Set(colors);
         }
     }
+
+    return true;
 }
 
 void DebugGeo::clear() {

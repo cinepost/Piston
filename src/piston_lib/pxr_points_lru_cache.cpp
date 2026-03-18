@@ -61,7 +61,7 @@ const PointsList* PxrPointsLRUCache::get(const PxrPointsLRUCache::CompositeKey& 
 	std::lock_guard<std::mutex> lock(mMutex);
 	auto it = mCacheItemsMap.find(key);
 	if (it == mCacheItemsMap.end()) {
-		dbg_printf("There is no such key (%s) in PxrPointsLRUCache.\n", key.name.c_str());
+		LOG_TRC << "There is no key (" << key.name << ") in PxrPointsLRUCache.";
 		return nullptr;
 	} else {
 		mCacheItemsList.splice(mCacheItemsList.begin(), mCacheItemsList, it->second);
@@ -92,17 +92,18 @@ void PxrPointsLRUCache::reduceMemUsage(const size_t mem_size_bytes) {
 }
 
 size_t PxrPointsLRUCache::removeByName(const std::string& name) {
+	std::lock_guard<std::mutex> lock(mMutex);
 	size_t removed_count = 0;
-	std::list<key_value_pair_t>::iterator i = mCacheItemsList.begin();
+	std::list<key_value_pair_t>::iterator it = mCacheItemsList.begin();
 
-	while(i != mCacheItemsList.end()) {
-		if(i->first.name == name) {
-			mCacheItemsMap.erase(i->first);
-			mCacheItemsList.pop_back();
+	while(it != mCacheItemsList.end()) {
+		if(it->first.name == name) {
+			mCacheItemsMap.erase(it->first);
+			it = mCacheItemsList.erase(it);
 			mCurrentMemSizeBytes = kInvalidUsedMemSize;
 			removed_count++;
 		} else {
-			i++;
+			++it;
 		}
 	}
 
@@ -119,9 +120,7 @@ void PxrPointsLRUCache::clear() {
 std::string PxrPointsLRUCache::getCacheUtilizationString() const {
 	static char _buffer[50];
 
-	const float utilization = 100.0f * (static_cast<double>(getMemSize()) / static_cast<float>(mMaxMemSizeBytes)); 
-
-    sprintf(_buffer, "%.2f", utilization);
+	sprintf(_buffer, "%.2f", getMemUsagePercent());
     return std::string(_buffer);
 }
 

@@ -1,5 +1,5 @@
 #include "serializable_data.h"
-
+#include "logging.h"
 
 namespace Piston {
 
@@ -9,7 +9,7 @@ SerializableDeformerDataBase::SerializableDeformerDataBase(): mIsPopulated(false
 
 bool SerializableDeformerDataBase::serialize(BSON& v_bson) const {
 	if(!isPopulated()) {
-		std::cerr << "Can't serialize empty deformer data !" << std::endl;
+		LOG_ERR << "Can't serialize empty deformer data !";
 		return false;
 	}
 
@@ -20,7 +20,7 @@ bool SerializableDeformerDataBase::serialize(BSON& v_bson) const {
 	j["data_version_build"] = jsonDataVersion().build;
 
 	if(!dumpToJSON(j["payload"])) {
-		std::cerr << "Error serializing deformer data !" << std::endl;
+		LOG_ERR << "Error serializing deformer data !";
 		return false;
 	}
 
@@ -35,17 +35,17 @@ bool SerializableDeformerDataBase::deserialize(const BSON& v_bson) {
 	clear();
 
 	if(j["data_name"] != jsonDataKey()) {
-		std::cerr << "Error de-serializing deformer data ! Data key is different !" << std::endl;
+		LOG_ERR << "Error de-serializing deformer data ! Data key is different !";
 		return false;
 	}
 
 	if(j["data_version_major"] != jsonDataVersion().major || j["data_version_minor"] != jsonDataVersion().minor || j["data_version_build"] != jsonDataVersion().build) {
-		std::cerr << "Error de-serializing deformer data ! Data version is different !" << std::endl;
+		LOG_ERR << "Error de-serializing deformer data ! Data version is different !";
 		return false;
 	}
 
 	if(!readFromJSON(j["payload"])) {
-		std::cerr << "Error de-serializing deformer data !" << std::endl;
+		LOG_ERR << "Error de-serializing deformer data !";
 		return false;
 	}
 

@@ -62,6 +62,7 @@ class PxrPointsLRUCache {
 
 		size_t size() const { return mCacheItemsMap.size(); }
 
+		inline float getMemUsagePercent() const { return 100.0f * (static_cast<double>(getMemSize()) / static_cast<float>(mMaxMemSizeBytes)); }
 		std::string getCacheUtilizationString() const;
 		std::string getMemUsageString() const;
 

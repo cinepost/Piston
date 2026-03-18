@@ -347,49 +347,67 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	point_surface_binds.reserve(curves_count);
 
 	auto bindPointToSkinPrim = [&] (const pxr::GfVec3f& pt, PointSurfaceBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_prim_boundaries = false) {
-		bool isBound = false;
+		bool is_bound = false;
 		const uint32_t prim_vertex_count = pSkinAdjacency->getFaceVertexCount(prim_id);
 		const uint32_t prim_vertex_offset = pSkinAdjacency->getFaceVertexOffset(prim_id);
 
-		float u, v, dist;
+		float face_id, u, v, dist;
 
 		if( prim_vertex_count > 3u){
 			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
-			
+				
+			const pxr::VtArray<pxr::GfVec3f>& rest_positions = pSkinPhantomTrimesh->getRestPositions();
+
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
-				_tmp_sq_distances[j] = distanceSquared(pt, pSkinPhantomTrimesh->getRestPositions()[pSkinAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+				_tmp_sq_distances[j] = distanceSquared(pt, rest_positions[pSkinAdjacency->getFaceVertex(prim_vertex_offset + j)]);
 			}
 
 			std::vector<float>::iterator it = std::min_element(_tmp_sq_distances.begin(), _tmp_sq_distances.begin() + prim_vertex_count);
 			uint32_t local_index = std::distance(std::begin(_tmp_sq_distances), it);
 
+			static const float kFLT_MAX = std::numeric_limits<float>::max();
+
+			float pt_tri_dist_sq_min = kFLT_MAX;
+			float _face_id = PhantomTrimesh::kInvalidTriFaceID, _u, _v, _dist;
 			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
-				const uint32_t face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
+				_face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
 					pSkinAdjacency->getFaceVertex(prim_id, local_index), 
 					pSkinAdjacency->getFaceVertex(prim_id, (local_index + i) % prim_vertex_count),
 					pSkinAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
 				);
 
-				isBound = pSkinPhantomTrimesh->projectPoint(pt, face_id, u, v, dist);
-				bind.u = u; bind.v = v; bind.dist = dist;
+				is_bound = pSkinPhantomTrimesh->projectPoint(pt, _face_id, _u, _v, _dist);
 				
-				if(isBound)	break;
-				
-				{
+				if(is_bound) {
+					face_id = _face_id; u = _u; v = _v; dist = _dist;
+					break;
+				} else if(ignore_prim_boundaries) {
 					// If outside we push point to triangle squared distance for later closest search
+					const auto& face = pSkinPhantomTrimesh->getFace(_face_id);
+					const float pt_tri_dist_sq = pointTriangleDistSquared(pt, rest_positions[face.indices[0]], rest_positions[face.indices[1]], rest_positions[face.indices[2]]);
+					if(pt_tri_dist_sq < pt_tri_dist_sq_min) {
+						face_id = _face_id;
+						u = _u; v =_v; dist = _dist;
+						pt_tri_dist_sq_min = pt_tri_dist_sq;
+					}
 				}
 			}
 		} else {
-			const uint32_t face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
+			face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
 				pSkinAdjacency->getFaceVertex(prim_id, 0), 
 				pSkinAdjacency->getFaceVertex(prim_id, 1),
 				pSkinAdjacency->getFaceVertex(prim_id, 2)
 			);
-			isBound = pSkinPhantomTrimesh->projectPoint(pt, face_id, u, v, dist);
-			bind.u = u; bind.v = v; bind.dist = dist;
+			is_bound = pSkinPhantomTrimesh->projectPoint(pt, face_id, u, v, dist);
 		}
 
-		return isBound;
+
+		if(is_bound || ignore_prim_boundaries) {
+			bind.face_id = face_id;
+			bind.u = u; bind.v = v; bind.dist = dist;
+		}
+		
+		return is_bound;
 	};
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
@@ -432,6 +450,8 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	} else {
 		func(0u, curves_count);
 	}
+
+	LOG_DBG << "Deformer " << getName() << " " << point_surface_binds.size() << " points are bound to skin surface.";
 
 	return true;
 }
