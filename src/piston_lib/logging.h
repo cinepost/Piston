@@ -27,13 +27,6 @@ static const char* kLevelStrFatal = "FATAL";
 
 enum class LogLevel { TRACE, DEBUG, INFO, WARNING, ERROR, FATAL };
 
-// #define LOG_TRC(msg) Logger::getInstance().log(LogLevel::TRACE, msg)
-// #define LOG_DBG(msg) Logger::getInstance().log(LogLevel::DEBUG, msg)
-// #define LOG_INF(msg) Logger::getInstance().log(LogLevel::INFO, msg)
-// #define LOG_WRN(msg) Logger::getInstance().log(LogLevel::WARNING, msg)
-// #define LOG_ERR(msg) Logger::getInstance().log(LogLevel::ERROR, msg)
-// #define LOG_FTL(msg) Logger::getInstance().log(LogLevel::FATAL, msg)
-
 #ifdef PISTON_DEBUG
 #define LOG_TRC Logger::getInstance().getStream(LogLevel::TRACE)
 #else
@@ -45,6 +38,14 @@ enum class LogLevel { TRACE, DEBUG, INFO, WARNING, ERROR, FATAL };
 #define LOG_WRN Logger::getInstance().getStream(LogLevel::WARNING)
 #define LOG_ERR Logger::getInstance().getStream(LogLevel::ERROR)
 #define LOG_FTL Logger::getInstance().getStream(LogLevel::FATAL)
+
+// Log with defotmer name
+#define DLOG_TRC LOG_INF << "[" << getName() <<  "]"
+#define DLOG_DBG LOG_INF << "[" << getName() <<  "]"
+#define DLOG_INF LOG_INF << "[" << getName() <<  "]"
+#define DLOG_WRN LOG_INF << "[" << getName() <<  "]"
+#define DLOG_ERR LOG_INF << "[" << getName() <<  "]"
+#define DLOG_FTL LOG_INF << "[" << getName() <<  "]"
 
 class LoggerStream;
 

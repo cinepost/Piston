@@ -101,8 +101,9 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 		}
 	};
 
+	DLOG_TRC << "FastCurvesDeformer::__deform__ " << (multi_threaded ? "multi_threaded" : "single thread");
+
 	if(multi_threaded) {
-		LOG_TRC << "FastCurvesDeformer::__deform__ " << (multi_threaded ? "multi_threaded" : "single thread");
 		mPool.detach_blocks(0u, curveBinds.size(), func);
 		mPool.wait();
 	} else {
@@ -117,7 +118,7 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 	}
 
 	if(!mCurvesGeoPrimHandle.writeDataToBson(mpFastCurvesDeformerData.get())) {
-		LOG_ERR << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
+		DLOG_ERR << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
 	}
 	return true;
@@ -194,7 +195,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 		assert(pAdjacency);
 		if(!pAdjacency->isValid()) {
-			LOG_ERR << "No valid mesh adjacency data!";
+			DLOG_ERR << "No valid mesh adjacency data!";
 			return false;
 		}
 
@@ -204,7 +205,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 		assert(pPhantomTrimesh);
 		if(!pPhantomTrimesh->isValid()) {
-			LOG_ERR << "No valid phantom trimesh data!";
+			DLOG_ERR << "No valid phantom trimesh data!";
 			return false;
 		}
 
@@ -552,6 +553,8 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 		}
 	};
 
+	DLOG_INF << "Binding curves to mesh.";
+
 	if(multi_threaded) {
 		mPool.detach_blocks(0u, total_curves_count, func);
 		mPool.wait();
@@ -559,10 +562,10 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 		func(0u, total_curves_count);
 	}
 
-	LOG_DBG << "Total curves count to bind: " << size_t(total_curves_count);
-	LOG_DBG << "Skin bound curves count: " << size_t(skin_bound_curves_count.load());
-	LOG_DBG << "KDtree bound curves count: " << size_t(kdtree_bound_curves_count.load());
-	LOG_DBG << "Brute force bound curves count: " << size_t(bforce_bound_curves_count.load());
+	DLOG_DBG << "Total curves count to bind: " << size_t(total_curves_count);
+	DLOG_DBG << "Skin bound curves count: " << size_t(skin_bound_curves_count.load());
+	DLOG_DBG << "KDtree bound curves count: " << size_t(kdtree_bound_curves_count.load());
+	DLOG_DBG << "Brute force bound curves count: " << size_t(bforce_bound_curves_count.load());
 
 	return true;
 }
