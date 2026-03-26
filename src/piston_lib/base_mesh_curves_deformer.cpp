@@ -11,7 +11,7 @@
 namespace Piston {
 
 BaseMeshCurvesDeformer::BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): BaseCurvesDeformer(t, name) {
-	LOG_TRC << "BaseMeshCurvesDeformer::BaseMeshCurvesDeformer()";
+	DLOG_TRC << "BaseMeshCurvesDeformer::BaseMeshCurvesDeformer()";
 }
 
 bool BaseMeshCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
@@ -20,12 +20,12 @@ bool BaseMeshCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim
 
 bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 	if(!mDeformerGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
-		LOG_ERR << "Error writing " << mpAdjacencyData->typeName() << " deformer data to json !";
+		DLOG_ERR << "Error writing " << mpAdjacencyData->typeName() << " deformer data to json !";
 		return false;
 	}
 
 	if(!mCurvesGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
-		LOG_ERR << "Error writing " << mpPhantomTrimeshData->typeName() << " curves data to json !";
+		DLOG_ERR << "Error writing " << mpPhantomTrimeshData->typeName() << " curves data to json !";
 		return false;
 	}
 	return true;
@@ -42,7 +42,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(mpAdjacencyData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
-			LOG_ERR << "Error building mesh adjacency data!";
+			DLOG_ERR << "Error building mesh adjacency data!";
 			return false;
 		}
 	}
@@ -55,7 +55,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
-			LOG_ERR << "Error building phantom mesh data!";
+			DLOG_ERR << "Error building phantom mesh data!";
 			return false;
 		}
 	}

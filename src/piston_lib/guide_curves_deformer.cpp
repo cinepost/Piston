@@ -451,7 +451,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		func(0u, curves_count);
 	}
 
-	LOG_DBG << "Deformer " << getName() << " " << point_surface_binds.size() << " points are bound to skin surface.";
+	DLOG_DBG << point_surface_binds.size() << " points are bound to skin surface.";
 
 	return true;
 }
@@ -469,7 +469,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	assert(mpGuideCurvesContainer);
 
 	if(!mpGuideCurvesContainer->init(mDeformerGeoPrimHandle, rest_time_code)) {
-		LOG_ERR << "Error initializing guide curves container !";
+		DLOG_ERR << "Error initializing guide curves container !";
 		return false;
 	}
 
@@ -478,12 +478,12 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 
 	if(guideIndicesNeeded()) {
 		if(mGuideIDPrimAttrName.empty()) {
-			LOG_ERR << "No guide id (clump_id) attribute name set but needed !";
+			DLOG_ERR << "No guide id (clump_id) attribute name set but needed !";
 			return false;
 		}
 
 		if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
-			LOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
+			DLOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
 			return false;
 		}
 		assert(mGuideIndices.size() == total_curves_count);
@@ -495,19 +495,19 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 		}
 
 		if(max_guide_index >= total_guides_count) {
-			LOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
+			DLOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
 			return false;
 		}
 	}
 
 	if(getBindRootsToSkinSurface()) {
 		if(!buildSkinPrimData(multi_threaded)) {
-			LOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
+			DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
 			return false;
 		}
 
 		if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
-			LOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
+			DLOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
 			return false;
 		}
 	}

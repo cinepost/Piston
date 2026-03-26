@@ -19,7 +19,7 @@ BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const s
 	mName(name), 
 	mID(current_id++) {
 	
-	LOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
+	DLOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
 
 	mUniqueName = toString() + mName + std::to_string(mID);
 
@@ -32,28 +32,28 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
 	
 	if(!validateDeformerGeoPrim(geoPrim)) {
 		mDeformerGeoPrimHandle.clear();
-		LOG_ERR << "Deformer " << mName << " invalid geometry prim " <<  geoPrim.GetPath().GetText() << " type!";
+		DLOG_ERR << "Deformer " << mName << " invalid geometry prim " <<  geoPrim.GetPath().GetText() << " type!";
 		return;
 	}
 
 	mDeformerGeoPrimHandle = UsdPrimHandle(geoPrim);
 	makeDirty();
 
-	LOG_DBG << "Deformer " << mName << " geometry prim is set to: " << mDeformerGeoPrimHandle.getPath().GetText();
+	DLOG_DBG << "Deformer " << mName << " geometry prim is set to: " << mDeformerGeoPrimHandle;
 }
 
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
 	if(mCurvesGeoPrimHandle == geoPrim) return;
 	if(!isBasisCurvesGeoPrim(geoPrim)) {
 		mCurvesGeoPrimHandle.clear();
-		LOG_ERR << "Curves geometry prim is not \"BasisCurves\"!";
+		DLOG_ERR << "Curves geometry prim is not \"BasisCurves\"!";
 		return;
 	}
 
 	mCurvesGeoPrimHandle = UsdPrimHandle(geoPrim);
 	makeDirty();
 
-	LOG_DBG << "Curves geometry prim is set to: " << mCurvesGeoPrimHandle.getPath().GetText();
+	DLOG_DBG << "Curves geometry prim is set to: " << mCurvesGeoPrimHandle;
 }
 
 void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
@@ -61,7 +61,7 @@ void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
 	mDeformerRestAttrName = name;
 	makeDirty();
 
-	LOG_DBG << "Deformer " << mName << " geometry rest attribute name is set to: " <<  name;
+	DLOG_DBG << "Geometry rest attribute name is set to: " <<  name;
 }
 
 void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
@@ -69,7 +69,7 @@ void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
 	mCurvesRestAttrName = name;
 	makeDirty();
 
-	LOG_DBG << "Curves geometry rest attribute name is set to: " << name;
+	DLOG_DBG << "Curves geometry rest attribute name is set to: " << name;
 }
 
 void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
@@ -85,7 +85,7 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 
 	// Write json data if needed
 	if(!buildDeformerData(time_code)) {
-		LOG_ERR << "Error building " << mName << " deformer data !";
+		DLOG_ERR << "Error building " << mName << " deformer data !";
 		return false;
 	}
 
@@ -99,18 +99,18 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 	SimpleProfiler::clear();
 
 	if(!mDeformerGeoPrimHandle || !mCurvesGeoPrimHandle) {
-		LOG_ERR << "No mesh or curves UsdPrim is set on deformer " << mName << " !";
+		DLOG_ERR << "No mesh or curves UsdPrim is set on deformer " << mName << " !";
 		return false;
 	}
 
 	mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, reference_time_code);
 	if(!mpCurvesContainer) {
-		LOG_ERR << "Error creating curves container for deformer " << mName << " !";
+		DLOG_ERR << "Error creating curves container for deformer " << mName << " !";
 		return false;
 	}
 
 	if(!buildDeformerDataImpl(reference_time_code, multi_threaded)) {
-		LOG_ERR << "Error building " << mName <<" deformer data !";
+		DLOG_ERR << "Error building " << mName <<" deformer data !";
 		return false;
 	}
 
@@ -159,7 +159,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 	PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr();
 
 	PxrPointsLRUCacheShrinkLock cache_shrink_lock(pPointsLRUCache); // avoid cache shrinking during deformation stage
-	LOG_TRC << "pPointsLRUCache locked";
+	DLOG_TRC << "pPointsLRUCache locked";
 
 	const PointsList* deformed_points_list_ptr = getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key);
 
@@ -178,7 +178,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 			const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::LEADING) ? (time_code.GetValue() - 1.0) : time_code};
 			const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::TRAILING) ? (time_code.GetValue() + 1.0) : time_code};
 
-			LOG_DBG << "Motion blur: " <<  std::to_string(key_from.time.GetValue()) << " to " <<  std::to_string(key_to.time.GetValue());
+			DLOG_DBG << "Motion blur: " <<  std::to_string(key_from.time.GetValue()) << " to " <<  std::to_string(key_to.time.GetValue());
 
 			const PointsList* pPointsFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from);
 			const PointsList* pPointsTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? deformed_points_list_ptr : getDeformedPoints(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to);
@@ -200,18 +200,18 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 
 		if(pxr::UsdAttribute attr_v = curves.GetVelocitiesAttr()) {
 			if(!attr_v.Set(veolcities_list_ptr->getVtArray(), time_code)) {
-				LOG_ERR << "Error setting velocities attribute !";
+				DLOG_ERR << "Error setting velocities attribute !";
 				return false;
 			}
 		} else {
-			LOG_ERR << mCurvesGeoPrimHandle << " has no velocities attribute !";
+			DLOG_ERR << mCurvesGeoPrimHandle << " has no velocities attribute !";
 		}
 	}
 
 	if(pPointsLRUCache) {
 		const std::string current_usage_str = pPointsLRUCache->getCacheUtilizationString();
 		if(gLRUCacheStatsLastUsageStr != current_usage_str) {
-			LOG_DBG << "Points cache utilization: " << current_usage_str << "%";
+			DLOG_DBG << "Points cache utilization: " << current_usage_str << "%";
 			gLRUCacheStatsLastUsageStr = current_usage_str;
 		}
 	}
@@ -240,7 +240,7 @@ void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
 	mVelocityAttrName = name;
 	makeDirty();
 
-	LOG_DBG << "Velocity attribute name is set to: " << mVelocityAttrName;
+	DLOG_DBG << "Velocity attribute name is set to: " << mVelocityAttrName;
 }
 
 void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
@@ -248,7 +248,7 @@ void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
 	mSkinPrimAttrName = name;
 	makeDirty();
 
-	LOG_DBG << "Skin prim ID attribute name is set to: " << mSkinPrimAttrName;
+	DLOG_DBG << "Skin prim ID attribute name is set to: " << mSkinPrimAttrName;
 }
 
 

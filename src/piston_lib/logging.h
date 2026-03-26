@@ -40,12 +40,12 @@ enum class LogLevel { TRACE, DEBUG, INFO, WARNING, ERROR, FATAL };
 #define LOG_FTL Logger::getInstance().getStream(LogLevel::FATAL)
 
 // Log with defotmer name
-#define DLOG_TRC LOG_INF << "[" << getName() <<  "]"
-#define DLOG_DBG LOG_INF << "[" << getName() <<  "]"
-#define DLOG_INF LOG_INF << "[" << getName() <<  "]"
-#define DLOG_WRN LOG_INF << "[" << getName() <<  "]"
-#define DLOG_ERR LOG_INF << "[" << getName() <<  "]"
-#define DLOG_FTL LOG_INF << "[" << getName() <<  "]"
+#define DLOG_TRC LOG_TRC << "[" << getName() <<  "] "
+#define DLOG_DBG LOG_DBG << "[" << getName() <<  "] "
+#define DLOG_INF LOG_INF << "[" << getName() <<  "] "
+#define DLOG_WRN LOG_WRN << "[" << getName() <<  "] "
+#define DLOG_ERR LOG_ERR << "[" << getName() <<  "] "
+#define DLOG_FTL LOG_FTL << "[" << getName() <<  "] "
 
 class LoggerStream;
 

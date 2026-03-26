@@ -343,9 +343,11 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
         		bind.face_id = PointBindData::kInvalidFaceID;
         		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i);
 
-        		const uint32_t prim_id = has_pp_prim_indices ? skin_prim_indices[curve_vertex_offset + i] : -1; 
+        		static constexpr float sInvalidPrimID = std::numeric_limits<uint32_t>::max();
 
-				if(prim_id >= 0) {
+        		const uint32_t prim_id = has_pp_prim_indices ? static_cast<uint32_t>(skin_prim_indices[curve_vertex_offset + i]) : sInvalidPrimID; 
+
+				if(prim_id != sInvalidPrimID) {
 					// bind using per point prim_id attr
 					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
 					if(prim_vertex_count == 3) {
@@ -363,6 +365,8 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 						
 						std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
 						
+						assert(tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second != tmp_indexed_squared_distances[2].second);
+
 						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
 							tmp_indexed_squared_distances[0].second,
 							tmp_indexed_squared_distances[1].second,
