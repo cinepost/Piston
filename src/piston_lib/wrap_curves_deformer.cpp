@@ -21,10 +21,8 @@ static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
 WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
-	DLOG_TRC << "WrapCurvesDeformer::WrapCurvesDeformer(" << getName() << ")";
-
 	mpWrapCurvesDeformerData = std::make_unique<WrapCurvesDeformerData>();
-	mpWrapCurvesDeformerData->setBindMode(BindMode::SPACE);
+	mpWrapCurvesDeformerData->setBindMode(BindMode::DIST);
 }
 
 WrapCurvesDeformer::SharedPtr WrapCurvesDeformer::create(const std::string& name) {

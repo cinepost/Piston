@@ -24,7 +24,6 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 namespace Piston {
 
 FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
-	LOG_TRC << "FastCurvesDeformer::FastCurvesDeformer(" << getName() << ")";
 	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
 
 	mpDebugGeo = DebugGeo::create(name);

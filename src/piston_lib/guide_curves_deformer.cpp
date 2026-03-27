@@ -18,7 +18,6 @@
 namespace Piston {
 
 GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::GUIDES, name) {
-	DLOG_TRC << "GuideCurvesDeformer::GuideCurvesDeformer(" << getName() << ")";
 	mpGuideCurvesDeformerData = std::make_unique<GuideCurvesDeformerData>();
 	mpGuideCurvesContainer = GuideCurvesContainer::create();
 }
