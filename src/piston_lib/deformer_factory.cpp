@@ -12,6 +12,7 @@ CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
             mInstancePtr = new CurvesDeformerFactory();
         }
     }
+
     return *mInstancePtr;
 }
 

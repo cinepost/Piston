@@ -294,4 +294,53 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
     }
 }
 
+template <typename T>
+bool validatePrimIndices(const T& indices, size_t expected_attrib_count, LoggerStream* pLogger) {
+    if(indices.size() != expected_attrib_count) {
+        if(pLogger) {
+            *pLogger << "Primitive indices count " << indices.size() << " is invalid. Expected " << expected_attrib_count << " indices !";
+        }
+        return false;
+    }
+
+    for(size_t i = 0; i < indices.size(); ++i) {
+        if(indices[i] < 0) {
+            if(pLogger) {
+                *pLogger << "Primitive index " << i << " has invalid value: " << indices[i];
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+template <typename T>
+bool validatePrimIndices(const T& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger) {
+    if(indices.size() != expected_attrib_count) {
+        if(pLogger) {
+            *pLogger << "Primitive indices count " << indices.size() << " is invalid. Expected " << expected_attrib_count << " indices !";
+        }
+        return false;
+    }
+
+    for(size_t i = 0; i < indices.size(); ++i) {
+        if(indices[i] < 0 || indices[i] > max_prim_id) {
+            if(pLogger) {
+                *pLogger << "Primitive index " << i << " has invalid value: " << indices[i];
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
+template bool validatePrimIndices(const std::vector<int>& indices, size_t expected_attrib_count, LoggerStream* pLogger);
+template bool validatePrimIndices(const pxr::VtArray<int>& indices, size_t expected_attrib_count, LoggerStream* pLogger);
+
+template bool validatePrimIndices(const std::vector<int>& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger);
+template bool validatePrimIndices(const pxr::VtArray<int>& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger);
+
 } // namespace Piston

@@ -340,6 +340,18 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		return false;
 	}
 
+	if(is_per_vertex_attr) {
+		auto err_log_stream = Logger::getInstance().getStream(LogLevel::FATAL);
+		if(!validatePrimIndices(skin_prim_indices, pCurvesContainer->getTotalVertexCount(), pSkinAdjacency->getFaceCount()), &err_log_stream) {
+			return false;
+		}
+	} else {
+		auto err_log_stream = Logger::getInstance().getStream(LogLevel::FATAL);
+		if(!validatePrimIndices(skin_prim_indices, pCurvesContainer->getCurvesCount(), pSkinAdjacency->getFaceCount()), &err_log_stream) {
+			return false;
+		}
+	}
+
 	std::mutex binds_mutex;
 	auto& point_surface_binds = mpGuideCurvesDeformerData->pointSurfaceBinds();
 	point_surface_binds.clear();
@@ -429,8 +441,6 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 				bind.weight = 1.0f;
 
 				const uint32_t prim_id = is_per_vertex_attr ? skin_prim_indices[bind.point_id] : skin_prim_indices[curve_index];
-				assert(prim_id >= 0 && prim_id < pSkinAdjacency->getFaceCount());
-
 				bindPointToSkinPrim(curr_pt, bind, prim_id, tmp_squared_distances, true /* ignore prim boundaries */); 
 
 				if(bind.face_id != PhantomTrimesh::kInvalidTriFaceID) {
@@ -845,6 +855,11 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 
 			const pxr::GfVec3f& root_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, 0 /* root vtx */);
         	pKDTree->findKNearestNeighbours(root_pt, 3, closest_deformer_points);
+
+        	assert( closest_deformer_points[0].first != closest_deformer_points[1].first &&
+        			closest_deformer_points[1].first != closest_deformer_points[2].first &&
+        			closest_deformer_points[2].first != closest_deformer_points[0].first
+        	);
 
         	const PhantomTrimesh::PxrIndexType a = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[0].first);
         	const PhantomTrimesh::PxrIndexType b = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[1].first);

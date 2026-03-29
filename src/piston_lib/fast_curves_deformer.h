@@ -35,8 +35,6 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		static SharedPtr create(const std::string& name);
 		virtual const std::string& toString() const override;
 
-		void setMeshGeoPrim(const pxr::UsdPrim& geoPrim) { setDeformerGeoPrim(geoPrim); }
-
 	protected:
 		FastCurvesDeformer(const std::string& name);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;

@@ -284,13 +284,6 @@ static std::unique_ptr<neighbour_search::KDTree<float, 3>> buildTrimeshCentroids
 	return std::make_unique<neighbour_search::KDTree<float, 3>>(trimesh_centroids, threaded_kdtree_creation);
 }
 
-static bool validatePerPointPrimIDAttrData(const std::vector<int>& pp_data, size_t expected_attrib_count) {
-	if(pp_data.size() != expected_attrib_count) return false;
-	for(int p: pp_data) if(p < 0) return false;
-
-	return true;
-}
-
 bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
 	PROFILE("WrapCurvesDeformer::buildDeformerData_DistMode");
 
@@ -307,12 +300,19 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 	PhantomTrimesh* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
-	std::vector<int> skin_prim_indices;
-	const bool has_pp_prim_indices = mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && validatePerPointPrimIDAttrData(skin_prim_indices, curves_vertex_count);
-
 	assert(mpAdjacencyData);
 	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacency();
 	assert(pAdjacency);
+
+	std::vector<int> skin_prim_indices;
+	bool has_pp_prim_indices = false;
+
+	{
+		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
+		has_pp_prim_indices = mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+	}
+
+	DLOG_INF << "Binding curves using DIST method " << (has_pp_prim_indices ? "with per-point skin primitive indices." : ".");
 
 	// Build kdtree
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDtree = has_pp_prim_indices ? nullptr : buildTrimeshCentroidsKDTree(pPhantomTrimesh, true);
@@ -348,6 +348,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 				if(prim_id != sInvalidPrimID) {
 					// bind using per point prim_id attr
 					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
+					assert(prim_vertex_count > 2);
 					if(prim_vertex_count == 3) {
 						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
 							pAdjacency->getFaceVertex(prim_id, 0), 
@@ -363,7 +364,10 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 						
 						std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
 						
-						assert(tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second != tmp_indexed_squared_distances[2].second);
+						assert(	tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second && 
+								tmp_indexed_squared_distances[1].second != tmp_indexed_squared_distances[2].second &&
+								tmp_indexed_squared_distances[2].second != tmp_indexed_squared_distances[0].second
+						);
 
 						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
 							tmp_indexed_squared_distances[0].second,
@@ -416,8 +420,6 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
     	}
     };
 
-    DLOG_INF << "Binding curves using DIST method " << (has_pp_prim_indices ? " using per-point skin primitive indices." : ".");
-
     if(multi_threaded) {
 		mPool.detach_blocks(0, curves_count, func);
 		mPool.wait();
@@ -448,8 +450,17 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 	const PhantomTrimesh* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
+	assert(mpAdjacencyData);
+	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacency();
+	assert(pAdjacency);
+
 	std::vector<int> skin_prim_indices;
-	const bool has_pp_prim_indices = mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && validatePerPointPrimIDAttrData(skin_prim_indices, curves_vertex_count);
+	bool has_pp_prim_indices = false;
+
+	{
+		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
+		bool has_pp_prim_indices = mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+	}
 
 	// Build kdtree
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDtree = has_pp_prim_indices ? nullptr : buildTrimeshCentroidsKDTree(pPhantomTrimesh, true);

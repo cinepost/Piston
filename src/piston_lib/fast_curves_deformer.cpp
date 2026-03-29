@@ -460,7 +460,12 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	};
 
 	pxr::VtArray<int> skin_prim_indices;
-	const bool has_skin_prim_attr = mCurvesGeoPrimHandle.fetchAttributeValues(mSkinPrimAttrName, skin_prim_indices, rest_time_code) && (skin_prim_indices.size() == total_curves_count);
+	bool has_skin_prim_attr = false;
+
+	{
+		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
+		mCurvesGeoPrimHandle.fetchAttributeValues(mSkinPrimAttrName, skin_prim_indices, rest_time_code) && validatePrimIndices(skin_prim_indices, total_curves_count, &err_log_stream);
+	}
 
 	std::mutex kdtree_mutex;  // protects kdree initialisation
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDTree;
@@ -496,6 +501,11 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 						}
 						
 						std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
+
+						assert(	tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second &&
+								tmp_indexed_squared_distances[1].second != tmp_indexed_squared_distances[2].second &&
+								tmp_indexed_squared_distances[2].second != tmp_indexed_squared_distances[0].second
+						);
 						
 						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
 							tmp_indexed_squared_distances[0].second,

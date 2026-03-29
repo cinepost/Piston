@@ -2,6 +2,7 @@
 #define PISTON_LIB_GEOMETRY_TOOLS_H_
 
 #include "framework.h"
+#include "logging.h"
 
 #include <memory>
 #include <string>
@@ -186,6 +187,12 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
 
 void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame> v);
 void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end);
+
+template <typename T>
+bool validatePrimIndices(const T& indices, size_t expected_attrib_count, LoggerStream* pLogger = nullptr);
+
+template <typename T>
+bool validatePrimIndices(const T& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger = nullptr);
 
 } // namespace Piston
 

@@ -105,14 +105,12 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<FastCurvesDeformer, FastCurvesDeformer::SharedPtr, bases<BaseMeshCurvesDeformer>, boost::noncopyable>("FastCurvesDeformer", no_init)
 		.def("create", &FastCurvesDeformer::create)
 		.staticmethod("create")
-		.def("setMeshGeoPrim", &FastCurvesDeformer::setMeshGeoPrim)
 		.def("toString", &FastCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
 	class_<WrapCurvesDeformer, WrapCurvesDeformer::SharedPtr, bases<BaseMeshCurvesDeformer>, boost::noncopyable>("WrapCurvesDeformer", no_init)
 		.def("create", &WrapCurvesDeformer::create)
 		.staticmethod("create")
-		.def("setMeshGeoPrim", &WrapCurvesDeformer::setMeshGeoPrim)
 		.def("setBindMode", &WrapCurvesDeformer::setBindMode)
 		.def("getBindMode", &WrapCurvesDeformer::getBindMode)
 		.def("toString", &WrapCurvesDeformer::toString, return_value_policy<copy_const_reference>())

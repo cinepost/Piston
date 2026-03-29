@@ -135,11 +135,9 @@ add_definitions(-DPISTON_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}")
 message(STATUS "CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  message("DEBUG!")
   add_definitions(-DPISTON_DEBUG)
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 else()
-  message("RELEASE!")
   remove_definitions(-DPISTON_DEBUG)
 endif()
 
