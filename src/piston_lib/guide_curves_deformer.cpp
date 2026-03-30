@@ -302,9 +302,12 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 
 bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	assert(mpCurvesContainer);
+	assert(mpGuideCurvesContainer);
 	assert(mpGuideCurvesDeformerData);
 	assert(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid());
 	assert(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid());
+
+	DLOG_INF << " Binding " << mCurvesGeoPrimHandle << " root points to skin surface.";
 
 	const UsdGeomMeshFaceAdjacency* pSkinAdjacency = mpSkinAdjacencyData->getAdjacency();
 	PhantomTrimesh* pSkinPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
@@ -340,14 +343,16 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		return false;
 	}
 
+	const int max_skin_prim_id = static_cast<int>(pSkinAdjacency->getFaceCount()) - 1;
+
 	if(is_per_vertex_attr) {
 		auto err_log_stream = Logger::getInstance().getStream(LogLevel::FATAL);
-		if(!validatePrimIndices(skin_prim_indices, pCurvesContainer->getTotalVertexCount(), pSkinAdjacency->getFaceCount()), &err_log_stream) {
+		if(!validatePrimIndices(skin_prim_indices, pCurvesContainer->getTotalVertexCount(), max_skin_prim_id, &err_log_stream)) {
 			return false;
 		}
-	} else {
+	} else if (is_per_curve_attr) {
 		auto err_log_stream = Logger::getInstance().getStream(LogLevel::FATAL);
-		if(!validatePrimIndices(skin_prim_indices, pCurvesContainer->getCurvesCount(), pSkinAdjacency->getFaceCount()), &err_log_stream) {
+		if(!validatePrimIndices(skin_prim_indices, pCurvesContainer->getCurvesCount(), max_skin_prim_id, &err_log_stream)) {
 			return false;
 		}
 	}

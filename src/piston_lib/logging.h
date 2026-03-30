@@ -141,9 +141,8 @@ class Logger {
 							pLevelStr = kLevelStrError;
 							break;
 						case LogLevel::FATAL:
-							pLevelStr = kLevelStrFatal;
-							break;
 						default:
+							pLevelStr = kLevelStrFatal;
 							break;
 					}
 					std::cout << "[" << entry.timestamp << "] [" << pLevelStr << "] " << entry.message << std::endl;
