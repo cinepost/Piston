@@ -74,7 +74,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 
 				bool operator==(uint32_t i) const { return raw_data == i; }
 
-				operator float() const { return raw_data; }
+				operator float() const { return static_cast<float>(raw_data); }
 			};
 
 			static constexpr uint32_t kInvalid = std::numeric_limits<uint32_t>::max();

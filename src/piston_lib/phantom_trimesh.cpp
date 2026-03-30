@@ -126,7 +126,7 @@ bool PhantomTrimesh::buildTetrahedrons() {
 	}
 
 	uint32_t offset = 0;
-	for(size_t i = 0; i < mTetrahedronCounts.size(); ++i) {
+	for(uint32_t i = 0; i < mTetrahedronCounts.size(); ++i) {
 		mTetrahedronOffsets[i] = offset;
 		offset += mTetrahedronCounts[i];
 	}
@@ -135,7 +135,7 @@ bool PhantomTrimesh::buildTetrahedrons() {
 	std::fill(mTetrahedronIndices.begin(), mTetrahedronIndices.end(), Tetrahedron::kInvalidVertexID);
 
 	std::fill(mTetrahedronCounts.begin(), mTetrahedronCounts.end(), 0);
-	for(size_t i = 0; i < mTetrahedrons.size(); ++i) {
+	for(uint32_t i = 0; i < mTetrahedrons.size(); ++i) {
 		const auto& tindices = mTetrahedrons[i].indices;
 		mTetrahedronIndices[mTetrahedronOffsets[tindices[0]] + mTetrahedronCounts[tindices[0]]++] = i;
 		mTetrahedronIndices[mTetrahedronOffsets[tindices[1]] + mTetrahedronCounts[tindices[1]]++] = i;
