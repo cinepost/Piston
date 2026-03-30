@@ -78,7 +78,7 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 #else
 #ifdef CHECK_PARALLEL
     // If det is close to 0, the ray and triangle are parallel.
-    if (fabs(det) < kEpsilon) return false;
+    if (std::fabs(det) < kEpsilon) return false;
 #endif // CHECK_PARALLEL
 #endif // CHECK_CULLING
     float invDet = 1.f / det;
@@ -111,7 +111,7 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 #else
 #ifdef CHECK_PARALLEL
     // If det is close to 0, the ray and triangle are parallel.
-    if (fabs(det) < kEpsilon) return false;
+    if (std::fabs(det) < kEpsilon) return false;
 #endif // CHECK_PARALLEL
 #endif // CHECK_CULLING
     float invDet = 1.f / det;
@@ -145,7 +145,7 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 #else
 #ifdef CHECK_PARALLEL
     // If det is close to 0, the ray and triangle are parallel.
-    if (fabs(det) < kEpsilon) return false;
+    if (std::fabs(det) < kEpsilon) return false;
 #endif // CHECK_PARALLEL
 #endif // CHECK_CULLING
     float invDet = 1.f / det;
@@ -179,7 +179,7 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
 #else
 #ifdef CHECK_PARALLEL
     // If det is close to 0, the ray and triangle are parallel.
-    if (fabs(det) < kEpsilon) return false;
+    if (std::fabs(det) < kEpsilon) return false;
 #endif // CHECK_PARALLEL
 #endif // CHECK_CULLING
     float invDet = 1.f / det;

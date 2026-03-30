@@ -2,7 +2,7 @@
 #include "phantom_trimesh.h"
 #include "geometry_tools.h"
 #include "simple_profiler.h"
-#include "math.h"
+#include "piston_math.h"
 #include "logging.h"
 
 #ifdef USE_CGAL

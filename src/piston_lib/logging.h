@@ -1,8 +1,11 @@
 #ifndef PISTON_LIB_LOGGING_H_
 #define PISTON_LIB_LOGGING_H_
 
+#include "framework.h"
+
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <mutex>
@@ -15,15 +18,15 @@
 
 namespace fs = std::filesystem;
 
+#if defined(_WIN32)
+
+#ifdef ERROR
+#undef ERROR
+#endif
+
+#endif
 
 namespace Piston {
-
-static const char* kLevelStrTrace = "TRACE";
-static const char* kLevelStrDebug = "DEBUG";
-static const char* kLevelStrInfo = "INFO";
-static const char* kLevelStrWarning = "WARNING";
-static const char* kLevelStrError = "ERROR";
-static const char* kLevelStrFatal = "FATAL";
 
 enum class LogLevel { TRACE, DEBUG, INFO, WARNING, ERROR, FATAL };
 
@@ -114,41 +117,7 @@ class Logger {
 		Logger(const Logger&) = delete;
 		Logger& operator=(const Logger&) = delete;
 
-		void processQueue() {
-			while (mIsRunning || !mLogQueue.empty()) {
-				std::unique_lock<std::mutex> lock(mQueueMutex);
-				mCV.wait(lock, [this] { 
-					return !mLogQueue.empty() || !mIsRunning;
-				});
-
-				if (!mLogQueue.empty()) {
-					LogEntry entry = mLogQueue.front();
-					mLogQueue.pop();
-					lock.unlock(); // Unlock early to allow other threads to push logs
-
-					const char* pLevelStr = kLevelStrTrace;
-					switch(entry.level) {
-						case LogLevel::DEBUG:
-							pLevelStr = kLevelStrDebug;
-							break;
-						case LogLevel::INFO:
-							pLevelStr = kLevelStrInfo;
-							break;
-						case LogLevel::WARNING:
-							pLevelStr = kLevelStrWarning;
-							break;
-						case LogLevel::ERROR:
-							pLevelStr = kLevelStrError;
-							break;
-						case LogLevel::FATAL:
-						default:
-							pLevelStr = kLevelStrFatal;
-							break;
-					}
-					std::cout << "[" << entry.timestamp << "] [" << pLevelStr << "] " << entry.message << std::endl;
-				}
-			}
-		}
+		void processQueue();
 
 		std::queue<LogEntry> mLogQueue;
 		mutable std::mutex mQueueMutex;

@@ -1,6 +1,10 @@
 #ifndef PISTON_LIB_FRAMEWORK_H_
 #define PISTON_LIB_FRAMEWORK_H_
 
+#if defined(_WIN32)
+#define NOGDI
+#endif
+
 #include <memory>
 #include <iostream>
 
