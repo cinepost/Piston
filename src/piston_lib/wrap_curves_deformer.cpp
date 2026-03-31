@@ -309,7 +309,10 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 
 	{
 		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
-		has_pp_prim_indices = mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+		has_pp_prim_indices = !getSkinPrimAttrName().empty() && 
+								mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
+							   	(skin_prim_indices.size() > 0) &&
+								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
 	}
 
 	DLOG_INF << "Binding curves using DIST method " << (has_pp_prim_indices ? "with per-point skin primitive indices." : ".");
@@ -459,7 +462,10 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 
 	{
 		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
-		bool has_pp_prim_indices = mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+		has_pp_prim_indices = !getSkinPrimAttrName().empty() &&
+								mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
+								(skin_prim_indices.size() > 0) &&
+								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
 	}
 
 	// Build kdtree

@@ -317,7 +317,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 
 	std::vector<int> skin_prim_indices;
 
-	if(!mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code)) {
+	if(getSkinPrimAttrName().empty() || !mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) || (skin_prim_indices.size() == 0)) {
 
 		// if there is no curves skinprim attr exist we can still try to promote it from guides ...
 		if(mGuideIndices.size() == curves_count) {

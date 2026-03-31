@@ -296,6 +296,7 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
 
 template <typename T>
 bool validatePrimIndices(const T& indices, size_t expected_attrib_count, LoggerStream* pLogger) {
+    if(indices.size() == 0) return false;
     if(indices.size() != expected_attrib_count) {
         if(pLogger) {
             *pLogger << "Primitive indices count " << indices.size() << " is invalid. Expected " << expected_attrib_count << " indices !";
@@ -318,6 +319,7 @@ bool validatePrimIndices(const T& indices, size_t expected_attrib_count, LoggerS
 
 template <typename T>
 bool validatePrimIndices(const T& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger) {
+    if(indices.size() == 0) return false;
     if(indices.size() != expected_attrib_count) {
         if(pLogger) {
             *pLogger << "Primitive indices count " << indices.size() << " is invalid. Expected " << expected_attrib_count << " indices !";

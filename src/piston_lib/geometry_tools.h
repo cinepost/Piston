@@ -74,6 +74,16 @@ inline void barycentrics_clamp_to_triangle(float& u, float& v, float& w) {
     }
 }
 
+// Distance from point's barycentric coords to centroid (1/3, 1/3, 1/3)
+inline float barycentricDistanceSquaredToCenter(float u, float v, float w) {
+    static constexpr float k = 1.0f/3.0f;
+
+    float du = u - k;
+    float dv = v - k;
+    float dw = w - k;
+    return du*du + dv*dv + dw*dw;
+}
+
 inline float distance(const glm::vec3& point, const Plane& plane) {
 	return dot(glm::vec3{plane.normal[0], plane.normal[1], plane.normal[2]}, glm::vec3{point[0] - plane.point[0], point[1] - plane.point[1], point[2] - plane.point[2]});
 }

@@ -25,7 +25,7 @@ namespace Piston {
 namespace {
 	const std::string kVelocitiAttrName = "velocities";
 	const std::string kDeformerRestPositionAttrName = "rest_p";
-	const std::string kСurvesSkinPrimAttrName = "skinprim";
+	const std::string kСurvesSkinPrimAttrName = ""; //"skinprim"
 }
 
 class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeformer> {

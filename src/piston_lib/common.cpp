@@ -148,12 +148,13 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr:
 		return false;
 	}
 
+	array.clear();
 	if(!primVar.GetAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting " << getPath() << " \"" << attribute_name << "\" values !";
 		return false;
 	}
 
-	return true;
+	return (array.size() > 0);
 }
 
 template<typename T>
