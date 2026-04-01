@@ -488,16 +488,12 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	};
 
 	pxr::VtArray<int> skin_prim_indices;
-	bool has_skin_prim_attr = false;
-
-	{
-		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
-		has_skin_prim_attr = !getSkinPrimAttrName().empty() && 
-							mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
-							(skin_prim_indices.size() > 0) &&
-							validatePrimIndices(skin_prim_indices, total_curves_count, &err_log_stream);
-	}
-
+	auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
+	const bool has_skin_prim_attr = !getSkinPrimAttrName().empty() && 
+						mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
+						(skin_prim_indices.size() > 0) &&
+						validatePrimIndices(skin_prim_indices, total_curves_count, &err_log_stream);
+	
 	DLOG_INF << "Binding curves to mesh" << (has_skin_prim_attr ? " using skin prim attribute." : ".");
 
 	std::mutex kdtree_mutex;  // protects kdree initialisation

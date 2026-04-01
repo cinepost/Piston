@@ -304,17 +304,15 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacency();
 	assert(pAdjacency);
 
+	static const uint32_t sInvalidPrimID = std::numeric_limits<uint32_t>::max();
+
 	std::vector<int> skin_prim_indices;
-	bool has_pp_prim_indices = false;
-
-	{
-		auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
-		has_pp_prim_indices = !getSkinPrimAttrName().empty() && 
-								mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
-							   	(skin_prim_indices.size() > 0) &&
-								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
-	}
-
+	auto err_log_stream = Logger::getInstance().getStream(LogLevel::ERROR);
+	const bool has_pp_prim_indices = !getSkinPrimAttrName().empty() && 
+							mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
+						   	(skin_prim_indices.size() > 0) &&
+							validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+	
 	DLOG_INF << "Binding curves using DIST method " << (has_pp_prim_indices ? "with per-point skin primitive indices." : ".");
 
 	// Build kdtree
@@ -343,9 +341,6 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
         		auto& bind = pointBinds[curve_vertex_offset + i];
         		bind.face_id = PointBindData::kInvalidFaceID;
         		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i);
-
-        		static constexpr float sInvalidPrimID = std::numeric_limits<uint32_t>::max();
-
         		const uint32_t prim_id = has_pp_prim_indices ? static_cast<uint32_t>(skin_prim_indices[curve_vertex_offset + i]) : sInvalidPrimID; 
 
 				if(prim_id != sInvalidPrimID) {
@@ -388,36 +383,32 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 					const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDtree->findNearestNeighbour(curr_pt);
 					const uint32_t face_id = nearest_pt.first;
 
-					auto bindCurvePointToPrim = [&] (const uint32_t curve_vtx, const uint32_t face_id, PointBindData& bind) {
-						const auto& face = faces[face_id];
+					const auto& face = faces[face_id];
 
-						const pxr::GfVec3f& p0 = meshRestPositions[face.indices[0]];
-						const pxr::GfVec3f& p1 = meshRestPositions[face.indices[1]];
-						const pxr::GfVec3f& p2 = meshRestPositions[face.indices[2]];
+					const pxr::GfVec3f& p0 = meshRestPositions[face.indices[0]];
+					const pxr::GfVec3f& p1 = meshRestPositions[face.indices[1]];
+					const pxr::GfVec3f& p2 = meshRestPositions[face.indices[2]];
 
-						const auto& face_normal = face.getRestNormal();
-						const Plane face_plane(p0, face_normal);
-						const float face_distance = distance(face_plane, curr_pt);
+					const auto& face_normal = face.getRestNormal();
+					const Plane face_plane(p0, face_normal);
+					const float face_distance = distance(face_plane, curr_pt);
 
-						const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
+					const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
 
-						const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
-						float d00 = pxr::GfDot(v0, v0);
-						float d01 = pxr::GfDot(v0, v1);
-						float d11 = pxr::GfDot(v1, v1);
-						float d20 = pxr::GfDot(v2, v0);
-						float d21 = pxr::GfDot(v2, v1);
-						float denom = d00 * d11 - d01 * d01;
+					const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
+					float d00 = pxr::GfDot(v0, v0);
+					float d01 = pxr::GfDot(v0, v1);
+					float d11 = pxr::GfDot(v1, v1);
+					float d20 = pxr::GfDot(v2, v0);
+					float d21 = pxr::GfDot(v2, v1);
+					float denom = d00 * d11 - d01 * d01;
 
-						bind.u = (d11 * d20 - d01 * d21) / denom;
-						bind.v = (d00 * d21 - d01 * d20) / denom;
+					bind.u = (d11 * d20 - d01 * d21) / denom;
+					bind.v = (d00 * d21 - d01 * d20) / denom;
 
-						const pxr::GfVec3f projected_point = pPhantomTrimesh->getInterpolatedRestPosition(face_id, bind.u, bind.v);
-			    		bind.dist = face_distance;
-						bind.face_id = face_id;
-					};
-
-					bindCurvePointToPrim(i, face_id, bind);
+					const pxr::GfVec3f projected_point = pPhantomTrimesh->getInterpolatedRestPosition(face_id, bind.u, bind.v);
+		    		bind.dist = face_distance;
+					bind.face_id = face_id;
 				}
         	}
     	}
