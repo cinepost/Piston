@@ -46,6 +46,9 @@ class CurvesDeformerFactory {
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 	    static GuideCurvesDeformer::SharedPtr getGuidesDeformer(const std::string& name);
 
+		static void setPointsCacheUsageState(bool state);
+		static bool getPointsCacheUsageState();
+
 	    static void clear();
 
 	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }

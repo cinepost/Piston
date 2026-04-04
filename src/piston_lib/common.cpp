@@ -303,9 +303,11 @@ PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource
 PointsList::PointsList(Piston::PointsList&& other): mPoints(std::move(other.mPoints)), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), false), mSizeInBytes(other.mSizeInBytes) {
 }
 
-void PointsList::resize(size_t size) {
-	mPoints.resize(size);
-	mVtArray.resize(size);
+void PointsList::resize(size_t new_size) {
+	if(size() == new_size) return;
+
+	mPoints.resize(new_size);
+	mVtArray.resize(new_size);
 	calcSizeInBytes();
 }
 

@@ -89,7 +89,7 @@ class PointsList {
 
 		PointsList(Piston::PointsList&& other);
 
-		size_t size() const { return mPoints.size(); }
+		size_t size() const { assert(mPoints.size() == mVtArray.size()); return mPoints.size(); }
 
 		pxr::GfVec3f& operator [](size_t idx) { return mPoints[idx]; }
 		const pxr::GfVec3f& operator [](size_t idx) const { return mPoints[idx]; }
@@ -102,7 +102,7 @@ class PointsList {
 
 		const pxr::VtArray<pxr::GfVec3f>& getVtArray() const { return mVtArray; }
 
-		void resize(size_t size);
+		void resize(size_t new_size);
 
 		void fillWithZero();
 

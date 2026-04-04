@@ -107,14 +107,26 @@ size_t PxrPointsLRUCache::removeByName(const std::string& name) {
 		}
 	}
 
+	if(removed_count > 0) {
+		LOG_DBG << "PxrPointsLRUCache: " << removed_count << " items for key \"" << name << "\" removed from cache.";
+	}
+
 	return removed_count;
 }
 
 void PxrPointsLRUCache::clear() {
-	std::lock_guard<std::mutex> lock(mMutex);
-	mCacheItemsMap.clear();
-	mCacheItemsList.clear();
-	mCurrentMemSizeBytes = kInvalidUsedMemSize;
+	size_t old_items_count = 0;
+	{
+		std::lock_guard<std::mutex> lock(mMutex);
+		
+		old_items_count = mCacheItemsList.size();
+		mCacheItemsMap.clear();
+		mCacheItemsList.clear();
+		mCurrentMemSizeBytes = kInvalidUsedMemSize;
+	}
+	if(old_items_count != 0) {
+		LOG_DBG << "PxrPointsLRUCache: cleared.";
+	}
 }
 
 std::string PxrPointsLRUCache::getCacheUtilizationString() const {

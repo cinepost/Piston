@@ -113,6 +113,9 @@ public:
         	mMtx.shrink_unlock();
     	}
     }
+
+    bool isValid() const { return mValid; }
+
 private:
 	bool mValid;
     PxrPointsLRUCache & mMtx;

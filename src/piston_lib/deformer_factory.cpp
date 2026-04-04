@@ -58,9 +58,32 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 	}
 }
 
+void CurvesDeformerFactory::setPointsCacheUsageState(bool state) {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	if(state) {
+		if(factory.mpPxrPointsLRUCache) return;
+
+		factory.mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
+	} else {
+		if(!factory.mpPxrPointsLRUCache) return;
+
+		factory.mpPxrPointsLRUCache->clear();
+		factory.mpPxrPointsLRUCache = nullptr;
+	}
+}
+
+bool CurvesDeformerFactory::getPointsCacheUsageState() {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+	return factory.mpPxrPointsLRUCache != nullptr;
+}
+
 void CurvesDeformerFactory::clear() {
 	CurvesDeformerFactory& factory = getInstance();
 	std::lock_guard<std::mutex> lock(factory.mMutex);
+	
 	factory.mDeformers.clear();
 	if(factory.mpPxrPointsLRUCache) {
 		factory.mpPxrPointsLRUCache->clear();
@@ -68,7 +91,7 @@ void CurvesDeformerFactory::clear() {
 }
 
 CurvesDeformerFactory::~CurvesDeformerFactory() {
-	SimpleProfiler::printReport();
+	//SimpleProfiler::printReport();
 }
 
 CurvesDeformerFactory::CurvesDeformerFactory() {

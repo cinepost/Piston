@@ -51,6 +51,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		void setDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
 		void setCurvesGeoPrim(const pxr::UsdPrim& geoPrim);
 
+		void setPointsCacheUsageState(bool state);
+		bool getPointsCacheUsageState() const;
+
 		void setDeformerRestAttrName(const std::string& name);
 		const std::string& getDeformerRestAttrName() const { return mDeformerRestAttrName; }
 		void setCurvesRestAttrName(const std::string& name);
@@ -87,9 +90,12 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+
 		void makeDirty();
-		
+		void clearLRUCaches();
+
 	protected:
+		bool mUsePointsCache = true;
 		bool mShowDebugGeometry = false;
 		bool mDirty = true;
 		bool mDeformerDataWritten = false;
@@ -109,6 +115,11 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		DeformerStats mStats;
 
 		std::mutex      mPrmMutex;
+
+		// we use these containers to store deformed points data when LRU cache is disabled
+		std::unique_ptr<PointsList> mpDeformedPointsList;
+		std::unique_ptr<PointsList> mpDeformedPointsListStep;
+		std::unique_ptr<PointsList> mpTempVelocitiesList;
 
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false) = 0;

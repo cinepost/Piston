@@ -338,8 +338,8 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	const bool is_per_vertex_attr = pCurvesContainer->getTotalVertexCount() == skin_prim_indices.size();
 	const bool is_per_curve_attr = pCurvesContainer->getCurvesCount() == skin_prim_indices.size();
 
-	if(!is_per_vertex_attr && !is_per_curve_attr) {
-		DLOG_ERR << "Wrong skin prim ID attribute values count ! Should be per curve or per curve vertex !";
+	if((skin_prim_indices.size() > 0) && !is_per_vertex_attr && !is_per_curve_attr) {
+		DLOG_ERR << "Wrong skin prim ID attribute values count (" << skin_prim_indices.size() << ")! Should be per-curve or per-curve-vertex !";
 		return false;
 	}
 
@@ -1090,12 +1090,11 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 }
 
 bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
-	if(!mGuidesSkinGeoPrimHandle.isValid()) {
-		DLOG_ERR << "Unable to build guides skin primtive data. No primitive \"" << mGuidesSkinGeoPrimHandle.getFullName() << "\" found!";
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+
+	if(!mGuidesSkinGeoPrimHandle) {
 		return false;
 	}
-
-	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
 	if(!mDirty && mpSkinAdjacencyData && mpSkinPhantomTrimeshData && 
 		mpSkinAdjacencyData->isValid() && 
@@ -1105,8 +1104,8 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	if(!mpSkinAdjacencyData) {
 		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mGuidesSkinGeoPrimHandle);
+		assert(mpSkinAdjacencyData);
 	}
-	assert(mpSkinAdjacencyData);
 
 	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinAdjacencyData.get())) {
 		if(!mpSkinAdjacencyData->buildInPlace(mGuidesSkinGeoPrimHandle)) {
@@ -1117,8 +1116,8 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	if(!mpSkinPhantomTrimeshData) {
 		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mGuidesSkinGeoPrimHandle);
+		assert(mpSkinPhantomTrimeshData);
 	}
-	assert(mpSkinPhantomTrimeshData);
 
 	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinPhantomTrimeshData.get())) {
 		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName)) {
@@ -1126,7 +1125,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 			return false;
 		}
 	}
-
+	
 	return true;
 }
 
@@ -1141,14 +1140,16 @@ bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 		return false;
 	}
 
-	if(mpSkinAdjacencyData && mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
-		DLOG_ERR << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !";
-		return false;
-	}
+	if(mGuidesSkinGeoPrimHandle) {
+		if(mpSkinAdjacencyData && mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
+			DLOG_ERR << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !";
+			return false;
+		}
 
-	if(mpSkinPhantomTrimeshData && !mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
-		DLOG_ERR << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !";
-		return false;
+		if(mpSkinPhantomTrimeshData && !mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
+			DLOG_ERR << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !";
+			return false;
+		}
 	}
 
 	return true;

@@ -168,7 +168,7 @@ class PhantomTrimesh {
 		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const;
 		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const;
 
-		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default()) const;
+		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const;
 
 		size_t calcHash() const;
 
