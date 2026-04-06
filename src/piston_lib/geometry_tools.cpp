@@ -208,8 +208,6 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
     vertex_normals.resize(pAdjacency->getVertexCount());
 
     const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? pTrimesh->getLivePositions() : pTrimesh->getRestPositions();
-
-    const auto& faces = pTrimesh->getFaces();
     const std::vector<PhantomTrimesh::PxrIndexType>& vertices = pTrimesh->getVertices();
     
     auto func = [&](const std::size_t vertex_index) {

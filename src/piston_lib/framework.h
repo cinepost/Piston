@@ -17,6 +17,9 @@
 #define dbg_printf(...) {}
 #endif
 
+#if !defined(__TBB_show_deprecation_message_task_H)
+#define  __TBB_show_deprecation_message_task_H
+#endif
 
 namespace Piston {
 

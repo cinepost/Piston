@@ -212,9 +212,8 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 	assert(hasSkinPrimitiveData()); // for now we only work with skin geometry
 	PhantomTrimesh* pSkinPhantomTrimesh = hasSkinPrimitiveData() ? mpSkinPhantomTrimeshData->getTrimesh() : nullptr;
 	assert(pSkinPhantomTrimesh);
-	pSkinPhantomTrimesh->update(mGuidesSkinGeoPrimHandle ,time_code);
+	pSkinPhantomTrimesh->update(mGuidesSkinGeoPrimHandle, time_code);
 
-	const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
 	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
 
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
@@ -614,7 +613,6 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
         		total_points++;
 
-        		bool bound = false;
         		const size_t curr_point_index = curve_vertex_offset + i;
         		auto& bind = pointBinds[curr_point_index];
         		bind.encoded_id = PointBindData::kInvalid;
@@ -909,7 +907,6 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 	assert(curves_count == mGuideIndices.size());
-	const size_t curve_points_count = mpCurvesContainer->getTotalVertexCount();
 
 	std::vector<NTBFrame> rest_guide_frames(mpGuideCurvesContainer->getRestCurvePoints().size());
 

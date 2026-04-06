@@ -39,18 +39,25 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
 		
 	if(!restPositionPrimVar) {
-		LOG_ERR << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << " !";
-		return false;
-	}
+		LOG_WRN << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
 
-	const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
+		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
+
+		static const pxr::UsdTimeCode s_zero_time_code(0.0);
+
+		if(!mesh.GetPointsAttr().Get(&mUsdMeshRestPositions, s_zero_time_code)) {
+			LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << s_zero_time_code.GetValue();
+			return false;
+		}
+	} else {
+		const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
-	if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
-		LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
-		return false;
+		if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
+			LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
+			return false;
+		}
+		LOG_DBG << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions.";
 	}
-
-	LOG_DBG << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions.";
 
 	mValid = true;
 	return mValid;

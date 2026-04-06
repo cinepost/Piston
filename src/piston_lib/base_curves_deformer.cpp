@@ -135,7 +135,9 @@ bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code) {
 	return deform(time_code, false);
 }
 
-bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {	
+bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
+	DLOG_DBG << "Deform at time code: " << time_code.GetValue();
+		
 	if(!buildDeformerData(time_code, multi_threaded)) {
 		return false;
 	}
