@@ -366,7 +366,8 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		const uint32_t prim_vertex_count = pSkinAdjacency->getFaceVertexCount(prim_id);
 		const uint32_t prim_vertex_offset = pSkinAdjacency->getFaceVertexOffset(prim_id);
 
-		float face_id, u, v, dist;
+		uint32_t face_id;
+		float u, v, dist;
 
 		if( prim_vertex_count > 3u){
 			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
@@ -383,7 +384,8 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 			static const float kFLT_MAX = std::numeric_limits<float>::max();
 
 			float pt_tri_dist_sq_min = kFLT_MAX;
-			float _face_id = PhantomTrimesh::kInvalidTriFaceID, _u, _v, _dist;
+			uint32_t _face_id = PhantomTrimesh::kInvalidTriFaceID; 
+			float _u, _v, _dist;
 			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
 				_face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
 					pSkinAdjacency->getFaceVertex(prim_id, local_index), 
@@ -431,7 +433,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		for(size_t curve_index = start; curve_index < end; ++curve_index) {
 			
 			const PxrCurvesContainer::CurveDataConstPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_index);
-			const int curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+			const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
 			if(curve_vertices_count < 2) continue;
 
 			const uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_index);
