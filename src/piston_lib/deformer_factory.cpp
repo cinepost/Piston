@@ -66,11 +66,13 @@ void CurvesDeformerFactory::setPointsCacheUsageState(bool state) {
 		if(factory.mpPxrPointsLRUCache) return;
 
 		factory.mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
+		LOG_DBG << "PxrPointsLRUCache enabled.";
 	} else {
 		if(!factory.mpPxrPointsLRUCache) return;
 
 		factory.mpPxrPointsLRUCache->clear();
 		factory.mpPxrPointsLRUCache = nullptr;
+		LOG_DBG << "PxrPointsLRUCache disabled.";
 	}
 }
 

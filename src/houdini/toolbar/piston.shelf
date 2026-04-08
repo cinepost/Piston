@@ -2,15 +2,26 @@
 <shelfDocument>
 
   <toolshelf name="piston_shelf" label="Piston">
+    <memberTool name="ptCacheToggle"/>
     <memberTool name="clearAll"/>
   </toolshelf>
+
+  <tool name="ptCacheToggle" label="Cache Toggle" icon="Piston_PtCache_On">
+    <helpText><![CDATA[Piston global point cache toggle]]></helpText>
+    <script scriptType="python">
+      <![CDATA[
+from piston_houdini.shelf_tools import toggleGlobalPointsCache
+toggleGlobalPointsCache()
+      ]]>
+    </script>
+  </tool>
 
   <tool name="clearAll" label="Clear Piston Data" icon="Piston_Delete">
     <helpText><![CDATA[Deletes all piston deformers and associated data.]]></helpText>
     <script scriptType="python">
       <![CDATA[
-import piston
-piston.clearAll()
+from piston_houdini.shelf_tools import clearAll
+clearAll()
       ]]>
     </script>
   </tool>
