@@ -26,8 +26,11 @@ void Logger::processQueue() {
 			mLogQueue.pop();
 			lock.unlock(); // Unlock early to allow other threads to push logs
 
-			const char* pLevelStr = kLevelStrTrace;
+			const char* pLevelStr = kLevelStrFatal;
 			switch(entry.level) {
+				case LogLevel::TRACE:
+					pLevelStr = kLevelStrTrace;
+					break;
 				case LogLevel::DEBUG:
 					pLevelStr = kLevelStrDebug;
 					break;
@@ -42,7 +45,6 @@ void Logger::processQueue() {
 					break;
 				case LogLevel::FATAL:
 				default:
-					pLevelStr = kLevelStrFatal;
 					break;
 			}
 			std::cout << "[" << entry.timestamp << "] [" << pLevelStr << "] " << entry.message << std::endl;

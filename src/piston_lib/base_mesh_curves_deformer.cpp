@@ -19,12 +19,12 @@ bool BaseMeshCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim
 }
 
 bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
-	if(!mDeformerGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
+	if(mpAdjacencyData && !mDeformerGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
 		DLOG_ERR << "Error writing " << mpAdjacencyData->typeName() << " deformer data to json !";
 		return false;
 	}
 
-	if(!mCurvesGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
+	if(mpPhantomTrimeshData && !mCurvesGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
 		DLOG_ERR << "Error writing " << mpPhantomTrimeshData->typeName() << " curves data to json !";
 		return false;
 	}

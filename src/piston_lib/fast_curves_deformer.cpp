@@ -116,7 +116,7 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 		return false;
 	}
 
-	if(!mCurvesGeoPrimHandle.writeDataToBson(mpFastCurvesDeformerData.get())) {
+	if(mpFastCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(mpFastCurvesDeformerData.get())) {
 		DLOG_ERR << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
 	}

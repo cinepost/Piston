@@ -486,53 +486,65 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 		return false;
 	}
 
-	const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
-	const auto total_curves_count = mpCurvesContainer->getCurvesCount();
+	bool result = false;
 
-	if(guideIndicesNeeded()) {
-		if(mGuideIDPrimAttrName.empty()) {
-			DLOG_ERR << "No guide id (clump_id) attribute name set but needed !";
-			return false;
+	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpGuideCurvesDeformerData.get())) {
+
+		const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
+		const auto total_curves_count = mpCurvesContainer->getCurvesCount();
+
+		if(guideIndicesNeeded()) {
+			if(mGuideIDPrimAttrName.empty()) {
+				DLOG_ERR << "No guide id (clump_id) attribute name set but needed !";
+				return false;
+			}
+
+			if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
+				DLOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
+				return false;
+			}
+			assert(mGuideIndices.size() == total_curves_count);
+
+			// check guide indices are not out of range
+			int max_guide_index = 0;
+			for(const int idx: mGuideIndices) {
+				max_guide_index = std::max(max_guide_index, idx);
+			}
+
+			if(max_guide_index >= total_guides_count) {
+				DLOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
+				return false;
+			}
 		}
 
-		if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
-			DLOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
-			return false;
-		}
-		assert(mGuideIndices.size() == total_curves_count);
+		if(getBindRootsToSkinSurface()) {
+			if(!buildSkinPrimData(multi_threaded)) {
+				DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
+				return false;
+			}
 
-		// check guide indices are not out of range
-		int max_guide_index = 0;
-		for(const int idx: mGuideIndices) {
-			max_guide_index = std::max(max_guide_index, idx);
+			if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
+				DLOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
+				return false;
+			}
 		}
 
-		if(max_guide_index >= total_guides_count) {
-			DLOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
-			return false;
+		switch(getBindMode()) {
+			case BindMode::SPACE:
+				result = buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
+				break;
+			case BindMode::NTB:
+				result = buildDeformerDataNTBMode(rest_time_code, multi_threaded);
+				break;
+			default:
+				result = buildDeformerDataAngleMode(rest_time_code, multi_threaded);
+				break;
 		}
+
+		mpGuideCurvesDeformerData->setPopulated(result);
 	}
 
-	if(getBindRootsToSkinSurface()) {
-		if(!buildSkinPrimData(multi_threaded)) {
-			DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
-			return false;
-		}
-
-		if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
-			DLOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
-			return false;
-		}
-	}
-
-	switch(getBindMode()) {
-		case BindMode::SPACE:
-			return buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
-		case BindMode::NTB:
-			return buildDeformerDataNTBMode(rest_time_code, multi_threaded);
-		default:
-			return buildDeformerDataAngleMode(rest_time_code, multi_threaded);
-	}
+	return result;
 }
 
 bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
@@ -1127,25 +1139,41 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 }
 
 bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
-	if(mpGuidesPhantomTrimeshData && !mDeformerGeoPrimHandle.writeDataToBson(mpGuidesPhantomTrimeshData.get())) {
-		DLOG_ERR << "Error writing " << mpGuidesPhantomTrimeshData->typeName() << " deformer data to json !";
-		return false;
+	if(mpGuidesPhantomTrimeshData){
+		if(!mDeformerGeoPrimHandle.writeDataToBson(mpGuidesPhantomTrimeshData.get())) {
+			DLOG_ERR << "Error writing " << mpGuidesPhantomTrimeshData->typeName() << " deformer data to json !";
+			return false;
+		} else {
+			DLOG_DBG << "Deformer data " << mpGuidesPhantomTrimeshData->jsonDataKey() << " written.";
+		}
 	}
 
-	if(mpGuideCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(mpGuideCurvesDeformerData.get())) {
-		DLOG_ERR << "Error writing " << mpGuideCurvesDeformerData->typeName() << " deformer data to json !";
-		return false;
+	if(mpGuideCurvesDeformerData) {
+		if(!mCurvesGeoPrimHandle.writeDataToBson(mpGuideCurvesDeformerData.get())) {
+			DLOG_ERR << "Error writing " << mpGuideCurvesDeformerData->typeName() << " deformer data to json !";
+			return false;
+		} else {
+			DLOG_DBG << "Deformer data " << mpGuideCurvesDeformerData->jsonDataKey() << " written.";
+		}
 	}
 
 	if(mGuidesSkinGeoPrimHandle) {
-		if(mpSkinAdjacencyData && mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
-			DLOG_ERR << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !";
-			return false;
+		if(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid()) {
+			if(!mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
+				DLOG_ERR << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !";
+				return false;
+			} else {
+				DLOG_DBG << "Deformer data " << mpSkinPhantomTrimeshData->jsonDataKey() << " written.";
+			}
 		}
 
-		if(mpSkinPhantomTrimeshData && !mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
-			DLOG_ERR << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !";
-			return false;
+		if(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid()) {
+			if(!mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
+				DLOG_ERR << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !";
+				return false;
+			} else {
+				DLOG_DBG << "Deformer data " << mpSkinAdjacencyData->jsonDataKey() << " written.";
+			}
 		}
 	}
 

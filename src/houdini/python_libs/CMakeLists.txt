@@ -15,7 +15,7 @@ if(NOT Houdini_FOUND)
     message( FATAL_ERROR "Houdini installation not found !" )
 endif()
 
-set(HOUDINI_PYTHON_LIBS_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/houdini_${Houdini_VERSION}/python${_houdini_python_version}libs)
+set(HOUDINI_PYTHON_LIBS_INSTALL_DIR ${HOUDINI_INSTALL_DIR}/python${_houdini_python_version}libs)
 
 # Without this, any build libraries automatically have names "lib{x}.so"
 set(CMAKE_SHARED_MODULE_PREFIX "_")

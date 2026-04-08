@@ -11,6 +11,7 @@
 namespace boost = hboost;
 #endif // BOOST_PYTHON_MODULE
 
+#include "../../piston_lib/common.h"
 #include "../../piston_lib/base_curves_deformer.h"
 #include "../../piston_lib/base_mesh_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
@@ -21,6 +22,8 @@ namespace boost = hboost;
 #include "../../piston_lib/deformer_stats.h"
 #include "../../piston_lib/simple_profiler.h"
 #include "../../piston_lib/tests.h"
+
+#include <pxr/base/tf/pyPtrHelpers.h>
 
 #include <vector>
 
@@ -33,6 +36,11 @@ void setLogLevel(Piston::LogLevel level) {
 	Piston::Logger::getInstance().setLogLevel(level);
 }
 
+void clearAllBSONData(pxr::UsdStageRefPtr pStage) {
+	if(Piston::clearAllPrimBson(pStage)) {
+		Piston::Logger::getInstance().getStream(Piston::LogLevel::INFO) << "Piston data deleted from stage " << Piston::getStageName(pStage);
+	}
+}
 
 struct BSON_to_Python {
 	static PyObject *convert(const Piston::BSON& bson) {
@@ -50,6 +58,7 @@ BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_ov
 BOOST_PYTHON_MODULE(_piston) {
 	using namespace boost::python;
 	using namespace Piston;
+
 
 	class_<SimpleProfiler, boost::noncopyable>("Profiler",  no_init)
 		.def("printReport", &SimpleProfiler::printReport)
@@ -169,6 +178,7 @@ BOOST_PYTHON_MODULE(_piston) {
 
 	to_python_converter<Piston::BSON , BSON_to_Python>();
 
+	def("clearAllBSONData", &clearAllBSONData);
 	def("getLogger", &Logger::getInstance, return_value_policy<reference_existing_object>());
 	def("setLogLevel", setLogLevel);
 	def("runTests", &Tests::runTests);	

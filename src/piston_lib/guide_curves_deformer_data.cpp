@@ -46,6 +46,7 @@ void GuideCurvesDeformerData::clearData() {
 	mPointSurfaceBinds.clear();
 	mGuideOrigins.clear();
 	mSkinPrimPath = "";
+	setPopulated(false);
 }
 
 size_t GuideCurvesDeformerData::calcHash() const {
@@ -61,8 +62,13 @@ size_t GuideCurvesDeformerData::calcHash() const {
 	}
 	hash += mPointSurfaceBinds.size();
 
+	for(int idx: mSkinPrimIndices) {
+		hash += static_cast<size_t>(idx);
+	}
+	hash += mSkinPrimIndices.size();
+
 	for(uint32_t id: mGuideOrigins) {
-		hash +=id;
+		hash += id;
 	}
 	hash += mGuideOrigins.size();
 
@@ -75,6 +81,7 @@ static const char* kJPointSurfaceBinds = "pointsurfacebinds";
 static const char* kJGuideOrigins = "guideorigs";
 static const char* kJDataHash = "data_hash";
 static const char* kJSkinPrimPath = "skin_prim_path";
+static const char* kJSkinPrimIndices = "skin_prim_indices";
 
 bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 	static const std::vector<GuideOrigin> kEmptyGuideOrigins;
@@ -83,10 +90,23 @@ bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 	j[kJPointSurfaceBinds] = mPointSurfaceBinds;
 	j[kJGuideOrigins] = (mBindMode == BindMode::NTB) ? mGuideOrigins : kEmptyGuideOrigins;
 	j[kJSkinPrimPath] = mSkinPrimPath;
+	j[kJSkinPrimPath] = mSkinPrimIndices;
+	j[kJSkinPrimIndices] = mSkinPrimIndices;
 	j[kJDataHash] = calcHash();
 
 	return true;
 }
+
+/*
+		std::vector<PointBindData> 			mPointBinds;
+		std::vector<GuideOrigin> 			mGuideOrigins;
+		std::vector<PointSurfaceBindData> 	mPointSurfaceBinds;
+		BindMode                    		mBindMode = BindMode::NTB;
+		std::string                 		mSkinPrimPath;
+		std::vector<int> 					mSkinPrimIndices;
+
+		bool                                mKeepRootsOnSurface = true;
+*/
 
 bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 	clearData();
@@ -110,12 +130,17 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 		mGuideOrigins = j[kJGuideOrigins].template get<std::vector<GuideOrigin>>();
 	}
 
+	mPointSurfaceBinds = j[kJPointSurfaceBinds].template get<std::vector<PointSurfaceBindData>>();
+	mSkinPrimIndices = j[kJSkinPrimIndices].template get<std::vector<int>>();
+
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		LOG_ERR << typeName() << " json data hash mismatch !";
 		return false;
 	}
 
 	LOG_DBG << "GuideCurvesDeformerData data read from json payload !";
+
+	setPopulated(true);
 	return true;
 }
 

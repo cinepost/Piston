@@ -1,0 +1,21 @@
+Утановка уровня логгирования:
+
+piston.setLogLevel(log_level)
+
+Доступны следующие уровни
+
+piston.LogLevel.TRACE
+piston.LogLevel.DEBUG
+piston.LogLevel.INFO
+piston.LogLevel.WARNING
+piston.LogLevel.ERROR
+piston.LogLevel.FATAL
+
+
+Очистка модуля и сцены (в текущей версии данные дефомеров могут не удаляться из сцены):
+
+piston.clearAll(stage = None):
+
+Все деформеры и ассоцированые данные удаляются, глобальный кэш очищается, данные деформсеров удаляются если они есть.
+На шелфе Piston в Houdini выведена кнопка.
+

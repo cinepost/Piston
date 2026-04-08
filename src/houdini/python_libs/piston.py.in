@@ -21,6 +21,27 @@ def __getattr__(name):
 setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__WrapDeformer_BindMode)
 setattr(_piston.GuideCurvesDeformer, "BindMode", _piston.__GuideDeformer_BindMode)
 
+# Clear all module data
+def clearAll(stage = None):
+
+	if not stage:
+		import hou
+
+		stages = {}
+
+		for node in hou.node('/stage').children():
+			if isinstance(node, hou.LopNode):
+				stage = node.stage()
+				if stage:
+					stages[stage.GetRootLayer().identifier] = stage
+
+		for stage in stages.values():
+			_piston.clearAllBSONData(stage)
+	else:
+		_piston.clearAllBSONData(stage)
+	
+	_piston.DeformerFactory.clear()
+
 
 #
 # Debug stuff

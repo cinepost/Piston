@@ -4,22 +4,33 @@
 #include "logging.h"
 
 #include <pxr/base/tf/token.h>
+#include <pxr/base/tf/pathUtils.h>
 #include <pxr/base/vt/value.h>
+#include <pxr/base/vt/dictionary.h>
+#include <pxr/usd/usd/namespaceEditor.h>
 
 #include <stdio.h>
 #include <stdint.h>
 
-
+/*
 static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
 	pxr::Vt_ArrayForeignDataSource fd(nullptr, 1);
 	static const bool addRef = 1;
 	return {&fd, (uint8_t*)vec.data(), vec.size(), addRef};
 }
-	
+*/	
 	
 namespace Piston {
 
 static const pxr::SdfPath sHiddenPrimPath("/__piston_data__");
+
+static inline std::string uniqueDataName(const UsdPrimHandle* pPrim, const SerializableDeformerDataBase* pDeformerData) {
+	assert(pDeformerData);
+	assert(pPrim);
+	std::string s = pDeformerData->jsonDataKey() + pPrim->getFullName();
+	std::replace(s.begin(), s.end(), '/', '_');
+	return s;
+}
 
 static inline void bytes_to_hexstr(const std::vector<uint8_t>& bytes, std::string& hexstr) {
 	static const uint8_t lookup[]= "0123456789abcdef";
@@ -76,7 +87,7 @@ static inline void hexstr_to_bytes(const std::string& hexstr, std::vector<uint8_
 	bytes.resize(bytes_count);
 
 	for(size_t i=0; i<bytes_count; ++i) {
-		bytes[i] = lookup[hexstr[i * 2]] << 4 | lookup[hexstr[i * 2 + 1]];
+		bytes[i] = lookup[static_cast<unsigned char>(hexstr[i * 2])] << 4 | lookup[static_cast<unsigned char>(hexstr[i * 2 + 1])];
 	}
 }
 
@@ -184,22 +195,10 @@ template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_n
 template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<int>& vec, pxr::UsdTimeCode time_code) const;
 template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<uint32_t>& vec, pxr::UsdTimeCode time_code) const;
 
-void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
-	pxr::UsdPrim prim = getPrim();
-	const pxr::TfToken token(identifier);
-
-	if(!prim.HasCustomDataKey(token)) {
-		LOG_ERR << "No bson payload \"" << identifier << "\" exist in prim " << getPath();
-		return;
-	}
-
-	prim.ClearCustomDataByKey(token);
-}
-
 bool UsdPrimHandle::getDataFromBson(SerializableDeformerDataBase* pDeformerData) const {
 	assert(pDeformerData);
 	BSON v_bson;
-	if(!getBsonFromPrim(pDeformerData->jsonDataKey(), v_bson)) {
+	if(!getBsonFromPrim(uniqueDataName(this, pDeformerData), v_bson)) {
 		return false;
 	}
 
@@ -221,16 +220,18 @@ bool UsdPrimHandle::writeDataToBson(SerializableDeformerDataBase* pDeformerData)
 		ScopedTimeMeasure _t("UsdPrimHandle::writeDataToBson serialize " + pDeformerData->jsonDataKey());
 
 		if(!pDeformerData->serialize(v_bson)) {
+			LOG_ERR << "Error serializing data " << pDeformerData->jsonDataKey() << " !!!";
 			return false;
 		}
 	}
 
-	return setBsonToPrim(pDeformerData->jsonDataKey(), v_bson);
+	return setBsonToPrim(uniqueDataName(this, pDeformerData), v_bson);
 }
 
 bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, BSON& v_bson) const {
 
 	if(!isValid()) {
+		LOG_ERR << "Unable to get BSON from invalid usd prim !";
 		return false;
 	}
 
@@ -239,14 +240,14 @@ bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, BSON& v_bson)
 
 	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(sHiddenPrimPath);
 	if(!data_prim.IsValid()) {
-		LOG_DBG << "Stage has no Piston hidden data prim!";
+		LOG_ERR << "Stage has no Piston hidden data prim!";
 		return false;
 	}
 
 	const pxr::TfToken key_path(identifier);
 
 	if(!data_prim.HasCustomDataKey(key_path)) {
-		LOG_ERR << "Error getting bson from prim " << getPath() << ". No custom data \"" << identifier << "\" exist !!!";
+		LOG_ERR << "Error getting bson from prim " << data_prim.GetPath() << ". No custom data \"" << identifier << "\" exist !!!";
 		return false;
 	}
 
@@ -255,8 +256,59 @@ bool UsdPrimHandle::getBsonFromPrim(const std::string& identifier, BSON& v_bson)
 	return true;
 }
 
+void UsdPrimHandle::clearPrimBson(const std::string& identifier) const {
+	auto pStage = mPrim.GetStage();
+	assert(pStage); 
+
+	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(sHiddenPrimPath);
+
+	const pxr::TfToken token(identifier);
+
+	if(!data_prim.HasCustomDataKey(token)) {
+		LOG_ERR << "No bson payload \"" << identifier << "\" exist in prim " << getPath();
+		return;
+	}
+
+	data_prim.ClearCustomDataByKey(token);
+}
+
+std::string getStageName(pxr::UsdStageRefPtr pStage) {
+	assert(pStage);
+	const std::string identifier = pStage->GetRootLayer()->GetIdentifier();
+	return pxr::TfGetBaseName(identifier);
+}
+
+bool clearAllPrimBson(pxr::UsdStageRefPtr pStage) {
+	assert(pStage); 
+	
+	bool result = false;
+
+	//LOG_DBG << "clearAllPrimBson " << getStageName(pStage);
+
+	if(pStage->GetPrimAtPath(sHiddenPrimPath).IsValid()) {
+		//LOG_DBG << "Got hidden prim";
+		pxr::SdfLayerHandle editLayer = pStage->GetEditTarget().GetLayer();
+
+		if (editLayer && editLayer->PermissionToEdit()) {
+			//LOG_DBG << "Deleting";
+			pxr::UsdNamespaceEditor editor(pStage);
+
+			if (editor.DeletePrimAtPath(sHiddenPrimPath)) {
+				editor.ApplyEdits();
+			}
+			result = true;
+		}
+	}
+
+	return result;
+}
+
 bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const BSON& v_bson) const {
+	assert(!v_bson.empty() && "v_bson is empty");
+	assert(isValid() && "prim is invalid");
+
 	if(v_bson.empty() || !isValid()) {
+		LOG_ERR << "Unable to set BSON to invalid UsdPrimHandle!";
 		return false;
 	}
 
@@ -265,7 +317,7 @@ bool UsdPrimHandle::setBsonToPrim(const std::string& identifier, const BSON& v_b
 
 	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(sHiddenPrimPath);
 	if(!data_prim.IsValid()) {
-		data_prim = pStage->DefinePrim(sHiddenPrimPath);
+		data_prim = pStage->CreateClassPrim(sHiddenPrimPath);
 		data_prim.SetHidden(true);
 	}
 
