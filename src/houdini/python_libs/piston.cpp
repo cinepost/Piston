@@ -178,7 +178,7 @@ BOOST_PYTHON_MODULE(_piston) {
 
 	to_python_converter<Piston::BSON , BSON_to_Python>();
 
-	def("clearAllBSONData", &clearAllBSONData);
+	def("clearAllBSONData", clearAllBSONData);
 	def("getLogger", &Logger::getInstance, return_value_policy<reference_existing_object>());
 	def("setLogLevel", setLogLevel);
 	def("runTests", &Tests::runTests);	

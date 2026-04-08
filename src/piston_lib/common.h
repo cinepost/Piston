@@ -27,11 +27,11 @@ const char *stringifyMemSize(size_t bytes);
 std::string bson_to_hex_string(const BSON& bson);
 void hex_string_to_bson(const std::string& str, BSON& bson);
 
-std::string getStageName(pxr::UsdStageWeakPtr pStage);
+std::string getStageName(pxr::UsdStageRefPtr pStage);
 
 inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "Mesh"; }
 inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "BasisCurves"; }
-bool clearAllPrimBson(pxr::UsdStageWeakPtr pStage);
+bool clearAllPrimBson(pxr::UsdStageRefPtr pStage);
 
 class SerializableDeformerDataBase;
 
