@@ -1,9 +1,18 @@
 #include "deformer_factory.h"
 #include "logging.h"
 
+#include <algorithm>
+#include <cctype>
+
+
 namespace Piston {
 
 static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
+
+static std::string tolower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    return s;
+}
 
 CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
     if (mInstancePtr == nullptr) {
@@ -97,7 +106,15 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 }
 
 CurvesDeformerFactory::CurvesDeformerFactory() {
-	mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
+	bool enable_cache = true;
+	std::string cache_var_value;
+	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
+		cache_var_value = tolower(cache_var_value);
+		if(cache_var_value == "off" || cache_var_value == "false" || cache_var_value == "0") {
+			enable_cache = false;
+		}
+	}
+	mpPxrPointsLRUCache = enable_cache ? PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize) : nullptr;
 }
 
 

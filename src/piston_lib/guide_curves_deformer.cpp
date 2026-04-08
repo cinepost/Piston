@@ -133,7 +133,7 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 	pSkinPhantomTrimesh->update(mGuidesSkinGeoPrimHandle ,time_code);
 
 	mTempSkinFaceLiveNormals.resize(pSkinPhantomTrimesh->getFaceCount());
-	DLOG_WRN << "TODO: precalculate skin live face normals first !!!";
+	TODO(precalculate skin live face normals first !!!)
 
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointSurfaceBinds();
 
@@ -281,7 +281,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 				points[i] = pPhantomTrimesh->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, u, v, w, x);
 			} else {
 				// bound to triface
-				LOG_WRN << "TODO: precalculate skin live face normals first for SPACE mode !!!";
+				TODO(precalculate skin live face normals first for SPACE mode !!!)
 				const pxr::GfVec3f face_normal = pPhantomTrimesh->getFaceLiveNormal(bind.encoded_id.mode_space.element_id);
 				bind.getData(u, v, w);
 				points[i] = pPhantomTrimesh->getInterpolatedLivePosition(bind.encoded_id.mode_space.element_id, u, v) + (face_normal * w);

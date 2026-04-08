@@ -210,4 +210,5 @@ add_subdirectory( src )
 #add_subdirectory( contrib )
 
 #install(FILES src/changelog.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(FILES help.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
 

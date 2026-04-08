@@ -6,7 +6,7 @@
 #include "wrap_curves_deformer.h"
 #include "guide_curves_deformer.h"
 #include "pxr_points_lru_cache.h"
-
+#include "os.h"
 #include "simple_profiler.h"
 
 #include <string>

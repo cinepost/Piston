@@ -6,7 +6,6 @@
 #endif
 
 #include <memory>
-#include <iostream>
 
 #include <pxr/base/vt/array.h>
 #include <pxr/base/gf/matrix3f.h>
@@ -20,6 +19,9 @@
 #if !defined(__TBB_show_deprecation_message_task_H)
 #define  __TBB_show_deprecation_message_task_H
 #endif
+
+#define DO_PRAGMA(x) _Pragma (#x)
+#define TODO(msg) DO_PRAGMA(message ("TODO: " #msg))
 
 namespace Piston {
 

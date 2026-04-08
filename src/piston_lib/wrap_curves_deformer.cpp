@@ -344,7 +344,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
         		bind.face_id = PointBindData::kInvalidFaceID;
         		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i);
 
-        		static constexpr float sInvalidPrimID = std::numeric_limits<uint32_t>::max();
+        		static constexpr uint32_t sInvalidPrimID = std::numeric_limits<uint32_t>::max();
 
         		const uint32_t prim_id = has_pp_prim_indices ? static_cast<uint32_t>(skin_prim_indices[curve_vertex_offset + i]) : sInvalidPrimID; 
 

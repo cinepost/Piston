@@ -42,6 +42,7 @@ if(USE_CGAL)
 endif(USE_CGAL)
 
 file( GLOB SOURCES
+    ./os.cpp
     ./common.cpp
     ./pxr_json.cpp
     ./pxr_points_lru_cache.cpp
