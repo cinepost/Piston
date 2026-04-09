@@ -34,6 +34,7 @@ import piston
 
 # Example: Set the logging level to DEBUG for troubleshooting
 piston.setLogLevel(piston.LogLevel.DEBUG)
+```
 
 ### Available Logging Levels
 
@@ -64,7 +65,7 @@ import piston
 
 # Toggle the cache globally (True = On, False = Off)
 piston.DeformerFactory.setPointsCacheUsageState(True)
-
+```
 
 ## Per-Deformer Cache Control
 For more granular control, the cache can be switched off or on for individual deformers. 
@@ -73,6 +74,7 @@ This allows you to keep caching active for the majority of your scene while disa
 ```python
 # Toggle the cache for a specific deformer instance
 deformer.setPointsCacheUsageState(False)
+```
 
 Note: While the cache significantly improves playback speed, disabling it ensures that geometry is recomputed every frame, which can be helpful for verifying live deformation logic.
 
@@ -100,17 +102,17 @@ This method performs a complete reset of the **piston** environment. It is parti
 
 ### Houdini Integration
 
-To enable the **Piston shelf** and interactive tools in Houdini, you must update your `houdini.env` file (usually located in `~/houdiniX.X/houdini.env`).
+To enable **Piston** in Houdini, you must update your `Houdini.env` file (usually located in `~/houdiniX.X/houdini.env`).
 
 Add the following line to ensure Houdini can locate the Piston plugins, OTLs, and shelf files:
 
-```bash
-# Add Piston to the Houdini Path
+#### Add Piston to the Houdini Path
 
 **Linux:**
 ```bash
 HOUDINI_PATH = "/opt/piston/houdini_${HOUDINI_VERSION};&"
-
+```
 **Windows:**
 ```bash
 HOUDINI_PATH = "D:\work\piston\houdini_${HOUDINI_VERSION};&"
+```

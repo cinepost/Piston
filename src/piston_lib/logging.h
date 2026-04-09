@@ -28,7 +28,14 @@ namespace fs = std::filesystem;
 
 namespace Piston {
 
-enum class LogLevel { TRACE, DEBUG, INFO, WARNING, ERROR, FATAL };
+enum class LogLevel { 
+	TRACE   = 0, 
+	DEBUG   = 1, 
+	INFO    = 2, 
+	WARNING = 3, 
+	ERROR   = 4, 
+	FATAL   = 5
+};
 
 #ifdef PISTON_DEBUG
 #define LOG_TRC Logger::getInstance().getStream(LogLevel::TRACE)

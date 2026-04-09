@@ -91,6 +91,21 @@ bool CurvesDeformerFactory::getPointsCacheUsageState() {
 	return factory.mpPxrPointsLRUCache != nullptr;
 }
 
+void CurvesDeformerFactory::setDefaultTposeFrame(pxr::UsdTimeCode time_code) {
+	CurvesDeformerFactory& factory = getInstance();
+	if(factory.getDefaultTposeFrame() == time_code) return;
+
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+	factory.mDefaultTposeFrame = time_code;
+}
+
+pxr::UsdTimeCode CurvesDeformerFactory::getDefaultTposeFrame() {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	return factory.mDefaultTposeFrame;
+}
+
 void CurvesDeformerFactory::clear() {
 	CurvesDeformerFactory& factory = getInstance();
 	std::lock_guard<std::mutex> lock(factory.mMutex);
@@ -105,16 +120,28 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 	//SimpleProfiler::printReport();
 }
 
-CurvesDeformerFactory::CurvesDeformerFactory() {
+CurvesDeformerFactory::CurvesDeformerFactory(): mDefaultTposeFrame(0.0) {
 	bool enable_cache = true;
 	std::string cache_var_value;
 	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
-		cache_var_value = tolower(cache_var_value);
+		cache_var_value = tolower(cache_var_value) ;
 		if(cache_var_value == "off" || cache_var_value == "false" || cache_var_value == "0") {
 			enable_cache = false;
 		}
 	}
 	mpPxrPointsLRUCache = enable_cache ? PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize) : nullptr;
+
+	std::string tpose_default_frame_string;
+	if(getEnvVar("PISTON_DEFAULT_TPOSE_FRAME", tpose_default_frame_string)) {
+		try {
+        	float d = std::stod(tpose_default_frame_string	);
+        	mDefaultTposeFrame = d;
+		} catch (const std::invalid_argument& e) {
+        	LOG_ERR << "Invalid \"PISTON_DEFAULT_TPOSE_FRAME\" environment variable: " << e.what();
+    	} catch (const std::out_of_range& e) {
+        	LOG_ERR << "\"PISTON_DEFAULT_TPOSE_FRAME\" environment variable out of range: " << e.what();
+    	}
+	}
 }
 
 

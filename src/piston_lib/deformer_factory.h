@@ -49,6 +49,9 @@ class CurvesDeformerFactory {
 		static void setPointsCacheUsageState(bool state);
 		static bool getPointsCacheUsageState();
 
+		static void setDefaultTposeFrame(pxr::UsdTimeCode time_code);
+		static pxr::UsdTimeCode getDefaultTposeFrame();
+
 	    static void clear();
 
 	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
@@ -65,6 +68,9 @@ class CurvesDeformerFactory {
 
     	// Static pointer to the CurvesDeformerFactory instance
     	static CurvesDeformerFactory* mInstancePtr;
+
+    private:
+    	pxr::UsdTimeCode mDefaultTposeFrame;
 
     	CurvesDeformerFactory();
 };
