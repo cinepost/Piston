@@ -63,6 +63,10 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		void setReadJsonDataFromPrim(bool state);
 		bool getReadJsonDataState() const { return mReadJsonDeformerData; }
+		
+		void setRestTimeCode(pxr::UsdTimeCode time_code);
+		pxr::UsdTimeCode getRestTimeCode() const;
+
 		bool writeJsonDataToPrim(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		void setVelocityAttrName(const std::string& name);
@@ -128,7 +132,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) {};
 
 	private:
-		bool buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);
+		bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		const std::string& uniqueName() const { return mUniqueName; }
 		std::string velocityKeyName() const { return uniqueName() + "_vel"; }
 
@@ -143,6 +147,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		bool mCalcMotionVectors = false;
 		MotionBlurDirection mMotionBlurDirection = MotionBlurDirection::TRAILING;
+
+		pxr::UsdTimeCode mRestTimeCode;
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;

@@ -49,8 +49,8 @@ class CurvesDeformerFactory {
 		static void setPointsCacheUsageState(bool state);
 		static bool getPointsCacheUsageState();
 
-		static void setDefaultTposeFrame(pxr::UsdTimeCode time_code);
-		static pxr::UsdTimeCode getDefaultTposeFrame();
+		static void setDefaultRestTimeCode(pxr::UsdTimeCode time_code);
+		static pxr::UsdTimeCode getDefaultRestTimeCode();
 
 	    static void clear();
 
@@ -70,7 +70,7 @@ class CurvesDeformerFactory {
     	static CurvesDeformerFactory* mInstancePtr;
 
     private:
-    	pxr::UsdTimeCode mDefaultTposeFrame;
+    	pxr::UsdTimeCode mDefaultRestTimeCode;
 
     	CurvesDeformerFactory();
 };

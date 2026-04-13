@@ -17,7 +17,8 @@ BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const s
 	mPool(std::thread::hardware_concurrency() - 1), 
 	mType(t), 
 	mName(name), 
-	mID(current_id++) {
+	mID(current_id++),
+	mRestTimeCode(pxr::UsdTimeCode::Default()) {
 	
 	DLOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
 
@@ -78,10 +79,28 @@ void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
 	makeDirty();
 }
 
+void BaseCurvesDeformer::setRestTimeCode(pxr::UsdTimeCode time_code) {
+	if(getRestTimeCode() == time_code) return;
+	mRestTimeCode = time_code;
+	makeDirty();
+}
+
+pxr::UsdTimeCode BaseCurvesDeformer::getRestTimeCode() const {
+	if(mRestTimeCode.IsDefault()) {
+		return CurvesDeformerFactory::getDefaultRestTimeCode();
+	}
+
+	return mRestTimeCode;
+}
+
 bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 	if(mDeformerDataWritten) return true;
 
 	mDeformerDataWritten = false;
+
+	if(time_code.IsDefault()) {
+		time_code = getRestTimeCode();
+	}
 
 	// Write json data if needed
 	if(!buildDeformerData(time_code)) {
@@ -93,7 +112,7 @@ bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 	return mDeformerDataWritten;
 }
 
-bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code, bool multi_threaded) {
+bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	if(!mDirty) return true;
 
 	SimpleProfiler::clear();
@@ -103,13 +122,13 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode reference_time_code,
 		return false;
 	}
 
-	mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, reference_time_code);
+	mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, rest_time_code);
 	if(!mpCurvesContainer) {
 		DLOG_ERR << "Error creating curves container for deformer " << mName << " !";
 		return false;
 	}
 
-	if(!buildDeformerDataImpl(reference_time_code, multi_threaded)) {
+	if(!buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		DLOG_ERR << "Error building " << mName <<" deformer data !";
 		return false;
 	}
@@ -138,7 +157,8 @@ bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code) {
 bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
 	DLOG_DBG << "Deform at time code: " << time_code.GetValue();
 		
-	if(!buildDeformerData(time_code, multi_threaded)) {
+	const pxr::UsdTimeCode bind_time_code = time_code.IsDefault() ? getRestTimeCode() : time_code;
+	if(!buildDeformerData(bind_time_code, multi_threaded)) {
 		return false;
 	}
 

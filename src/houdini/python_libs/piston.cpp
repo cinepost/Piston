@@ -111,8 +111,6 @@ BOOST_PYTHON_MODULE(_piston) {
 
 	class_<BaseMeshCurvesDeformer, BaseMeshCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("BaseMeshCurvesDeformer",  no_init)
 		.def("setReadJsonDataFromPrim", &BaseMeshCurvesDeformer::setReadJsonDataFromPrim)
-		.def("writeJsonDataToPrim", &BaseMeshCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
-
 		.def("toString", &BaseMeshCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
