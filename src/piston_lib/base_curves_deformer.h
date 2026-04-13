@@ -54,6 +54,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		void setPointsCacheUsageState(bool state);
 		bool getPointsCacheUsageState() const;
 
+		void setDataPrimPath(const std::string& path);
+		const pxr::SdfPath& getDataPrimPath() const { return mDataPrimPath; }
+
 		void setDeformerRestAttrName(const std::string& name);
 		const std::string& getDeformerRestAttrName() const { return mDeformerRestAttrName; }
 		void setCurvesRestAttrName(const std::string& name);
@@ -149,6 +152,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		MotionBlurDirection mMotionBlurDirection = MotionBlurDirection::TRAILING;
 
 		pxr::UsdTimeCode mRestTimeCode;
+		pxr::SdfPath mDataPrimPath;
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;

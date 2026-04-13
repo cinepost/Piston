@@ -85,6 +85,20 @@ set(CMAKE_SHARED_MODULE_PREFIX "")
 
 add_library( piston_lib STATIC ${SOURCES} ${HEADERS} )
 
+find_package(Doxygen)
+
+if(DOXYGEN_FOUND)
+    # Configure Doxygen parameters as CMake variables
+    set(DOXYGEN_GENERATE_HTML YES)
+    set(DOXYGEN_PROJECT_NAME "Pisont Project")
+    set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/piston_lib/docs")
+    
+    # Create the 'doc' target to generate documentation
+    # Includes all source files in the current directory
+    doxygen_add_docs(doc ${CMAKE_CURRENT_SOURCE_DIR} 
+        COMMENT "Generating Piston API documentation with Doxygen")
+endif()
+
 if(WIN32)
 
     set(_HOU_DSOLIB_ ${HROOT}/custom/houdini/dsolib)

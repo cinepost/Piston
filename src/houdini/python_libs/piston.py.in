@@ -31,10 +31,17 @@ def clearAll(stage = None):
 
 		for node in hou.node('/stage').children():
 			if isinstance(node, hou.LopNode):
-				stage = node.stage()
+				stage = None
+				if not node.needsCook():
+					# only access the stage if the node is already cooked/valid
+					stage = node.stage()
+				else:
+					# stage from the last cook, or None if not cooked.
+					stage = node.cachedStage()
+				
 				if stage:
 					stages[stage.GetRootLayer().identifier] = stage
-
+				
 		for stage in stages.values():
 			_piston.clearAllBSONData(stage)
 	else:

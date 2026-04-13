@@ -2,6 +2,27 @@
 
 A C++/Python library for high-performance geometry deformation and processing.
 
+## Installation
+
+### Houdini Integration
+
+To enable **Piston** in Houdini, you must update your `Houdini.env` file (usually located in `~/houdiniX.X/houdini.env`).
+
+Add the following line to ensure Houdini can locate the Piston plugins, OTLs, and shelf files:
+
+#### Add Piston to the Houdini Path
+
+**Linux:**
+```bash
+HOUDINI_PATH = "/opt/piston/houdini_${HOUDINI_VERSION};&"
+```
+**Windows:**
+```bash
+HOUDINI_PATH = "D:\work\piston\houdini_${HOUDINI_VERSION};&"
+```
+
+---
+
 ## Configuration
 
 ### Environment Variables
@@ -97,22 +118,3 @@ This method performs a complete reset of the **piston** environment. It is parti
     piston.clearAll()
     ```
 ---
-
-## Installation
-
-### Houdini Integration
-
-To enable **Piston** in Houdini, you must update your `Houdini.env` file (usually located in `~/houdiniX.X/houdini.env`).
-
-Add the following line to ensure Houdini can locate the Piston plugins, OTLs, and shelf files:
-
-#### Add Piston to the Houdini Path
-
-**Linux:**
-```bash
-HOUDINI_PATH = "/opt/piston/houdini_${HOUDINI_VERSION};&"
-```
-**Windows:**
-```bash
-HOUDINI_PATH = "D:\work\piston\houdini_${HOUDINI_VERSION};&"
-```

@@ -212,3 +212,8 @@ add_subdirectory( src )
 #install(FILES src/changelog.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_PREFIX})
 
+install(
+  DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/piston_lib/docs/html/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/doc/piston_lib/html"
+  OPTIONAL
+)

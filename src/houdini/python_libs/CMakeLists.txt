@@ -7,7 +7,7 @@ include_directories(
 )
 
 file( GLOB SOURCES
-    ./piston.cpp
+    ./piston.generated.cpp
 )
 
 # Find python and Boost - both are required dependencies
@@ -20,9 +20,32 @@ set(HOUDINI_PYTHON_LIBS_INSTALL_DIR ${HOUDINI_INSTALL_DIR}/python${_houdini_pyth
 # Without this, any build libraries automatically have names "lib{x}.so"
 set(CMAKE_SHARED_MODULE_PREFIX "_")
 
+find_package(Python3 REQUIRED)
+
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/piston.generated.cpp"
+    COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/tools/boost_python_docstrings.py
+            --srcdir ${PROJECT_SOURCE_DIR}/src/piston_lib
+            --template ${CMAKE_CURRENT_SOURCE_DIR}/piston.cpp
+            --output ${CMAKE_CURRENT_BINARY_DIR}/piston.generated.cpp
+    DEPENDS ${PROJECT_SOURCE_DIR}/tools/boost_python_docstrings.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/piston.cpp
+    COMMENT "Running Python script to configure boost python module C++ source"
+    VERBATIM
+)
+
 # Add a shared module - modules are intended to be imported at runtime.
 # - This is where you add the source files
-add_library(piston MODULE ${SOURCES} ${HEADERS})
+add_library(piston MODULE ${CMAKE_CURRENT_BINARY_DIR}/piston.generated.cpp ${HEADERS})
+
+# add_custom_target(
+#     run ALL
+#     COMMAND python3 ${PROJECT_SOURCE_DIR}/tools/boost_python_docstrings.py ${CMAKE_CURRENT_SOURCE_DIR}/piston.cpp
+#     BYPRODUCTS piston.generated.cpp
+#     COMMENT "Generating boost python source"
+# )
+
+# add_dependencies(piston run)
 
 # Set up the libraries and header search paths for this target
 target_link_libraries( piston 

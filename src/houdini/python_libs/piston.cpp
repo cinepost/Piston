@@ -68,7 +68,7 @@ BOOST_PYTHON_MODULE(_piston) {
 	;
 
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
-		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>())
+		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>(), "@DocString(CurvesDeformerFactory::getInstance)")
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
 		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
 		.def("getGuidesDeformer", &CurvesDeformerFactory::getGuidesDeformer)
@@ -94,6 +94,9 @@ BOOST_PYTHON_MODULE(_piston) {
 
 		.def("setMotionBlurState", &BaseCurvesDeformer::setMotionBlurState)
 		.def("getMotionBlurState", &BaseCurvesDeformer::getMotionBlurState)
+
+		.def("setDataPrimPath", &BaseCurvesDeformer::setDataPrimPath)
+		.def("getDataPrimPath", &BaseCurvesDeformer::getDataPrimPath, return_value_policy<copy_const_reference>())
 
 		.def("setPointsCacheUsageState", &BaseCurvesDeformer::setPointsCacheUsageState)
 		.def("getPointsCacheUsageState", &BaseCurvesDeformer::getPointsCacheUsageState)
