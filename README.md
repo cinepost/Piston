@@ -41,6 +41,22 @@ Specifies the exact timeline frame where T-pose geometry and rest-state attribut
 *   **Usage:** This variable is utilized if no specific "rest" attribute name is provided.
 *   **Default:** If unset, the library defaults to **frame 0.0** or the first available frame in the sequence.
 
+#### `PISTON_DEFAULT_DATA_PRIM_PATH`
+Sets the default USD primitive path used by the `piston` module for deformer data storage.
+
+*   **Default Value:** `/__piston_data__`
+*   **Behavior:** Defines the fallback location where Piston will look for or create data storage primitives. 
+*   **Usage:** This path is used automatically unless a different path is explicitly defined via the `setDataPrimPath()` method on a specific deformer instance. Use this variable to redirect data storage to a specific namespace or hidden hierarchy within your USD stage.
+
+#### `PISTON_DATA_TO_PRIM_STORAGE`
+This environment variable determines how Piston stores data on a Pixar USD primitive.
+
+*   **Supported Values:** `attribute` or `metadata`.
+*   **Default Value:** `attribute`.
+*   **Behavior:** This variable is **case-insensitive**. 
+    *   Setting this to `attribute` writes data as a standard USD attribute. 
+    *   Setting this to `metadata` writes the data as custom metadata on the primitive.
+    
 ---
 
 ## Logging
