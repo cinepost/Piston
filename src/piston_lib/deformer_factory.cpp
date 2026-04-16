@@ -7,6 +7,8 @@
 
 namespace Piston {
 
+static const pxr::SdfPath sDefaultPrimPath("/__piston_data__");
+
 static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
 
 static std::string tolower(std::string s) {
@@ -106,6 +108,40 @@ pxr::UsdTimeCode CurvesDeformerFactory::getDefaultRestTimeCode() {
 	return factory.mDefaultRestTimeCode;
 }
 
+void CurvesDeformerFactory::setDefaultDataPrimPath(const std::string& path) {
+	const pxr::SdfPath new_path(path);
+	CurvesDeformerFactory& factory = getInstance();
+	if(factory.getDefaultDataPrimPath() == new_path) return;
+
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+	factory.mDefaultDataPrimPath = new_path;
+}
+
+const pxr::SdfPath& CurvesDeformerFactory::getDefaultDataPrimPath() {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	return factory.mDefaultDataPrimPath;
+}
+
+bool CurvesDeformerFactory::isDefaultDataPrimPath(const std::string& path) {
+	return CurvesDeformerFactory::isDefaultDataPrimPath(pxr::SdfPath(path));
+}
+
+bool CurvesDeformerFactory::isDefaultDataPrimPath(const pxr::SdfPath& path) {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	return factory.mDefaultDataPrimPath == path;
+}
+
+CurvesDeformerFactory::DataToPrimStorageMethod CurvesDeformerFactory::getDataStorageMethod() {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	return factory.mDataToPrimStorageMethod;
+}
+
 void CurvesDeformerFactory::clear() {
 	CurvesDeformerFactory& factory = getInstance();
 	std::lock_guard<std::mutex> lock(factory.mMutex);
@@ -120,7 +156,7 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 	//SimpleProfiler::printReport();
 }
 
-CurvesDeformerFactory::CurvesDeformerFactory(): mDefaultRestTimeCode(pxr::UsdTimeCode::Default()) {
+CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(DataToPrimStorageMethod::ATTRIBUTE), mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), mDefaultDataPrimPath(sDefaultPrimPath) {
 	bool enable_cache = true;
 	std::string cache_var_value;
 	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
@@ -145,6 +181,32 @@ CurvesDeformerFactory::CurvesDeformerFactory(): mDefaultRestTimeCode(pxr::UsdTim
 
 	if(!mDefaultRestTimeCode.IsDefault()) {
 		LOG_INF << "Default system T-Pose frame is " << mDefaultRestTimeCode;
+	}
+
+	std::string default_data_prim_path_override;
+	if(getEnvVar("PISTON_DEFAULT_DATA_PRIM_PATH", default_data_prim_path_override)) {
+		const pxr::SdfPath new_path(default_data_prim_path_override);
+		if(new_path.IsPrimPath()) {
+			mDefaultDataPrimPath = new_path;
+		} else {
+			LOG_ERR << "Unable to set default data prim path to \"" << default_data_prim_path_override << "\". Path is not a prim path !";
+		}
+	}
+
+	if(mDefaultDataPrimPath != sDefaultPrimPath) {
+		LOG_INF << "Default system data prim path is " << mDefaultDataPrimPath;
+	}
+
+	std::string data_to_prim_storage_method;
+	if(getEnvVar("PISTON_DATA_TO_PRIM_STORAGE", data_to_prim_storage_method)) {
+		auto default_storage_method = mDataToPrimStorageMethod;
+		if(tolower(data_to_prim_storage_method) == "metadata") {
+			mDataToPrimStorageMethod = DataToPrimStorageMethod::METADATA;
+		} else if (tolower(data_to_prim_storage_method) == "attribute") {
+			mDataToPrimStorageMethod = DataToPrimStorageMethod::ATTRIBUTE;
+		} else {
+			LOG_ERR << "Unknown data storage method \"" << data_to_prim_storage_method << "\" !!! Reverting to default method (" << to_string(default_storage_method) << ").";
+		}
 	}
 }
 

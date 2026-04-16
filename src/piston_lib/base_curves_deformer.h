@@ -48,14 +48,25 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	public:
 		virtual ~BaseCurvesDeformer() {}
 
-		void setDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
-		void setCurvesGeoPrim(const pxr::UsdPrim& geoPrim);
+		// DocString: setDeformerGeoPrim
+		/**
+		 * @brief Sets the Pixar USD primitive used as the deformation geometry.
+		 * @param prim The USD primitive to be used for deformation.
+		 */
+		void setDeformerGeoPrim(const pxr::UsdPrim& prim);
+
+		// DocString: setCurvesGeoPrim
+		/**
+		 * @brief Sets the Pixar USD curves primitive that will undergo deformation.
+		 * @param prim The USD curves primitive to be deformed.
+		 */		
+		void setCurvesGeoPrim(const pxr::UsdPrim& prim);
 
 		void setPointsCacheUsageState(bool state);
 		bool getPointsCacheUsageState() const;
 
 		void setDataPrimPath(const std::string& path);
-		const pxr::SdfPath& getDataPrimPath() const { return mDataPrimPath; }
+		const pxr::SdfPath& getDataPrimPath() const;
 
 		void setDeformerRestAttrName(const std::string& name);
 		const std::string& getDeformerRestAttrName() const { return mDeformerRestAttrName; }
@@ -75,6 +86,14 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		void setVelocityAttrName(const std::string& name);
 		const std::string& getVelocityAttrName() const { return mVelocityAttrName; }
 
+
+		// DocString: deform
+		/**
+		 * @brief Sets the Pixar USD curves primitive that will undergo deformation.
+		 * @param prim The USD curves primitive to be deformed.
+		 * @return something
+		 *
+		 */	
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
 		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 

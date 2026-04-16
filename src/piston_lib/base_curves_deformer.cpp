@@ -28,30 +28,49 @@ BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const s
 	mpTempStage = pxr::UsdStage::CreateInMemory();
 }
 
-void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {
-	if(mDeformerGeoPrimHandle == geoPrim) return;
+void BaseCurvesDeformer::setDataPrimPath(const std::string& path) {
+	const pxr::SdfPath new_path(path);
+	if(mDataPrimPath == new_path) return;
+	if(!new_path.IsPrimPath()) {
+		DLOG_ERR << "Unable to set data prim path to \"" << path << "\". Path is not a prim path !";
+		return;
+	}
+	mDataPrimPath = new_path;
+	makeDirty();
+}
+
+const pxr::SdfPath& BaseCurvesDeformer::getDataPrimPath() const { 
+	if(mDataPrimPath.IsPrimPath()) {
+		return mDataPrimPath; 
+	}
+
+	return CurvesDeformerFactory::getInstance().getDefaultDataPrimPath();
+}
+
+void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
+	if(mDeformerGeoPrimHandle == prim) return;
 	
-	if(!validateDeformerGeoPrim(geoPrim)) {
+	if(!validateDeformerGeoPrim(prim)) {
 		mDeformerGeoPrimHandle.clear();
-		DLOG_ERR << "Deformer " << mName << " invalid geometry prim " <<  geoPrim.GetPath().GetText() << " type!";
+		DLOG_ERR << "Deformer " << mName << " invalid geometry prim " << prim << " type!";
 		return;
 	}
 
-	mDeformerGeoPrimHandle = UsdPrimHandle(geoPrim);
+	mDeformerGeoPrimHandle = UsdPrimHandle(prim);
 	makeDirty();
 
-	DLOG_DBG << "Deformer " << mName << " geometry prim is set to: " << mDeformerGeoPrimHandle;
+	DLOG_DBG << "Deformer " << mName << " geometry prim " << prim << " is set to: " << mDeformerGeoPrimHandle;
 }
 
-void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& geoPrim) {
-	if(mCurvesGeoPrimHandle == geoPrim) return;
-	if(!isBasisCurvesGeoPrim(geoPrim)) {
+void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
+	if(mCurvesGeoPrimHandle == prim) return;
+	if(!isBasisCurvesGeoPrim(prim)) {
 		mCurvesGeoPrimHandle.clear();
 		DLOG_ERR << "Curves geometry prim is not \"BasisCurves\"!";
 		return;
 	}
 
-	mCurvesGeoPrimHandle = UsdPrimHandle(geoPrim);
+	mCurvesGeoPrimHandle = UsdPrimHandle(prim);
 	makeDirty();
 
 	DLOG_DBG << "Curves geometry prim is set to: " << mCurvesGeoPrimHandle;

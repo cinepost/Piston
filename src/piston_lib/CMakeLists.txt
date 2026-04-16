@@ -88,14 +88,44 @@ add_library( piston_lib STATIC ${SOURCES} ${HEADERS} )
 find_package(Doxygen)
 
 if(DOXYGEN_FOUND)
+
+    set(DOC_FILES 
+        "${CMAKE_CURRENT_SOURCE_DIR}/deformer_factory.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/base_curves_deformer.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/base_mesh_curves_deformer.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/fast_curves_deformer.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/guide_curves_deformer.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/wrap_curves_deformer.h"
+    )
+
     # Configure Doxygen parameters as CMake variables
     set(DOXYGEN_GENERATE_HTML YES)
-    set(DOXYGEN_PROJECT_NAME "Pisont Project")
+    set(DOXYGEN_PROJECT_NAME "Piston")
     set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/piston_lib/docs")
     
+    set(DOXYGEN_HAVE_DOT NO)
+    set(DOXYGEN_CLASS_DIAGRAMS NO)
+
+    set(DOXYGEN_EXTRACT_PRIVATE NO)
+    #set(DOXYGEN_HIDE_UNDOC_CLASSES YES)
+
+    set(DOXYGEN_EXCLUDE_SYMBOLS 
+        "std::*" 
+        "pxr::*" 
+        "neighbour_search::*"
+    )
+
+    set(DOXYGEN_EXCLUDE_PATTERNS 
+        "*/CGAL/*"
+        "*/float16.h"
+        "*/float24.h"
+    )
+
     # Create the 'doc' target to generate documentation
     # Includes all source files in the current directory
-    doxygen_add_docs(doc ${CMAKE_CURRENT_SOURCE_DIR} 
+    doxygen_add_docs(docs
+        ALL
+        ${DOC_FILES}
         COMMENT "Generating Piston API documentation with Doxygen")
 endif()
 
@@ -132,4 +162,10 @@ endif() #WIN32
 
 target_link_libraries( piston_lib
     Houdini
+)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/piston_lib/docs/html/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/docs/piston_lib/html"
+  OPTIONAL
 )

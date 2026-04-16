@@ -158,7 +158,7 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 		return false;
 	}
 
-	if(mpWrapCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(mpWrapCurvesDeformerData.get())) {
+	if(mpWrapCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpWrapCurvesDeformerData.get())) {
 		DLOG_ERR << "Error writing " << mpWrapCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
 	}
@@ -192,7 +192,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	// Clear deformer data
 	mpWrapCurvesDeformerData->clear();
 
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpWrapCurvesDeformerData.get())) {
+	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get())) {
 		// Build deformer data in place if no json data present or not needed
 
 		// First triangulate using simple "fan" triangulation

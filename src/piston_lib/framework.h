@@ -25,7 +25,15 @@
 
 namespace Piston {
 
-using BSON = std::vector<std::uint8_t>;
+#define BSON_USES_PXR_VTARRAY 1
+#define MY_TYPE TYPE_INT
+
+#if BSON_USES_PXR_VTARRAY
+    using BSON = pxr::VtArray<unsigned char>;
+#else
+    using BSON = std::vector<std::uint8_t>;
+#endif
+
 
 #define enum_class_operators(e_) \
     inline e_ operator& (e_ a, e_ b) { return static_cast<e_>(static_cast<int>(a)& static_cast<int>(b)); } \

@@ -116,7 +116,7 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 		return false;
 	}
 
-	if(mpFastCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(mpFastCurvesDeformerData.get())) {
+	if(mpFastCurvesDeformerData && !mCurvesGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpFastCurvesDeformerData.get())) {
 		DLOG_ERR << "Error writing " << mpFastCurvesDeformerData->typeName() << " deformer data to json !";	
 		return false;
 	}
@@ -187,7 +187,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	}
 	mpFastCurvesDeformerData->clear();
 
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpFastCurvesDeformerData.get())) {
+	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get())) {
 		// Build deformer data in place if no json data present or not needed
 		
 		assert(mpAdjacencyData);

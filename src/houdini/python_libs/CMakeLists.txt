@@ -20,7 +20,9 @@ set(HOUDINI_PYTHON_LIBS_INSTALL_DIR ${HOUDINI_INSTALL_DIR}/python${_houdini_pyth
 # Without this, any build libraries automatically have names "lib{x}.so"
 set(CMAKE_SHARED_MODULE_PREFIX "_")
 
-find_package(Python3 REQUIRED)
+# Generates boost python docstrings
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/piston.generated.cpp"
@@ -37,13 +39,6 @@ add_custom_command(
 # Add a shared module - modules are intended to be imported at runtime.
 # - This is where you add the source files
 add_library(piston MODULE ${CMAKE_CURRENT_BINARY_DIR}/piston.generated.cpp ${HEADERS})
-
-# add_custom_target(
-#     run ALL
-#     COMMAND python3 ${PROJECT_SOURCE_DIR}/tools/boost_python_docstrings.py ${CMAKE_CURRENT_SOURCE_DIR}/piston.cpp
-#     BYPRODUCTS piston.generated.cpp
-#     COMMENT "Generating boost python source"
-# )
 
 # add_dependencies(piston run)
 

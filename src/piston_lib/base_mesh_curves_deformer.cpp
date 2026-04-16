@@ -19,12 +19,12 @@ bool BaseMeshCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim
 }
 
 bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
-	if(mpAdjacencyData && !mDeformerGeoPrimHandle.writeDataToBson(mpAdjacencyData.get())) {
+	if(mpAdjacencyData && !mDeformerGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpAdjacencyData.get())) {
 		DLOG_ERR << "Error writing " << mpAdjacencyData->typeName() << " deformer data to json !";
 		return false;
 	}
 
-	if(mpPhantomTrimeshData && !mCurvesGeoPrimHandle.writeDataToBson(mpPhantomTrimeshData.get())) {
+	if(mpPhantomTrimeshData && !mCurvesGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
 		DLOG_ERR << "Error writing " << mpPhantomTrimeshData->typeName() << " curves data to json !";
 		return false;
 	}
@@ -39,7 +39,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	}
 
 	// Get primitive adjacency json data if present
-	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(mpAdjacencyData.get())) {
+	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpAdjacencyData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
 			DLOG_ERR << "Error building mesh adjacency data!";
@@ -52,7 +52,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	}
 
 	// Get phantom mesh json data if present
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(mpPhantomTrimeshData.get())) {
+	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
 			DLOG_ERR << "Error building phantom mesh data!";

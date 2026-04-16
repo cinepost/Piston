@@ -490,7 +490,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 
 	bool result = false;
 
-	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpGuideCurvesDeformerData.get())) {
+	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuideCurvesDeformerData.get())) {
 
 		const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
 		const auto total_curves_count = mpCurvesContainer->getCurvesCount();
@@ -554,7 +554,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 		mpGuidesPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
 	}
 
-	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(mpGuidesPhantomTrimeshData.get())) {
+	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
 			DLOG_ERR << "Error building phantom mesh data!";
@@ -1118,7 +1118,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 		assert(mpSkinAdjacencyData);
 	}
 
-	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinAdjacencyData.get())) {
+	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinAdjacencyData.get())) {
 		if(!mpSkinAdjacencyData->buildInPlace(mGuidesSkinGeoPrimHandle)) {
 			DLOG_ERR << "Error building guides skin adjacency data!";
 			return false;
@@ -1130,7 +1130,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 		assert(mpSkinPhantomTrimeshData);
 	}
 
-	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(mpSkinPhantomTrimeshData.get())) {
+	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinPhantomTrimeshData.get())) {
 		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName)) {
 			DLOG_ERR << "Error building guides skin trimesh data!";
 			return false;
@@ -1142,7 +1142,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 	if(mpGuidesPhantomTrimeshData){
-		if(!mDeformerGeoPrimHandle.writeDataToBson(mpGuidesPhantomTrimeshData.get())) {
+		if(!mDeformerGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
 			DLOG_ERR << "Error writing " << mpGuidesPhantomTrimeshData->typeName() << " deformer data to json !";
 			return false;
 		} else {
@@ -1151,7 +1151,7 @@ bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 	}
 
 	if(mpGuideCurvesDeformerData) {
-		if(!mCurvesGeoPrimHandle.writeDataToBson(mpGuideCurvesDeformerData.get())) {
+		if(!mCurvesGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpGuideCurvesDeformerData.get())) {
 			DLOG_ERR << "Error writing " << mpGuideCurvesDeformerData->typeName() << " deformer data to json !";
 			return false;
 		} else {
@@ -1161,7 +1161,7 @@ bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 
 	if(mGuidesSkinGeoPrimHandle) {
 		if(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid()) {
-			if(!mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinPhantomTrimeshData.get())) {
+			if(!mGuidesSkinGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpSkinPhantomTrimeshData.get())) {
 				DLOG_ERR << "Error writing " << mpSkinPhantomTrimeshData->typeName() << " curves data to json !";
 				return false;
 			} else {
@@ -1170,7 +1170,7 @@ bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 		}
 
 		if(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid()) {
-			if(!mGuidesSkinGeoPrimHandle.writeDataToBson(mpSkinAdjacencyData.get())) {
+			if(!mGuidesSkinGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpSkinAdjacencyData.get())) {
 				DLOG_ERR << "Error writing " << mpSkinAdjacencyData->typeName() << " deformer data to json !";
 				return false;
 			} else {

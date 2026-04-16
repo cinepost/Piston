@@ -52,12 +52,12 @@ class UsdPrimHandle {
 		pxr::SdfPath getPath() const { return mPrim.GetPath(); }
 		pxr::UsdStageWeakPtr getStage() const { return mPrim.GetStage(); }
 
-		bool getDataFromBson(SerializableDeformerDataBase* pDeformerData) const;
-		bool writeDataToBson(SerializableDeformerDataBase* pDeformerData) const;
+		bool getDataFromBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const;
+		bool writeDataToBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const;
 
-		bool getBsonFromPrim(const std::string& identifier, BSON& v_bson) const;
-		bool setBsonToPrim(const std::string& identifier, const BSON& v_bson) const;
-		void clearPrimBson(const std::string& identifier) const;
+		bool getBsonFromPrim(const pxr::SdfPath& prim_path, const std::string& identifier, BSON& v_bson) const;
+		bool setBsonToPrim(const pxr::SdfPath& prim_path, const std::string& identifier, const BSON& v_bson) const;
+		void clearPrimBson(const pxr::SdfPath& prim_path, const std::string& identifier) const;
 
 		template<typename T>
 		bool fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
@@ -120,6 +120,11 @@ class PointsList {
 
 		mutable size_t mSizeInBytes;
 };
+
+inline std::ostream& operator<<( std::ostream& os, const pxr::UsdPrim& prim ) {
+	os << prim.GetPath();
+	return os;
+}
 
 } // namespace Piston
 

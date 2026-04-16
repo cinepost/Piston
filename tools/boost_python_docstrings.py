@@ -68,7 +68,7 @@ def main():
             
         # search for cpp/h files and extract doc strings
         for cxx_file_name in cxx_file_names:
-            with open(args.template, 'r') as in_file:
+            with open(cxx_file_name, 'r') as in_file:
                 extract(in_file, docstrings)
 
         # substitute docstrings

@@ -1,6 +1,8 @@
 #include "serializable_data.h"
 #include "logging.h"
 
+#include <type_traits>
+
 namespace Piston {
 
 SerializableDeformerDataBase::SerializableDeformerDataBase(): mIsPopulated(false) {
@@ -23,8 +25,18 @@ bool SerializableDeformerDataBase::serialize(BSON& v_bson) const {
 		LOG_ERR << "Error serializing deformer data !";
 		return false;
 	}
+  
+	#if BSON_USES_PXR_VTARRAY
+		std::vector<uint8_t> tmp;
+		tmp.reserve(65536);
+		json::to_bson(j, tmp);
 
-	v_bson = json::to_bson(j);    
+		v_bson.assign(tmp.begin(), tmp.end());
+
+	#else
+		v_bson = json::to_bson(j);
+	#endif
+
 	return true;
 }
 

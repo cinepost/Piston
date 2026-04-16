@@ -163,7 +163,7 @@ elseif ( UNIX ) #(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 
-  ADD_DEFINITIONS(-std=c++17 -pthread -Wall -fPIC -Wfatal-errors) # -Wno-reorder -pedantic
+  ADD_DEFINITIONS(-std=c++17 -pthread -Wall -Wconversion -fPIC -Wfatal-errors) # -Wno-reorder -pedantic
 else ()
   MESSAGE(FATAL_ERROR "CMakeLists.txt has not been tested/written for your compiler.")
 endif ()
@@ -211,9 +211,3 @@ add_subdirectory( src )
 
 #install(FILES src/changelog.txt DESTINATION ${CMAKE_INSTALL_PREFIX})
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_PREFIX})
-
-install(
-  DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/piston_lib/docs/html/"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/doc/piston_lib/html"
-  OPTIONAL
-)

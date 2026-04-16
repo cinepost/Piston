@@ -78,8 +78,8 @@ BOOST_PYTHON_MODULE(_piston) {
 	;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
-		.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim)
-		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim)
+		.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim, "@DocString(setDeformerGeoPrim)")
+		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim, "@DocString(setCurvesGeoPrim)")
 
 		.def("setDeformerRestAttrName", &BaseCurvesDeformer::setDeformerRestAttrName)
 		.def("getDeformerRestAttrName", &BaseCurvesDeformer::getDeformerRestAttrName, return_value_policy<copy_const_reference>())
