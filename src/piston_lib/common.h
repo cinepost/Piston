@@ -31,7 +31,9 @@ std::string getStageName(pxr::UsdStageRefPtr pStage);
 
 inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "Mesh"; }
 inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "BasisCurves"; }
-bool clearAllPrimBson(pxr::UsdStageRefPtr pStage);
+
+bool clearPistonDataFromStage(pxr::UsdStageRefPtr pStage);
+bool clearPistonDataFromPrim(pxr::UsdStageRefPtr pStage, const pxr::SdfPath& prim_path);
 
 class SerializableDeformerDataBase;
 

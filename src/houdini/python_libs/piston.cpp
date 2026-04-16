@@ -28,17 +28,19 @@ namespace boost = hboost;
 #include <vector>
 
 
-char const* greet() {
-	return "Parovoz Piston python library!";
-}
-
-void setLogLevel(Piston::LogLevel level) {
+static void _setLogLevel(Piston::LogLevel level) {
 	Piston::Logger::getInstance().setLogLevel(level);
 }
 
-void clearAllBSONData(pxr::UsdStageRefPtr pStage) {
-	if(Piston::clearAllPrimBson(pStage)) {
+static void _clearPistonDataFromStage(pxr::UsdStageRefPtr pStage) {
+	if(Piston::clearPistonDataFromStage(pStage)) {
 		Piston::Logger::getInstance().getStream(Piston::LogLevel::INFO) << "Piston data deleted from stage " << Piston::getStageName(pStage);
+	}
+}
+
+static void _clearPistonDataFromPrim(pxr::UsdStageRefPtr pStage, const pxr::SdfPath& prim_path) {
+	if(Piston::clearPistonDataFromPrim(pStage, prim_path)) {
+		Piston::Logger::getInstance().getStream(Piston::LogLevel::INFO) << "Piston data deleted from prim " << prim_path;
 	}
 }
 
@@ -177,11 +179,13 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &DeformerStats::toString)
 	;
 
+#if !BSON_USES_PXR_VTARRAY
 	to_python_converter<Piston::BSON , BSON_to_Python>();
+#endif
 
-	def("clearAllBSONData", clearAllBSONData);
+	def("clearPistonDataFromStage", _clearPistonDataFromStage);
+	def("clearPistonDataFromPrim", _clearPistonDataFromPrim);
 	def("getLogger", &Logger::getInstance, return_value_policy<reference_existing_object>());
-	def("setLogLevel", setLogLevel);
+	def("setLogLevel", _setLogLevel);
 	def("runTests", &Tests::runTests);	
-	def("greet", greet);
 }

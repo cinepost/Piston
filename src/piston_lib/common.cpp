@@ -245,13 +245,26 @@ bool UsdPrimHandle::getBsonFromPrim(const pxr::SdfPath& prim_path, const std::st
 
 	const pxr::TfToken key_path(identifier);
 
-	if(!data_prim.HasCustomDataKey(key_path)) {
-		LOG_ERR << "Error getting bson from prim " << data_prim.GetPath() << ". No custom data \"" << identifier << "\" exist !!!";
-		return false;
+	const bool readAsMetadata = CurvesDeformerFactory::getDataStorageMethod() == CurvesDeformerFactory::DataToPrimStorageMethod::METADATA;
+
+	if(readAsMetadata) {
+		if(!data_prim.HasCustomDataKey(key_path)) {
+			LOG_ERR << "Error getting bson from prim " << data_prim << ". No custom data \"" << identifier << "\" exist !!!";
+			return false;
+		}
+
+		auto _v = data_prim.GetCustomDataByKey(key_path);
+		hex_string_to_bson(_v.Get<std::string>(), v_bson);
+	} else {
+		pxr::UsdAttribute attr = data_prim.HasAttribute(key_path) ? data_prim.GetAttribute(key_path):  data_prim.CreateAttribute(key_path, pxr::SdfValueTypeNames->UCharArray);
+		if(attr.GetTypeName() != pxr::SdfValueTypeNames->UCharArray) {
+			LOG_ERR << "Error getting bson data to prim " << data_prim << ". Attribute type " << attr.GetTypeName() << " is unsupported!";
+			return false;
+		}
+
+		attr.Get(&v_bson);
 	}
 
-	auto _v = data_prim.GetCustomDataByKey(key_path);
-	hex_string_to_bson(_v.Get<std::string>(), v_bson);
 	return true;
 }
 
@@ -277,27 +290,23 @@ std::string getStageName(pxr::UsdStageRefPtr pStage) {
 	return pxr::TfGetBaseName(identifier);
 }
 
-bool clearAllPrimBson(const pxr::SdfPath& prim_path, pxr::UsdStageRefPtr pStage) {
+bool clearPistonDataFromStage(pxr::UsdStageRefPtr pStage) {
+	assert(pStage);
+	if(!pStage) {
+		LOG_ERR << "Unable to clear Piston data from stage. Stage is invalid!";
+		return false;
+	}
+
+	LOG_ERR << "UNIMPLEMENTED!!! clearPistonDataFromPrim()";
+	return false;
+}
+
+bool clearPistonDataFromPrim(pxr::UsdStageRefPtr pStage, const pxr::SdfPath& prim_path) {
 	assert(pStage); 
 	
 	bool result = false;
 
-	//LOG_DBG << "clearAllPrimBson " << getStageName(pStage);
-
-	if(pStage->GetPrimAtPath(prim_path).IsValid()) {
-		//LOG_DBG << "Got hidden prim";
-		pxr::SdfLayerHandle editLayer = pStage->GetEditTarget().GetLayer();
-
-		if (editLayer && editLayer->PermissionToEdit()) {
-			//LOG_DBG << "Deleting";
-			pxr::UsdNamespaceEditor editor(pStage);
-
-			if (CurvesDeformerFactory::isDefaultDataPrimPath(prim_path) && editor.DeletePrimAtPath(prim_path)) {
-				editor.ApplyEdits();
-			}
-			result = true;
-		}
-	}
+	LOG_ERR << "UNIMPLEMENTED!!! clearPistonDataFromPrim()";
 
 	return result;
 }

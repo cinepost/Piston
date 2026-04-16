@@ -43,9 +43,9 @@ def clearAll(stage = None):
 					stages[stage.GetRootLayer().identifier] = stage
 				
 		for stage in stages.values():
-			_piston.clearAllBSONData(stage)
+			_piston.clearPistonDataFromStage(stage)
 	else:
-		_piston.clearAllBSONData(stage)
+		_piston.clearPistonDataFromStage(stage)
 	
 	_piston.DeformerFactory.clear()
 
