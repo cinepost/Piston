@@ -8,6 +8,7 @@
 namespace Piston {
 
 static const pxr::SdfPath sDefaultPrimPath("/__piston_data__");
+static const CurvesDeformerFactory::DataToPrimStorageMethod sDefaultDataToPrimStorage(CurvesDeformerFactory::DataToPrimStorageMethod::ATTRIBUTE);
 
 static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
 
@@ -156,7 +157,7 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 	//SimpleProfiler::printReport();
 }
 
-CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(DataToPrimStorageMethod::ATTRIBUTE), mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), mDefaultDataPrimPath(sDefaultPrimPath) {
+CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaultDataToPrimStorage), mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), mDefaultDataPrimPath(sDefaultPrimPath) {
 	bool enable_cache = true;
 	std::string cache_var_value;
 	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
@@ -206,6 +207,9 @@ CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(DataToP
 			mDataToPrimStorageMethod = DataToPrimStorageMethod::ATTRIBUTE;
 		} else {
 			LOG_ERR << "Unknown data storage method \"" << data_to_prim_storage_method << "\" !!! Reverting to default method (" << to_string(default_storage_method) << ").";
+		}
+		if(mDataToPrimStorageMethod != sDefaultDataToPrimStorage) {
+			LOG_INF << "Data storage method is \"" << to_string(mDataToPrimStorageMethod) << "\"";
 		}
 	}
 }
