@@ -68,6 +68,9 @@ class CurvesDeformerFactory {
 
 	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
 
+	    std::map<Key, BaseCurvesDeformer::SharedPtr>::iterator begin() { return mDeformers.begin(); }
+    	std::map<Key, BaseCurvesDeformer::SharedPtr>::iterator end() { return mDeformers.end(); }
+
 	private:
 		BaseCurvesDeformer::SharedPtr getDeformer(BaseCurvesDeformer::Type type, const std::string& name);
 

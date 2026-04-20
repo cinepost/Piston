@@ -69,6 +69,11 @@ BOOST_PYTHON_MODULE(_piston) {
 		.staticmethod("clear")
 	;
 
+	class_<CurvesDeformerFactory::Key>("__CurvesDeformerFactory_Key")
+		.def_readonly("type", &CurvesDeformerFactory::Key::type)
+		.def_readwrite("name", &CurvesDeformerFactory::Key::name)
+		;
+
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>(), "@DocString(CurvesDeformerFactory::getInstance)")
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
@@ -76,6 +81,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getGuidesDeformer", &CurvesDeformerFactory::getGuidesDeformer)
 		.def("setPointsCacheUsageState", &CurvesDeformerFactory::setPointsCacheUsageState)
 		.def("getPointsCacheUsageState", &CurvesDeformerFactory::getPointsCacheUsageState)
+		.def("__iter__", range(&CurvesDeformerFactory::begin, &CurvesDeformerFactory::end))
 		.def("clear", &CurvesDeformerFactory::clear)
 	;
 

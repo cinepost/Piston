@@ -365,6 +365,10 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 		return false;
 	}
 
+	if(mPrim.GetStage() != prim.GetStage()) {
+		return false;
+	}
+
 	return true;
 }
 

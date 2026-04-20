@@ -47,6 +47,7 @@ file( GLOB SOURCES
     ./pxr_json.cpp
     ./pxr_points_lru_cache.cpp
     ./adjacency.cpp
+    ./topology.cpp
     ./curves_container.cpp
     ./phantom_trimesh.cpp
     ./geometry_tools.cpp

@@ -2,6 +2,7 @@
 #include "base_curves_deformer.h"
 #include "geometry_tools.h"
 #include "pxr_points_lru_cache.h"
+#include "topology.h"
 #include "logging.h"
 
 #include <thread>
@@ -56,8 +57,12 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 		return;
 	}
 
+	const bool same_topology = isSameTopology(mDeformerGeoPrimHandle.getPrim(), prim);
+
 	mDeformerGeoPrimHandle = UsdPrimHandle(prim);
-	makeDirty();
+	if(!same_topology) {
+		makeDirty();
+	}
 
 	DLOG_DBG << "Deformer " << mName << " geometry prim " << prim << " is set to: " << mDeformerGeoPrimHandle;
 }
@@ -70,8 +75,12 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 		return;
 	}
 
+	const bool same_topology = isSameTopology(mCurvesGeoPrimHandle.getPrim(), prim);
+
 	mCurvesGeoPrimHandle = UsdPrimHandle(prim);
-	makeDirty();
+	if(!same_topology) {
+		makeDirty();
+	}
 
 	DLOG_DBG << "Curves geometry prim is set to: " << mCurvesGeoPrimHandle;
 }
