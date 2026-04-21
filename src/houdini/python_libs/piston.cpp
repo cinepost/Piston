@@ -6,6 +6,7 @@
 #ifndef BOOST_PYTHON_MODULE 
 #include <hboost/python.hpp>
 #include <hboost/python/overloads.hpp>
+#include <hboost/python/suite/indexing/map_indexing_suite.hpp>
 #define BOOST_PYTHON_MODULE HBOOST_PYTHON_MODULE
 #define BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS HBOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS
 namespace boost = hboost;
@@ -52,6 +53,15 @@ struct BSON_to_Python {
 	}
 };
 
+// convert std::map to a list of tuples for .items() behavior
+boost::python::list get_deformers_map_items(Piston::CurvesDeformerFactory::DeformersMap& deformers) {
+    boost::python::list items;
+    for (auto const& [key, ptr] : deformers) {
+        items.append(boost::python::make_tuple(key, ptr));
+    }
+    return items;
+}
+
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_dbg_overloads, Piston::BaseCurvesDeformer::deform_dbg, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_overloads, Piston::BaseCurvesDeformer::writeJsonDataToPrim, 0, 1)
@@ -72,18 +82,27 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<CurvesDeformerFactory::Key>("__CurvesDeformerFactory_Key")
 		.def_readonly("type", &CurvesDeformerFactory::Key::type)
 		.def_readwrite("name", &CurvesDeformerFactory::Key::name)
-		;
+		.def("__repr__", &CurvesDeformerFactory::Key::repr)
+	;
 
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>(), "@DocString(CurvesDeformerFactory::getInstance)")
+		.def("deleteDeformer", &CurvesDeformerFactory::deleteDeformer)
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
 		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
 		.def("getGuidesDeformer", &CurvesDeformerFactory::getGuidesDeformer)
 		.def("setPointsCacheUsageState", &CurvesDeformerFactory::setPointsCacheUsageState)
 		.def("getPointsCacheUsageState", &CurvesDeformerFactory::getPointsCacheUsageState)
 		.def("__iter__", range(&CurvesDeformerFactory::begin, &CurvesDeformerFactory::end))
+		.def("deformers", &CurvesDeformerFactory::deformers, return_value_policy<reference_existing_object>())
 		.def("clear", &CurvesDeformerFactory::clear)
 	;
+
+	class_<CurvesDeformerFactory::DeformersMap>("DeformersMap")
+        .def(map_indexing_suite<CurvesDeformerFactory::DeformersMap, true>()) // true as the second template argument for NoProxy
+        .def("items", &get_deformers_map_items) 
+        .def("__iter__", iterator<CurvesDeformerFactory::DeformersMap>()); 
+    ;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
 		.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim, "@DocString(setDeformerGeoPrim)")
@@ -117,6 +136,7 @@ BOOST_PYTHON_MODULE(_piston) {
 
 		.def("showDebugGeometry", &BaseCurvesDeformer::showDebugGeometry)
 
+		.def("__repr__", &BaseCurvesDeformer::repr)
 		.def("toString", &BaseCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
@@ -156,6 +176,13 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setFastPointBind", &GuideCurvesDeformer::setFastPointBind)
 		.def("isFastPointBind", &GuideCurvesDeformer::isFastPointBind)
 		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+	;
+
+	enum_<BaseCurvesDeformer::Type>("__BaseCurvesDeformer_Type")
+		.value("FAST", BaseCurvesDeformer::Type::FAST)
+		.value("WRAP", BaseCurvesDeformer::Type::WRAP)
+		.value("GUIDES", BaseCurvesDeformer::Type::GUIDES)
+		.export_values()
 	;
 
 	enum_<WrapCurvesDeformer::BindMode>("__WrapDeformer_BindMode")

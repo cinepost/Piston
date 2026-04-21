@@ -99,6 +99,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		const std::string& getName() const { return mName; }
 
+		std::string repr() const;
 		virtual const std::string& toString() const;
 
 		const DeformerStats& getStats() const { return mStats; }
@@ -179,16 +180,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 } // namespace Piston
 
-inline std::string to_string(Piston::BaseCurvesDeformer::Type mt) {
-#define t2s(t_) case Piston::BaseCurvesDeformer::Type::t_: return #t_;
-    switch (mt) {
-        t2s(FAST);
-        t2s(WRAP);
-        default:
-            assert(false);
-            return "UNKNOWN";
-    }
-#undef t2s
-}
+std::string to_string(const Piston::BaseCurvesDeformer::Type& mt);
 
 #endif // PISTON_LIB_BASE_CURVES_DEFORMER_H_

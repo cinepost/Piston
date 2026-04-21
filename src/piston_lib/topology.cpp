@@ -42,6 +42,8 @@ size_t computeCurvesTopologyHash(const pxr::UsdGeomBasisCurves& curves, const px
 }
 
 bool isSameTopology(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r) {
+    assert(prim_l.IsValid() && "Invalid prim_l");
+    assert(prim_r.IsValid() && "Invalid prim_r");
     if(prim_l.GetTypeName() != prim_r.GetTypeName()) return false;
 
     if(isMeshGeoPrim(prim_r)){

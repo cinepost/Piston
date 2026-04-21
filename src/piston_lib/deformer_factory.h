@@ -30,7 +30,11 @@ class CurvesDeformerFactory {
 			bool operator< (const Key &other) const {   
                if(type == other.type) return name < other.name;
                return type < other.type; 
-            } 
+            }
+
+            std::string repr() const {
+				return "Key(type=" + ::to_string(type) + ", name='" + name + "')";
+			} 
 		};
 
 		enum class DataToPrimStorageMethod {
@@ -39,6 +43,8 @@ class CurvesDeformerFactory {
 		};
 
 	public:
+		using DeformersMap = std::map<Key, BaseCurvesDeformer::SharedPtr>;
+
 		~CurvesDeformerFactory();
 		
     	// Deleting the copy constructor to prevent copies
@@ -46,6 +52,9 @@ class CurvesDeformerFactory {
 
     	// Static method to get the CurvesDeformerFactory instance
 	    static CurvesDeformerFactory& getInstance();
+
+	    static DeformersMap& deformers();
+	    static void deleteDeformer(BaseCurvesDeformer::Type type, const std::string& name);
 
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
@@ -68,14 +77,16 @@ class CurvesDeformerFactory {
 
 	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
 
-	    std::map<Key, BaseCurvesDeformer::SharedPtr>::iterator begin() { return mDeformers.begin(); }
-    	std::map<Key, BaseCurvesDeformer::SharedPtr>::iterator end() { return mDeformers.end(); }
+	    const DeformersMap& getDeformers() const { return mDeformers; }
+
+	    DeformersMap::iterator begin() { return mDeformers.begin(); }
+    	DeformersMap::iterator end() { return mDeformers.end(); }
 
 	private:
 		BaseCurvesDeformer::SharedPtr getDeformer(BaseCurvesDeformer::Type type, const std::string& name);
 
 	private:
-		std::map<Key, BaseCurvesDeformer::SharedPtr> mDeformers;
+		DeformersMap mDeformers;
 		PxrPointsLRUCache::UniquePtr mpPxrPointsLRUCache;
 
 		// Mutex to ensure thread safety

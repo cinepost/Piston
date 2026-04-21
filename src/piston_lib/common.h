@@ -29,8 +29,8 @@ void hex_string_to_bson(const std::string& str, BSON& bson);
 
 std::string getStageName(pxr::UsdStageRefPtr pStage);
 
-inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "Mesh"; }
-inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.GetTypeName() == "BasisCurves"; }
+inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.IsValid() && prim.IsA<pxr::UsdGeomMesh>(); }
+inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.IsValid() && prim.IsA<pxr::UsdGeomBasisCurves>(); }
 
 bool clearPistonDataFromStage(pxr::UsdStageRefPtr pStage);
 bool clearPistonDataFromPrim(pxr::UsdStageRefPtr pStage, const pxr::SdfPath& prim_path);

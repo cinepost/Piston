@@ -49,7 +49,7 @@ const pxr::SdfPath& BaseCurvesDeformer::getDataPrimPath() const {
 }
 
 void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
-	if(mDeformerGeoPrimHandle == prim) return;
+	if(!prim.IsValid() || mDeformerGeoPrimHandle == prim) return;
 	
 	if(!validateDeformerGeoPrim(prim)) {
 		mDeformerGeoPrimHandle.clear();
@@ -57,7 +57,7 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 		return;
 	}
 
-	const bool same_topology = isSameTopology(mDeformerGeoPrimHandle.getPrim(), prim);
+	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle.getPrim(), prim) : false;
 
 	mDeformerGeoPrimHandle = UsdPrimHandle(prim);
 	if(!same_topology) {
@@ -68,14 +68,15 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 }
 
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
-	if(mCurvesGeoPrimHandle == prim) return;
+	if(!prim.IsValid() || mCurvesGeoPrimHandle == prim) return;
+
 	if(!isBasisCurvesGeoPrim(prim)) {
 		mCurvesGeoPrimHandle.clear();
 		DLOG_ERR << "Curves geometry prim is not \"BasisCurves\"!";
 		return;
 	}
 
-	const bool same_topology = isSameTopology(mCurvesGeoPrimHandle.getPrim(), prim);
+	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle.getPrim(), prim) : false;
 
 	mCurvesGeoPrimHandle = UsdPrimHandle(prim);
 	if(!same_topology) {
@@ -373,6 +374,25 @@ const std::string& BaseCurvesDeformer::toString() const {
 	return kBaseDeformerString;
 }
 
+std::string BaseCurvesDeformer::repr() const {
+	std::stringstream ss;
+    ss << toString() << "(name='" << getName() << "')";
+    return ss.str();
+}
+
 } // namespace Piston
+
+std::string to_string(const Piston::BaseCurvesDeformer::Type& mt) {
+#define t2s(t_) case Piston::BaseCurvesDeformer::Type::t_: return #t_;
+    switch (mt) {
+        t2s(FAST);
+        t2s(WRAP);
+        t2s(GUIDES);
+        default:
+            assert(false);
+            return "UNKNOWN";
+    }
+#undef t2s
+}
 
 std::atomic_uint32_t Piston::BaseCurvesDeformer::current_id = 0;

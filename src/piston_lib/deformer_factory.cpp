@@ -28,6 +28,23 @@ CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
     return *mInstancePtr;
 }
 
+CurvesDeformerFactory::DeformersMap& CurvesDeformerFactory::deformers() { 
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+	return factory.mDeformers; 
+}
+
+void CurvesDeformerFactory::deleteDeformer(BaseCurvesDeformer::Type type, const std::string& name) {
+	const CurvesDeformerFactory::Key key = {type, name};
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	auto it = factory.mDeformers.find(key);
+	if(it != factory.mDeformers.end()) {
+		factory.mDeformers.erase(key);
+	}
+}
+
 FastCurvesDeformer::SharedPtr CurvesDeformerFactory::getFastDeformer(const std::string& name) {
 	return std::dynamic_pointer_cast<FastCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::FAST, name));
 }
@@ -42,6 +59,8 @@ GuideCurvesDeformer::SharedPtr CurvesDeformerFactory::getGuidesDeformer(const st
 
 BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDeformer::Type type, const std::string& name) {
 	const CurvesDeformerFactory::Key key = {type, name};
+	std::lock_guard<std::mutex> lock(mMutex);
+
 	auto it = mDeformers.find(key);
 	if(it != mDeformers.end()) {
 		return it->second;
@@ -213,7 +232,6 @@ CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaul
 		}
 	}
 }
-
 
 } // namespace Piston
 
