@@ -79,7 +79,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.staticmethod("clear")
 	;
 
-	class_<CurvesDeformerFactory::Key>("__CurvesDeformerFactory_Key")
+	class_<CurvesDeformerFactory::Key>("DeformerKey")
 		.def_readonly("type", &CurvesDeformerFactory::Key::type)
 		.def_readwrite("name", &CurvesDeformerFactory::Key::name)
 		.def("__repr__", &CurvesDeformerFactory::Key::repr)
@@ -178,7 +178,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
-	enum_<BaseCurvesDeformer::Type>("__BaseCurvesDeformer_Type")
+	enum_<BaseCurvesDeformer::Type>("DeformerType")
 		.value("FAST", BaseCurvesDeformer::Type::FAST)
 		.value("WRAP", BaseCurvesDeformer::Type::WRAP)
 		.value("GUIDES", BaseCurvesDeformer::Type::GUIDES)
