@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "common.h"
 #include "curves_container.h"
+#include "mesh_container.h"
 #include "deformer_stats.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
@@ -136,7 +137,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		std::string   	mVelocityAttrName = kVelocitiAttrName;
 		
-		PxrCurvesContainer::UniquePtr mpCurvesContainer;
+		PxrCurvesContainer::UniquePtr 	mpCurvesContainer;
+		MeshContainer::UniquePtr   		mpDeformerMeshContainer;
 
 		BS::thread_pool<BS::tp::none> mPool;
 		DeformerStats mStats;

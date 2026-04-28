@@ -7,6 +7,7 @@
 
 namespace Piston {
 
+static const bool sDataInstancingDefaultState = true;
 static const pxr::SdfPath sDefaultPrimPath("/__piston_data__");
 static const CurvesDeformerFactory::DataToPrimStorageMethod sDefaultDataToPrimStorage(CurvesDeformerFactory::DataToPrimStorageMethod::ATTRIBUTE);
 
@@ -113,6 +114,20 @@ bool CurvesDeformerFactory::getPointsCacheUsageState() {
 	return factory.mpPxrPointsLRUCache != nullptr;
 }
 
+void CurvesDeformerFactory::setDataInstancingState(bool state) {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+
+	if(factory.mDataInstancingState == state) return;
+	factory.mDataInstancingState = state;
+}
+
+bool CurvesDeformerFactory::getDataInstancingState() {
+	CurvesDeformerFactory& factory = getInstance();
+	std::lock_guard<std::mutex> lock(factory.mMutex);
+	return factory.mDataInstancingState;
+}
+
 void CurvesDeformerFactory::setDefaultRestTimeCode(pxr::UsdTimeCode time_code) {
 	CurvesDeformerFactory& factory = getInstance();
 	if(factory.getDefaultRestTimeCode() == time_code) return;
@@ -176,7 +191,7 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 	//SimpleProfiler::printReport();
 }
 
-CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaultDataToPrimStorage), mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), mDefaultDataPrimPath(sDefaultPrimPath) {
+CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaultDataToPrimStorage), mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), mDefaultDataPrimPath(sDefaultPrimPath), mDataInstancingState(sDataInstancingDefaultState) {
 	bool enable_cache = true;
 	std::string cache_var_value;
 	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
@@ -186,6 +201,18 @@ CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaul
 		}
 	}
 	mpPxrPointsLRUCache = enable_cache ? PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize) : nullptr;
+	LOG_INF << "Point cache is " << (mpPxrPointsLRUCache ? "ON" : "OFF");
+
+	std::string data_instancing_var_value;
+	if(getEnvVar("PISTON_DATA_INSTANCING", data_instancing_var_value)) {
+		data_instancing_var_value = tolower(cache_var_value) ;
+		if(data_instancing_var_value == "off" || data_instancing_var_value == "false" || data_instancing_var_value == "0") {
+			mDataInstancingState = false;
+		} else {
+			mDataInstancingState = true;
+		}
+	}
+	LOG_INF << "Data instancing is " << (mDataInstancingState ? "ON" : "OFF");
 
 	std::string tpose_default_frame_string;
 	if(getEnvVar("PISTON_DEFAULT_TPOSE_FRAME", tpose_default_frame_string)) {

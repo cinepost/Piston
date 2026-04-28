@@ -52,7 +52,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
-	if(!pPhantomTrimesh || !pPhantomTrimesh->update(mDeformerGeoPrimHandle, time_code)) {
+	if(!pPhantomTrimesh) {
 		return false;
 	}
 
@@ -64,10 +64,13 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 		return false;
 	}
 
+	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
 	const bool build_live = true; // build using live data
 	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
+	const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
 
-	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
 	calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
 	calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
 
@@ -90,7 +93,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 				N[2], T[2], B[2]
 			};
 
-			auto curve_bind_pos = pPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v);
+			auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
 			uint32_t vertex_offset = mpCurvesContainer->getCurveVertexOffset(i);
 			PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(i);
 
@@ -128,10 +131,12 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
+	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
 	if(mpDebugGeo) {
 		mpDebugGeo->clear();
 
-		const pxr::VtArray<pxr::GfVec3f>& positions = pPhantomTrimesh->getLivePositions();
+		const pxr::VtArray<pxr::GfVec3f>& positions = pDeformerMeshContainer->getLivePositions();
 
 		for(const auto face: pPhantomTrimesh->getFaces()) {
 			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]);
@@ -157,7 +162,7 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 			const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
 
 			const auto& bind = curveBinds[i];
-			auto curve_bind_pos = pPhantomTrimesh->getInterpolatedLivePosition(bind.face_id, bind.u, bind.v);
+			auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
 
 			DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f);
 			lN.setColor({0.0, 1.0, 0.0});
@@ -187,26 +192,12 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	}
 	mpFastCurvesDeformerData->clear();
 
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get())) {
+	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
+	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	
+	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
 		// Build deformer data in place if no json data present or not needed
-		
-		assert(mpAdjacencyData);
-		const auto* pAdjacency = mpAdjacencyData->getAdjacency();
-		assert(pAdjacency);
-		if(!pAdjacency->isValid()) {
-			DLOG_ERR << "No valid mesh adjacency data!";
-			return false;
-		}
-
-		assert(pAdjacency->getMaxFaceVertexCount() > 0);
-
-		assert(mpPhantomTrimeshData);
-		const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-		assert(pPhantomTrimesh);
-		if(!pPhantomTrimesh->isValid()) {
-			DLOG_ERR << "No valid phantom trimesh data!";
-			return false;
-		}
 
 		if(!buildCurvesBindingData(rest_time_code, multi_threaded)) {
 			return false;
@@ -221,7 +212,9 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		// Additional per-bind rest normals if needed
 		const bool build_live = false; // build using rest data
 		std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
-		buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+		const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
+
+		buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
 		calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
 		calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
 		
@@ -275,6 +268,8 @@ void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* p
 	static constexpr float kF = 1.f / 3.f;
 
 	assert(pPhantomTrimesh);
+	assert(mpDeformerMeshContainer);
+
 	auto& perBindNormals = build_live ? mPerBindLiveNormals : mpFastCurvesDeformerData->mPerBindRestNormals;
 
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
@@ -283,7 +278,7 @@ void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* p
 	auto& mPerBindTBs = build_live ? mPerBindLiveTBs : mpFastCurvesDeformerData->mPerBindRestTBs;
 	assert(mPerBindTBs.size() == curveBinds.size());
 
-	const auto& pt_positions = build_live ? pPhantomTrimesh->getLivePositions() : pPhantomTrimesh->getRestPositions();
+	const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
 	const std::vector<PhantomTrimesh::TriFace>& faces = pPhantomTrimesh->getFaces(); 
 
 	pxr::VtArray<pxr::GfVec3f> face_center_points(faces.size());
@@ -326,6 +321,8 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
+	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
 	const auto& perBindRestNormals = mpFastCurvesDeformerData->getPerBindRestNormals();
 	const auto& perBindRestTBs = mpFastCurvesDeformerData->getPerBindRestTBs();
 
@@ -334,7 +331,7 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 		const auto& bind = curveBinds[curve_index];
 		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
 
-		const auto root_pos_offset = mpCurvesContainer->getCurveRootPoint(curve_index) - pPhantomTrimesh->getInterpolatedRestPosition(bind.face_id, bind.u, bind.v);
+		const auto root_pos_offset = mpCurvesContainer->getCurveRootPoint(curve_index) - pDeformerMeshContainer->getInterpolatedRestPosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
 		const pxr::GfVec3f& N = perBindRestNormals[curve_index];
 		const pxr::GfVec3f& T = perBindRestTBs[curve_index].first;
 		const pxr::GfVec3f& B = perBindRestTBs[curve_index].second;
@@ -355,17 +352,21 @@ bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
+	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
 	PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 	// first we try to itersect one of the curves segments
 	if(curve_data_ptr.first < 2 || !curve_data_ptr.second) return false; // invalid curve
 
 	const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
 
+	const auto& face = pPhantomTrimesh->getFace(face_id);
+
 	for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first - 1); ++ptr_offset) {
 		const pxr::GfVec3f orig = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
 		const pxr::GfVec3f dir  = *(curve_data_ptr.second + ptr_offset + 1) - *(curve_data_ptr.second + ptr_offset); 
 		float isect_dist;
-		if(pPhantomTrimesh->intersectRay(orig, dir, face_id, bind.u, bind.v, isect_dist)) {
+		if(pDeformerMeshContainer->intersectRay(orig, dir, face, bind.u, bind.v, isect_dist)) {
 			// check we've intersected within curve segment
 			if((isect_dist*isect_dist) <= lengthSquared(dir)) {
 				bind.face_id = face_id;
@@ -380,7 +381,7 @@ bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_
 	for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
 		const pxr::GfVec3f pt = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
 		float dist = FLT_MAX;
-		bool bound = pPhantomTrimesh->projectPoint(pt, face_id, bind.u, bind.v, dist);
+		bool bound = pDeformerMeshContainer->projectPoint(pt, face, bind.u, bind.v, dist);
 		if(bound) {
 			bind.face_id = face_id;
 			return true;
@@ -425,6 +426,8 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 		bind.face_id = CurveBindData::kInvalidFaceID;
 	}
 
+	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
 	assert(mpAdjacencyData);
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	assert(pAdjacency);
@@ -432,6 +435,8 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	assert(mpPhantomTrimeshData);
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
+
+	const pxr::VtArray<pxr::GfVec3f>& rest_positions = pDeformerMeshContainer->getRestPositions();
 
 	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_face_boundaries) {
 		bool isBound = false;
@@ -442,7 +447,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
 			
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
-				_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), pPhantomTrimesh->getRestPositions()[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+				_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
 			}
 
 			std::vector<float>::iterator it = std::min_element(_tmp_sq_distances.begin(), _tmp_sq_distances.begin() + prim_vertex_count);
@@ -526,7 +531,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 
 						for(size_t j = 0; j < prim_vertex_count; ++j) {
 							const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
-							tmp_indexed_squared_distances[j] = { distanceSquared(pt, pPhantomTrimesh->getRestPositions()[vtx]), vtx };
+							tmp_indexed_squared_distances[j] = { distanceSquared(pt, rest_positions[vtx]), vtx };
 						}
 						
 						std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
@@ -544,7 +549,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 					}
 
 					assert(bind.face_id != PhantomTrimesh::kInvalidTriFaceID);
-					pPhantomTrimesh->projectPoint(pt, bind.face_id, bind.u, bind.v);
+					pDeformerMeshContainer->projectPoint(pt, pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
 				}
 
 				skin_bound_curves_count++;
@@ -557,7 +562,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			{
         		const std::lock_guard<std::mutex> lock(kdtree_mutex);
         		if(!pKDTree) {
-        			pKDTree = std::make_unique<neighbour_search::KDTree<float, 3>>(pPhantomTrimesh->getRestPositions(), false /* no threads */);
+        			pKDTree = std::make_unique<neighbour_search::KDTree<float, 3>>(rest_positions, false /* no threads */);
         		}
         	}
 

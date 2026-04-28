@@ -201,13 +201,11 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
     return result;
 }
 
-void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool) {
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const pxr::VtArray<pxr::GfVec3f>& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool) {
     assert(pAdjacency);
     assert(pTrimesh);
 
     vertex_normals.resize(pAdjacency->getVertexCount());
-
-    const pxr::VtArray<pxr::GfVec3f>& pt_positions = build_live ? pTrimesh->getLivePositions() : pTrimesh->getRestPositions();
     const std::vector<PhantomTrimesh::PxrIndexType>& vertices = pTrimesh->getVertices();
     
     auto func = [&](const std::size_t vertex_index) {

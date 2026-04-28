@@ -9,6 +9,8 @@
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
+#include <pxr/imaging/hd/meshTopology.h>
+#include <pxr/imaging/hd/basisCurvesTopology.h>
 
 #include <memory>
 #include <string>
@@ -22,6 +24,26 @@ using json = nlohmann::json;
 
 namespace Piston {
 
+using PxrTopologyVariant = std::variant<pxr::HdMeshTopology, pxr::HdBasisCurvesTopology>;
+
+struct Topology {
+	size_t             topology_hash;
+	PxrTopologyVariant topology_variant;
+	pxr::UsdTimeCode   time_code;
+
+	Topology(size_t hash, PxrTopologyVariant&& variant, const pxr::UsdTimeCode time = pxr::UsdTimeCode::Default()) {
+		topology_hash = hash;
+		topology_variant = std::move(variant);
+		time_code = time;
+	}
+
+	bool operator==(const Topology& other) const {
+		if(topology_hash != other.topology_hash) return false;
+
+		return topology_variant == other.topology_variant;
+	}
+};
+
 const char *stringifyMemSize(size_t bytes);
 
 std::string bson_to_hex_string(const BSON& bson);
@@ -32,6 +54,10 @@ std::string getStageName(pxr::UsdStageRefPtr pStage);
 inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.IsValid() && prim.IsA<pxr::UsdGeomMesh>(); }
 inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.IsValid() && prim.IsA<pxr::UsdGeomBasisCurves>(); }
 
+inline bool isSameType(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r) {
+	return prim_l.GetTypeName() == prim_r.GetTypeName();
+}
+
 bool clearPistonDataFromStage(pxr::UsdStageRefPtr pStage);
 bool clearPistonDataFromPrim(pxr::UsdStageRefPtr pStage, const pxr::SdfPath& prim_path);
 
@@ -41,6 +67,9 @@ class UsdPrimHandle {
 	public:
 		UsdPrimHandle();
 		UsdPrimHandle(const pxr::UsdPrim& pPrim);
+		UsdPrimHandle(UsdPrimHandle&& other) noexcept;
+
+		UsdPrimHandle& operator=(UsdPrimHandle&& other) noexcept;
 
 		const pxr::UsdPrim& getPrim() const;
 
@@ -72,6 +101,9 @@ class UsdPrimHandle {
 		double getStageFPS() const;
 		double getStageTimeCodesPerSecond() const;
 
+		const Topology& getTopology(pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+		size_t getTopologyHash(pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+
 		/* Invalidate handle */
 		void clear();
 
@@ -84,7 +116,8 @@ class UsdPrimHandle {
   		}
 
 	private:
-		pxr::UsdPrim            mPrim;
+		pxr::UsdPrim     mPrim;
+		mutable std::unique_ptr<Topology> mpTopology;
 
 };
 
@@ -126,6 +159,12 @@ class PointsList {
 inline std::ostream& operator<<( std::ostream& os, const pxr::UsdPrim& prim ) {
 	os << prim.GetPath();
 	return os;
+}
+
+inline size_t getTopologyHash(const PxrTopologyVariant& topology) {
+    return std::visit([](const auto& t) -> size_t {
+        return static_cast<size_t>(t.ComputeHash());
+    }, topology);
 }
 
 } // namespace Piston

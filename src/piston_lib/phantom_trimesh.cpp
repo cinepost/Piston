@@ -16,13 +16,13 @@
 
 namespace Piston {
 
-static const SerializableDeformerDataBase::DataVersion kTrimeshDataVersion( 0u, 0u, 0u);
+static const SerializableDeformerDataBase::DataVersion kTrimeshDataVersion( 0u, 0u, 1u);
 
 PhantomTrimesh::UniquePtr PhantomTrimesh::create() {
 	return std::make_unique<PhantomTrimesh>();
 }
 
-PhantomTrimesh::PhantomTrimesh() : mValid(false), mExternalDataSource(false) {
+PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mValid(false) {
 	static const size_t reserve_size = 1024;
 
 	mFaceMap.reserve(reserve_size);
@@ -37,7 +37,8 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
 	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
-		
+	pxr::VtArray<pxr::GfVec3f> points;
+
 	if(!restPositionPrimVar) {
 		LOG_WRN << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
 
@@ -45,41 +46,29 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 
 		static const pxr::UsdTimeCode s_zero_time_code(0.0);
 
-		if(!mesh.GetPointsAttr().Get(&mUsdMeshRestPositions, s_zero_time_code)) {
+		if(!mesh.GetPointsAttr().Get(&points, s_zero_time_code)) {
 			LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << s_zero_time_code.GetValue();
 			return false;
 		}
 	} else {
 		const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
-		if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
+		if(!restPosAttr.Get(&points, time_code)) {
 			LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
 			return false;
 		}
-		LOG_DBG << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions.";
+		LOG_DBG << "Prim " << prim_handle.getPath() << " has " << points.size() << " points.";
 	}
+
+	mPointsCount = points.size();
 
 	mValid = true;
 	return mValid;
 }
 
-bool PhantomTrimesh::init(const pxr::VtArray<pxr::GfVec3f>& restPointsExt, const pxr::VtArray<pxr::GfVec3f>& livePointsExt) {
-	mExternalDataSource = mValid = false;
-
-	if(restPointsExt.size() != livePointsExt.size()) {
-		LOG_ERR << "Error initalizing PhantomTrimesh with external data. Rest and live point arrays sizes are not equal !!!";
-	} else {
-		mUsdMeshRestPositions = restPointsExt; // should share underlying structure
-		mUsdMeshLivePositions = livePointsExt; // should share underlying structure
-		mExternalDataSource = mValid = true;
-	}
-
-	return mValid;
-}
-
 #ifdef USE_CGAL
 
-bool PhantomTrimesh::buildTetrahedrons() {
+bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions) {
 	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
 	using Vb =  CGAL::Triangulation_vertex_base_with_info_3<uint32_t, Kernel>;
 	using Tds = CGAL::Triangulation_data_structure_3<Vb>;
@@ -91,8 +80,7 @@ bool PhantomTrimesh::buildTetrahedrons() {
 	using CGAL_VtxHandle = Triangulation::Vertex_handle;
 	using CGAL_LocateType = Triangulation::Locate_type;
 
-	const pxr::VtArray<pxr::GfVec3f>& rest_positions = getRestPositions();
-	const size_t points_count = rest_positions.size();
+	const size_t points_count = positions.size();
 
 	if(points_count < 4) {
 		LOG_ERR << "Mesh has less than 4 vertices !";
@@ -101,7 +89,7 @@ bool PhantomTrimesh::buildTetrahedrons() {
 
 	std::vector< std::pair<CGAL_Point, uint32_t> > points;
 	for(size_t i = 0; i < points_count; ++i) {
-		const auto& pxr_pt = rest_positions[i];
+		const auto& pxr_pt = positions[i];
   		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
   	}
 
@@ -162,103 +150,6 @@ bool PhantomTrimesh::buildTetrahedrons() {
 
 #endif  // USE_CGAL
 
-pxr::GfVec3f PhantomTrimesh::getTetrahedronRestCentroid(const Tetrahedron& t) const {
-	assert(t.isValid());
-
-	const pxr::VtArray<pxr::GfVec3f>& rest_positions = getRestPositions();
-	return (rest_positions[t.indices[0]] + rest_positions[t.indices[1]] + rest_positions[t.indices[2]] + rest_positions[t.indices[3]]) / 4.0f;
-}
-
-pxr::GfVec3f PhantomTrimesh::getTetrahedronRestCentroid(size_t idx) const {
-	assert(idx < mTetrahedrons.size());
-	return getTetrahedronRestCentroid(mTetrahedrons[idx]);
-}
-
-void PhantomTrimesh::barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const {
-	assert(t.isValid());
-
-	const pxr::VtArray<pxr::GfVec3f>& rest_positions = getRestPositions();
-
-	const pxr::GfVec3f& a = rest_positions[t.indices[0]];
-	const pxr::GfVec3f& b = rest_positions[t.indices[1]];
-	const pxr::GfVec3f& c = rest_positions[t.indices[2]];
-	const pxr::GfVec3f& d = rest_positions[t.indices[3]];
-
-    pxr::GfVec3f vap = p - a;
-    pxr::GfVec3f vbp = p - b;
-
-    pxr::GfVec3f vab = b - a;
-    pxr::GfVec3f vac = c - a;
-    pxr::GfVec3f vad = d - a;
-
-    pxr::GfVec3f vbc = c - b;
-    pxr::GfVec3f vbd = d - b;
-
-    // ScTP computes the scalar triple product
-    auto ScTP = [](const pxr::GfVec3f &a, const pxr::GfVec3f &b, const pxr::GfVec3f &c) {
-    	// computes scalar triple product
-    	return pxr::GfDot(a, pxr::GfCross(b, c));
-	};
-
-    float va6 = ScTP(vbp, vbd, vbc);
-    float vb6 = ScTP(vap, vac, vad);
-    float vc6 = ScTP(vap, vad, vab);
-    float vd6 = ScTP(vap, vab, vac);
-    float v6 = 1.f / ScTP(vab, vac, vad);
-
-    u = va6*v6;
-    v = vb6*v6;
-    w = vc6*v6;
-    x = vd6*v6;
-/*
-    float _x = 1.0f - (u + v + w);
-
-    if(!floatsAreEqualRelative(x, _x)) {
-    	std::cout << "x " << x << " _x " << _x << std::endl;
-    }
-*/
-}
-
-void PhantomTrimesh::barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const {
-	assert(idx < mTetrahedrons.size());
-	barycentricTetrahedronRestCoords(mTetrahedrons[idx], p, u, v, w, x);
-}
-
-void PhantomTrimesh::barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w) const {
-	float _temp_x;
-	barycentricTetrahedronRestCoords(t, p, u, v, w, _temp_x);
-}
-
-void PhantomTrimesh::barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w) const {
-	assert(idx < mTetrahedrons.size());
-	barycentricTetrahedronRestCoords(mTetrahedrons[idx], p, u, v, w);
-}
-
-pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const {
-	assert(t.isValid());
-
-	const pxr::VtArray<pxr::GfVec3f>& live_positions = getLivePositions();
-
-	assert(t.indices[0] < live_positions.size());
-	assert(t.indices[1] < live_positions.size());
-	assert(t.indices[2] < live_positions.size());
-	assert(t.indices[3] < live_positions.size());
-
-	const pxr::GfVec3f& a = live_positions[t.indices[0]];
-	const pxr::GfVec3f& b = live_positions[t.indices[1]];
-	const pxr::GfVec3f& c = live_positions[t.indices[2]];
-	const pxr::GfVec3f& d = live_positions[t.indices[3]];
-
-    return {u * a[0] + v * b[0] + w * c[0] + x * d[0], 
-    		u * a[1] + v * b[1] + w * c[1] + x * d[1], 
-    		u * a[2] + v * b[2] + w * c[2] + x * d[2]};
-}
-
-pxr::GfVec3f PhantomTrimesh::getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const {
-	assert(idx < mTetrahedrons.size());
-	return getPointPositionFromBarycentricTetrahedronLiveCoords(mTetrahedrons[idx], u, v, w, x);
-}
-
 uint32_t PhantomTrimesh::getPointConnectedTetrahedronIndex(size_t pt_index, size_t tetra_local_index) const { 
 	assert(pt_index < mTetrahedronCounts.size()); 
 	assert(tetra_local_index < mTetrahedronCounts[pt_index]);
@@ -267,9 +158,6 @@ uint32_t PhantomTrimesh::getPointConnectedTetrahedronIndex(size_t pt_index, size
 
 void PhantomTrimesh::invalidate() {
 	mValid = false;
-
-	mUsdMeshRestPositions.clear();
-	mUsdMeshLivePositions.clear();
 
 	// Tetrahedrons
 	mTetrahedronCounts.clear();
@@ -325,12 +213,6 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(PhantomTrimesh::PxrIndexType a, Phant
 	if(mTmpVertices.insert(b).second == true) mVertices.push_back(b);
 	if(mTmpVertices.insert(c).second == true) mVertices.push_back(c);
 
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-
-	mFaces.back().restNormal = pxr::GfGetNormalized(
-		pxr::GfCross(usdMeshRestPositions[indices[1]] - usdMeshRestPositions[indices[0]], usdMeshRestPositions[indices[2]] - usdMeshRestPositions[indices[0]])
-	);
-
 	mFaceMap[indices] = idx;
 
 	return idx;
@@ -340,122 +222,8 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(const std::array<PxrIndexType, 3>& a)
 	return getOrCreateFaceID(a[0], a[1], a[2]);
 }
 
-bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-	if(face_id == kInvalidTriFaceID) return false;
-	
-	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-	return rayTriangleIntersect(pt, -face.getRestNormal(), usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], u, v);
-}
-
-bool PhantomTrimesh::projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v, float& dist) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-	if(face_id == kInvalidTriFaceID) return false;
-	
-	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-	return rayTriangleIntersect(pt, -face.getRestNormal(), usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], dist, u, v);
-}
-
-bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const uint32_t face_id, float& u, float& v) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-	if(face_id == kInvalidTriFaceID) return false;
-
-	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-	return rayTriangleIntersect(orig, dir, usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], u, v);
-}
-
-bool PhantomTrimesh::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const uint32_t face_id, float& u, float& v, float& dist) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-	if(face_id == kInvalidTriFaceID) return false;
-
-	const TriFace& face = mFaces[static_cast<size_t>(face_id)];
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-	return rayTriangleIntersect(orig, dir, usdMeshRestPositions[face.indices[0]], usdMeshRestPositions[face.indices[1]], usdMeshRestPositions[face.indices[2]], dist, u, v);
-}
-
-pxr::GfVec3f PhantomTrimesh::getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const {
-	return getInterpolatedRestPosition(face_id, u, v, (1.f - u - v));
-};
-
-
-pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const {
-	return getInterpolatedLivePosition(face_id, u, v, (1.f - u - v));
-};
-
-pxr::GfVec3f PhantomTrimesh::getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v, const float w) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-
-	auto const& face = mFaces[face_id];
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-
-	return u * usdMeshRestPositions[face.indices[1]] + v * usdMeshRestPositions[face.indices[2]] + w * usdMeshRestPositions[face.indices[0]];
-}
-
-pxr::GfVec3f PhantomTrimesh::getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v, const float w) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-
-	auto const& face = mFaces[face_id];
-	auto const& usdMeshLivePositions = mUsdMeshLivePositions.AsConst();
-
-	return u * usdMeshLivePositions[face.indices[1]] + v * usdMeshLivePositions[face.indices[2]] + w * usdMeshLivePositions[face.indices[0]];
-}
-
-pxr::GfVec3f PhantomTrimesh::getFaceRestCentroid(const uint32_t face_id) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-
-	static constexpr float kInvThree = 1.f / 3.f;
-	auto const& face = mFaces[face_id];
-	auto const& usdMeshRestPositions = mUsdMeshRestPositions.AsConst();
-
-	return (usdMeshRestPositions[face.indices[0]] + usdMeshRestPositions[face.indices[1]] + usdMeshRestPositions[face.indices[2]]) * kInvThree;
-}
-
-bool PhantomTrimesh::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const {
-	assert(!mExternalDataSource);
-	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
-
-	pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
-
-	if(!mesh.GetPointsAttr().Get(&mUsdMeshLivePositions, time_code)) {
-		LOG_ERR << "Error getting point positions from " << prim_handle.getPath() << " !";
-		return false;
-	}
-
-	if(mUsdMeshLivePositions.size() != mUsdMeshRestPositions.size()) {
-		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mUsdMeshRestPositions.size() << " vs " << mUsdMeshLivePositions.size() << " ) mismatch !";
-		return false;
-	}
-
-	return true;
-}
-
-const pxr::GfVec3f& PhantomTrimesh::getFaceRestNormal(const uint32_t face_id) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-
-	return mFaces[face_id].getRestNormal();
-}
-
-pxr::GfVec3f PhantomTrimesh::getFaceLiveNormal(const uint32_t face_id) const {
-	assert(static_cast<size_t>(face_id) < mFaces.size());
-
-	auto const& indices = mFaces[face_id].indices;
-	auto const& usdMeshLivePositions = mUsdMeshLivePositions.AsConst();
-
-	return pxr::GfGetNormalized(
-		pxr::GfCross(usdMeshLivePositions[indices[1]] - usdMeshLivePositions[indices[0]], usdMeshLivePositions[indices[2]] - usdMeshLivePositions[indices[0]])
-	);
-}
-
 size_t PhantomTrimesh::calcHash() const {
 	size_t hash = 0;
-
-	for(const auto& pos: mUsdMeshRestPositions) {
-		hash += static_cast<uint32_t>(pos[0]) + (static_cast<uint32_t>(pos[1]) << 1) + (static_cast<uint32_t>(pos[2]) << 2);
-	}
-	hash += mUsdMeshRestPositions.size() << 3;
 
 	for(const auto& face: mFaces) {
 		hash += face.calcHash();
@@ -484,8 +252,7 @@ size_t PhantomTrimesh::calcHash() const {
 void to_json(json& j, const std::vector<PhantomTrimesh::TriFace>& trifaces) {
 	for(const auto& f: trifaces) {
     	j.push_back({
-    		f.indices[0], f.indices[1], f.indices[2],
-    		f.restNormal[0], f.restNormal[1], f.restNormal[2],
+    		f.indices[0], f.indices[1], f.indices[2]
     	});
     }
 }
@@ -496,10 +263,7 @@ void from_json(const json& j, std::vector<PhantomTrimesh::TriFace>& trifaces) {
  		trifaces.emplace_back(
  			e.at(0).template get<PhantomTrimesh::PxrIndexType>(),
  			e.at(1).template get<PhantomTrimesh::PxrIndexType>(),
- 			e.at(2).template get<PhantomTrimesh::PxrIndexType>(),
- 			e.at(3).template get<float>(),
- 			e.at(4).template get<float>(),
- 			e.at(5).template get<float>()
+ 			e.at(2).template get<PhantomTrimesh::PxrIndexType>()
  		);
 	}
 }
@@ -549,8 +313,6 @@ void SerializablePhantomTrimesh::clearData() {
 bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 	if(!mpTrimesh || !mpTrimesh->isValid()) return false;
 
-	to_json(j[kJUsdRestPositions], mpTrimesh->mUsdMeshRestPositions);
-
 	j[kJFaces] = mpTrimesh->mFaces;
 	j[kJFaceMap] = mpTrimesh->mFaceMap;
 	j[kJFaceFlags] = mpTrimesh->mFaceFlags;
@@ -564,7 +326,6 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	mpTrimesh = std::make_unique<PhantomTrimesh>();
 	mpTrimesh->mValid = false;
 
-	from_json(j[kJUsdRestPositions], mpTrimesh->mUsdMeshRestPositions);
 	mpTrimesh->mFaces = j[kJFaces].template get<std::vector<PhantomTrimesh::TriFace>>();
 	mpTrimesh->mFaceMap = j[kJFaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
 	mpTrimesh->mFaceFlags = j[kJFaceFlags].template get<std::vector<PhantomTrimesh::TriFace::Flags>>();

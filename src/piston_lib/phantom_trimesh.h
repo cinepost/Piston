@@ -57,25 +57,18 @@ class PhantomTrimesh {
 
 			TriFace(): indices{kInvalidVertexID} { }
 			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c): indices{a, b, c} { }
-			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c, const pxr::GfVec3f& _restNormal): indices{a, b, c}, restNormal(_restNormal) {}
-			TriFace(PxrIndexType a, PxrIndexType b, PxrIndexType c, const float& n0, const float& n1, const float& n2): indices{a, b, c}, restNormal{n0, n1, n2} {}
 			TriFace(const std::array<PxrIndexType, 3>& d): indices{d} { }
 
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
 
-			const pxr::GfVec3f& getRestNormal() const { return restNormal; }
+			//const pxr::GfVec3f& getRestNormal() const { return restNormal; }
 
 			const IndicesList&  getIndices() const { return indices; }
 
 			const PxrIndexType& operator[](size_t index) const { return indices[index]; }
 
 			size_t calcHash() const {
-				size_t hash = 0;
-				
-				hash += indices[0] + indices[1]*2 + indices[2]*3;
-				hash += size_t(restNormal[0] * 111.f) + size_t(restNormal[1] * 222.f) + size_t(restNormal[2] * 333.f);
-
-				return hash;
+				return static_cast<size_t>(indices[0]) + (static_cast<size_t>(indices[1]) << 16) + (static_cast<size_t>(indices[2]) << 32);
 			}
 
 			IndicesList 	indices;
@@ -103,14 +96,8 @@ class PhantomTrimesh {
 		static PhantomTrimesh::UniquePtr create();
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
-		bool init(const pxr::VtArray<pxr::GfVec3f>& restPointsExt, const pxr::VtArray<pxr::GfVec3f>& livePointsExt);
 
-		inline size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
-		inline const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
-		inline const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions.AsConst(); }
-
-		inline const pxr::GfVec3f& getRestPointPosition(size_t i) const { assert(i < mUsdMeshRestPositions.size()); return mUsdMeshRestPositions[i]; }
-		inline const pxr::GfVec3f& getLivePointPosition(size_t i) const { assert(i < mUsdMeshLivePositions.size()); return mUsdMeshLivePositions[i]; }
+		size_t getPointsCount() const { return mPointsCount; }
 
 		std::vector<TriFace::Flags>& getFaceFlags() { return mFaceFlags; }
 		const std::vector<TriFace::Flags>& getFaceFlags() const { return mFaceFlags; }
@@ -126,57 +113,24 @@ class PhantomTrimesh {
 		const TriFace& getFace(const uint32_t id) const { assert(id < mFaces.size()); return mFaces[id]; }
 		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 
-		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v) const;
-		bool projectPoint(const pxr::GfVec3f& pt, const uint32_t face_id, float& u, float& v, float& dist) const;
-		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v) const;
-		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, uint32_t face_id, float& u, float& v, float& dist) const;
-
-		pxr::GfVec3f getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v) const;
-		pxr::GfVec3f getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v) const;
-
-		pxr::GfVec3f getInterpolatedRestPosition(const uint32_t face_id, const float u, const float v, const float w) const;
-		pxr::GfVec3f getInterpolatedLivePosition(const uint32_t face_id, const float u, const float v, const float w) const;
-
-		pxr::GfVec3f getFaceRestCentroid(const uint32_t face_id) const;
-
-		const pxr::GfVec3f& getFaceRestNormal(const uint32_t face_id) const;
-		pxr::GfVec3f getFaceLiveNormal(const uint32_t face_id) const;
-
 		const std::vector<PxrIndexType>& getVertices() const { return mVertices; }
 		size_t getVertexCount() const { return mVertices.size(); }
 
 		bool isValid() const { return mValid; }
 		void invalidate();
 
-		bool buildTetrahedrons();
-		bool hasTetrahedrons() const { return !mTetrahedrons.empty() && (mTetrahedronCounts.size() == mTetrahedronOffsets.size() == mUsdMeshRestPositions.size()); }
+		bool buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions);
+		bool hasTetrahedrons() const { return !mTetrahedrons.empty() && (mTetrahedronCounts.size() == mTetrahedronOffsets.size() == mPointsCount); }
 		const std::vector<Tetrahedron>& getTetrahedrons() const { return mTetrahedrons; }
 		const Tetrahedron& getTetrahedron(size_t i) const { assert(i < mTetrahedrons.size()); return mTetrahedrons[i]; }
 
 		size_t getPointConnectedTetrahedronsCount(size_t pt_index) const { assert(pt_index < mTetrahedronCounts.size()); return mTetrahedronCounts[pt_index];}
 		uint32_t getPointConnectedTetrahedronIndex(size_t pt_index, size_t tetra_local_index) const;
 
-		pxr::GfVec3f getTetrahedronRestCentroid(const Tetrahedron& t) const;
-		pxr::GfVec3f getTetrahedronRestCentroid(size_t idx) const;
-
-		void barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const;
-		void barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const;
-
-		void barycentricTetrahedronRestCoords(const Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w) const;
-		void barycentricTetrahedronRestCoords(size_t idx, const pxr::GfVec3f& p, float& u, float& v, float& w) const;
-
-		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(const Tetrahedron& t, float u, float v, float w, float x) const;
-		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(size_t idx, float u, float v, float w, float x) const;
-
-		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const;
-
 		size_t calcHash() const;
 
 	private:
-		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
-		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
-
-		bool                                                    mExternalDataSource = false;
+		size_t                                                  mPointsCount;
 
 		// TriFaces part
 		std::unordered_map<std::array<PxrIndexType, 3>, size_t, IndicesArrayHasher<PxrIndexType, 3>> mFaceMap;

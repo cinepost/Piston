@@ -60,6 +60,9 @@ class CurvesDeformerFactory {
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 	    static GuideCurvesDeformer::SharedPtr getGuidesDeformer(const std::string& name);
 
+	    static void setDataInstancingState(bool state);
+	    static bool getDataInstancingState();
+
 		static void setPointsCacheUsageState(bool state);
 		static bool getPointsCacheUsageState();
 
@@ -99,6 +102,7 @@ class CurvesDeformerFactory {
     	DataToPrimStorageMethod 	mDataToPrimStorageMethod;
     	pxr::UsdTimeCode 			mDefaultRestTimeCode;
     	pxr::SdfPath    		 	mDefaultDataPrimPath;
+    	bool                        mDataInstancingState;
 
     	CurvesDeformerFactory();
 };

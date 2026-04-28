@@ -23,6 +23,13 @@ setattr(_piston.DeformerFactory, "Key", _piston.DeformerKey)
 setattr(_piston.WrapCurvesDeformer, "BindMode", _piston.__WrapDeformer_BindMode)
 setattr(_piston.GuideCurvesDeformer, "BindMode", _piston.__GuideDeformer_BindMode)
 
+# Init instance so we grab env variables as soon as possible.
+# TODO: Later move to something like GlobalConfig singleton class.
+_piston.DeformerFactory.getInstance() 
+
+#
+# Additional module unctions
+#
 
 # Clear all module data
 def clearAll(stage = None):

@@ -47,6 +47,11 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 		}
 	}
 
+	if(!mpAdjacencyData || !mpAdjacencyData->getAdjacency() || !mpAdjacencyData->getAdjacency()->isValid()) {
+		DLOG_ERR << "No valid mesh adjacency data!";
+		return false;
+	}
+
 	if(!mpPhantomTrimeshData) {
 		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mDeformerGeoPrimHandle);
 	}
@@ -58,6 +63,11 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 			DLOG_ERR << "Error building phantom mesh data!";
 			return false;
 		}
+	}
+
+	if(!mpPhantomTrimeshData || !mpPhantomTrimeshData->getTrimesh() || !mpPhantomTrimeshData->getTrimesh()->isValid()) {
+		DLOG_ERR << "No valid phantom trimesh data!";
+		return false;
 	}
 	
 	return true;

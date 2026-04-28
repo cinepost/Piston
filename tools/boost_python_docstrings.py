@@ -5,7 +5,6 @@ from pathlib import Path
 
 def get_cxx_files(directory):
     path = Path(directory)
-    print(directory)
     # Define common C++ header extensions
     extensions = ("*.h", "*.hpp")
     

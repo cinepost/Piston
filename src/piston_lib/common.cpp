@@ -1,5 +1,6 @@
 #include "common.h"
 #include "deformer_factory.h"
+#include "topology.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
 #include "logging.h"
@@ -99,7 +100,7 @@ const char *stringifyMemSize(size_t bytes) {
 
 	if (bytes > 1024) {
 		for (i = 0; (bytes / 1024) > 0 && i<length-1; i++, bytes /= 1024) {
-			dblBytes = bytes / 1024.0;
+			dblBytes = static_cast<double>(bytes) / 1024.0;
 		}
 	}
 
@@ -108,10 +109,18 @@ const char *stringifyMemSize(size_t bytes) {
 	return output;
 }
 
-UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()) {}
+UsdPrimHandle::UsdPrimHandle(): UsdPrimHandle(pxr::UsdPrim()) {}
 
-UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim) {
-	mPrim = prim;
+UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim): mPrim(prim), mpTopology(nullptr) { }
+
+UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : mPrim(std::move(other.mPrim)), mpTopology(std::move(other.mpTopology)) { }
+
+UsdPrimHandle& UsdPrimHandle::operator=(UsdPrimHandle&& other) noexcept {
+	if (this != &other) {
+		mPrim = std::move(other.mPrim);
+		mpTopology = std::move(other.mpTopology);
+	}
+	return *this;
 }
 
 const pxr::UsdPrim& UsdPrimHandle::getPrim() const {
@@ -121,6 +130,7 @@ const pxr::UsdPrim& UsdPrimHandle::getPrim() const {
 
 void UsdPrimHandle::clear() {
 	mPrim = pxr::UsdPrim();
+	mpTopology = nullptr;
 }
 
 double UsdPrimHandle::getStageFPS() const {
@@ -282,6 +292,34 @@ void UsdPrimHandle::clearPrimBson(const pxr::SdfPath& prim_path, const std::stri
 	}
 
 	data_prim.ClearCustomDataByKey(token);
+}
+
+const Topology& UsdPrimHandle::getTopology(pxr::UsdTimeCode time_code) const {
+	assert(mPrim.IsValid());
+	if(!mpTopology || (mpTopology->time_code != time_code)) {
+		if(isMeshGeoPrim()) {
+			const auto topology = computeMeshTopology(pxr::UsdGeomMesh(mPrim), time_code);
+			const size_t topology_hash = topology.ComputeHash();
+			mpTopology = std::make_unique<Topology>(topology_hash, std::move(topology));
+		} else if(isBasisCurvesGeoPrim()) {
+			const auto topology = computeCurvesTopology(pxr::UsdGeomBasisCurves(mPrim), time_code);
+			const size_t topology_hash = topology.ComputeHash();
+			mpTopology = std::make_unique<Topology>(topology_hash, std::move(topology));
+		} else {
+			assert(false);
+			LOG_FTL << "Unsupported usd primitive type: " <<  mPrim.GetTypeName().GetText();
+		}
+
+		assert(mpTopology);
+	}
+
+	return *mpTopology.get();
+}
+
+size_t UsdPrimHandle::getTopologyHash(pxr::UsdTimeCode time_code) const {
+	if(mpTopology && (mpTopology->time_code == time_code)) return mpTopology->topology_hash;
+
+	return getTopology(time_code).topology_hash;
 }
 
 std::string getStageName(pxr::UsdStageRefPtr pStage) {

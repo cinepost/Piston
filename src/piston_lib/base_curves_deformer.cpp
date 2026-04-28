@@ -57,9 +57,16 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 		return;
 	}
 
-	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle.getPrim(), prim) : false;
+	if(mCurvesGeoPrimHandle == prim) {
+		mDeformerGeoPrimHandle.clear();
+		DLOG_ERR << "Can't use the same prim " << mCurvesGeoPrimHandle << " for curves and deformer geometry !!!";
+		return;
+	}
 
-	mDeformerGeoPrimHandle = UsdPrimHandle(prim);
+	auto new_handle = UsdPrimHandle(prim);
+	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle) : false;
+
+	mDeformerGeoPrimHandle = std::move(new_handle);
 	if(!same_topology) {
 		makeDirty();
 	}
@@ -76,9 +83,16 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 		return;
 	}
 
-	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle.getPrim(), prim) : false;
+	if(mDeformerGeoPrimHandle == prim) {
+		mCurvesGeoPrimHandle.clear();
+		DLOG_ERR << "Can't use the same prim " << mDeformerGeoPrimHandle << " for deformer and curves geometry !!!";
+		return;
+	}
 
-	mCurvesGeoPrimHandle = UsdPrimHandle(prim);
+	auto new_handle = UsdPrimHandle(prim);
+	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle, new_handle) : false;
+
+	mCurvesGeoPrimHandle = std::move(new_handle);
 	if(!same_topology) {
 		makeDirty();
 	}
@@ -146,20 +160,52 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 
 	SimpleProfiler::clear();
 
-	if(!mDeformerGeoPrimHandle || !mCurvesGeoPrimHandle) {
-		DLOG_ERR << "No mesh or curves UsdPrim is set on deformer " << mName << " !";
+	if(!mDeformerGeoPrimHandle) {
+		DLOG_ERR << "No mesh UsdPrim is set !!!";
 		return false;
 	}
 
-	mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, rest_time_code);
+	if(!mCurvesGeoPrimHandle) {
+		DLOG_ERR << "No curves UsdPrim is set !!!";
+		return false;
+	}
+
 	if(!mpCurvesContainer) {
-		DLOG_ERR << "Error creating curves container for deformer " << mName << " !";
-		return false;
+		mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, rest_time_code);
+		if(!mpCurvesContainer) {
+			DLOG_ERR << "Error creating curves container for prim " << mCurvesGeoPrimHandle << " !";
+			return false;
+		}
+	} else {
+		if(!mpCurvesContainer->init(mCurvesGeoPrimHandle, rest_time_code)) {
+			DLOG_ERR << "Error initializing curves container for prim " << mCurvesGeoPrimHandle << " !";
+			return false;
+		}
 	}
 
-	if(!buildDeformerDataImpl(rest_time_code, multi_threaded)) {
-		DLOG_ERR << "Error building " << mName <<" deformer data !";
-		return false;
+	if(!mpDeformerMeshContainer) {
+		mpDeformerMeshContainer = MeshContainer::create(mDeformerGeoPrimHandle, getDeformerRestAttrName(), rest_time_code);
+		if(!mpDeformerMeshContainer) {
+			DLOG_ERR << "Error creating deformer mesh container for prim " << mDeformerGeoPrimHandle << " !";
+			return false;
+		}
+	} else {
+		if(!mpDeformerMeshContainer->init(mDeformerGeoPrimHandle, getDeformerRestAttrName(), rest_time_code)) {
+			DLOG_ERR << "Error initializing curves container for prim " << mDeformerGeoPrimHandle << " !";
+			return false;
+		}
+	}
+
+
+	{
+		const std::string entry_name_str = toString() + ":" + getName() + ":buildDeformerData";
+		Piston::SimpleProfiler(entry_name_str.c_str());
+
+		if(!buildDeformerDataImpl(rest_time_code, multi_threaded)) {
+			DLOG_ERR << "Error building " << mName <<" deformer data !";
+			return false;
+		}
+
 	}
 
 	mDirty = false;
@@ -191,10 +237,17 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		return false;
 	}
 
+	assert(mpDeformerMeshContainer);
+	if(!mpDeformerMeshContainer || mpDeformerMeshContainer->getRestPositions().empty()) {
+		return false;
+	}
+
 	assert(mpCurvesContainer);	
 	if(!mpCurvesContainer || mpCurvesContainer->empty()) {
 		return false;
 	}
+
+	if(!mpDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code)) return false;
 
 	auto deformPoints = [this](bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
 		if(multi_threaded) { return deformMtImpl(points, time_code); }

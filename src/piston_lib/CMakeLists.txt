@@ -49,6 +49,7 @@ file( GLOB SOURCES
     ./adjacency.cpp
     ./topology.cpp
     ./curves_container.cpp
+    ./mesh_container.cpp
     ./phantom_trimesh.cpp
     ./geometry_tools.cpp
     ./serializable_data.cpp

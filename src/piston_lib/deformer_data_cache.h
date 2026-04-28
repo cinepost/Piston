@@ -3,8 +3,10 @@
 
 #include "framework.h"
 #include "common.h"
+#include "topology.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
+#include "logging.h"
 
 #include <string>
 #include <vector>
@@ -20,22 +22,36 @@ namespace Piston {
 class DeformerDataCache {
 	public:
 	struct Key {
-		std::type_index type_idx;
-		pxr::SdfPath 	path;
+		std::type_index 	type_idx;
+		pxr::SdfPath 		path;
+		size_t              topology_hash;
+		PxrTopologyVariant 	topology_variant;
 
-		bool operator==(const Key &other) const { 
-			return (type_idx == other.type_idx && path == other.path);
-		}
+		bool operator==(const Key& other) const {
+			if(type_idx != other.type_idx) return false;
+			if(path == other.path) return true;
 
-		bool operator<(const Key &other) const {
-			if(type_idx < other.type_idx) return true;
-			if(type_idx == other.type_idx) {
-				if(path < other.path) return true;
+			if(topology_hash == other.topology_hash) {
+				return topology_variant == other.topology_variant;
 			}
 			return false;
 		}
 
-		Key(const std::type_index& _type_idx, const pxr::SdfPath& _path):type_idx(_type_idx), path(_path) {}	
+		bool operator<(const Key& other) const {
+        	if (type_idx != other.type_idx) return type_idx < other.type_idx;
+
+        	if (path == other.path) return false;
+
+        	if (topology_hash != other.topology_hash) return topology_hash < other.topology_hash;
+
+        	if (topology_variant == other.topology_variant) return false; 
+
+        	if(topology_variant < other.topology_variant) return true;
+
+        	return path < other.path;
+		}
+
+		Key(const std::type_index& _type_idx, const UsdPrimHandle& handle);
 	};
 
 	using MapType = std::map<Key, std::shared_ptr<SerializableDeformerDataBase>>; // we dont's expect large number of entries here. Also we might opt fo std::string as a key so we use std::map for now  
@@ -49,14 +65,14 @@ class DeformerDataCache {
 		// Static method to get the CurvesDeformerFactory instance
 		static DeformerDataCache& getInstance();
 
-		template< class T>
-		std::shared_ptr<T> getOrCreateData(const std::string& name);
+//		template< class T>
+//		std::shared_ptr<T> getOrCreateData(const std::string& name);
 
 		template< class T>
 		std::shared_ptr<T> getOrCreateData(const UsdPrimHandle& handle);
 
-		template< class T>
-		std::shared_ptr<T> getOrCreateData(const pxr::SdfPath& path);
+//		template< class T>
+//		std::shared_ptr<T> getOrCreateData(const pxr::SdfPath& path);
 
 	protected:
 		void clear();

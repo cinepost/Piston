@@ -95,6 +95,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		std::unique_ptr<GuideCurvesDeformerData>   				mpGuideCurvesDeformerData;
 		GuideCurvesContainer::UniquePtr 						mpGuideCurvesContainer;
+		MeshContainer::UniquePtr                                mpSkinMeshContainer;
 		
 		UsdPrimHandle 											mGuidesSkinGeoPrimHandle;
 
