@@ -86,7 +86,7 @@ class SerializableUsdGeomMeshFaceAdjacency: public SerializableDeformerDataBase 
 		SerializableUsdGeomMeshFaceAdjacency();
 
 		bool buildInPlace(const UsdPrimHandle& prim_handle);
-		bool isValid() const { return mpAdjacency && mpAdjacency->isValid(); }
+		virtual bool isValid() const override { return mpAdjacency && mpAdjacency->isValid(); }
 
 		const UsdGeomMeshFaceAdjacency* getAdjacency() const;
 		virtual const std::string& typeName() const override;

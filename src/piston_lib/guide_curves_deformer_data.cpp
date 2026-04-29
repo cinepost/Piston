@@ -41,6 +41,10 @@ inline void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
 	o.raw_data = j.at(0).template get<uint32_t>();
 }
 
+GuideCurvesDeformerData::GuideCurvesDeformerData(): mIsValid(false) {
+
+}
+
 void GuideCurvesDeformerData::clearData() {
 	mPointBinds.clear();
 	mPointSurfaceBinds.clear();

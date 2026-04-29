@@ -6,6 +6,7 @@
 #include "curves_container.h"
 #include "mesh_container.h"
 #include "deformer_stats.h"
+#include "deformer_data_cache.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
 
@@ -118,6 +119,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+
+		virtual void invalidateData(DeformerDataCache& cache);
 
 		void makeDirty();
 		void clearLRUCaches();

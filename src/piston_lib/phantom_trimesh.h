@@ -165,7 +165,7 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 		SerializablePhantomTrimesh();
 
 		bool buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
-		bool isValid() const { return mpTrimesh && mpTrimesh->isValid(); }
+		virtual bool isValid() const override { return mpTrimesh && mpTrimesh->isValid(); }
 		
 		PhantomTrimesh* getTrimesh();
 		const PhantomTrimesh* getTrimesh() const;

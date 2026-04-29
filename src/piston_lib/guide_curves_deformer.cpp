@@ -1150,8 +1150,9 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 		return true;
 	}
 
+	bool skin_adjacency_data_created;
 	if(!mpSkinAdjacencyData) {
-		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mGuidesSkinGeoPrimHandle);
+		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mGuidesSkinGeoPrimHandle, skin_adjacency_data_created);
 		assert(mpSkinAdjacencyData);
 	}
 
@@ -1162,8 +1163,9 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 		}
 	}
 
+	bool skin_trimesh_data_created;
 	if(!mpSkinPhantomTrimeshData) {
-		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mGuidesSkinGeoPrimHandle);
+		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mGuidesSkinGeoPrimHandle, skin_trimesh_data_created);
 		assert(mpSkinPhantomTrimeshData);
 	}
 
@@ -1223,6 +1225,11 @@ void GuideCurvesDeformer::setBindRootsToSkinSurface(bool bind) {
 	if( mBindRootsToSkinSurface == bind) return;
 	mBindRootsToSkinSurface = bind;
 	makeDirty();
+}
+
+void GuideCurvesDeformer::invalidateData(DeformerDataCache& cache) {
+	BaseCurvesDeformer::invalidateData(cache);
+	cache.invalidate(mGuidesSkinGeoPrimHandle);
 }
 
 void GuideCurvesDeformer::setBindMode(GuideCurvesDeformer::BindMode mode) {

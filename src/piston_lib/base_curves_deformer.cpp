@@ -407,7 +407,10 @@ void BaseCurvesDeformer::makeDirty() {
 	mDirty = true;
 	mDeformerDataWritten = false;
 
+	static auto& cache = DeformerDataCache::getInstance();
+
 	clearLRUCaches();
+	invalidateData(cache);
 }
 
 void BaseCurvesDeformer::clearLRUCaches() {
@@ -415,6 +418,11 @@ void BaseCurvesDeformer::clearLRUCaches() {
 		pPointsLRUCache->removeByName(uniqueName());
 		pPointsLRUCache->removeByName(velocityKeyName());
 	}
+}
+
+void BaseCurvesDeformer::invalidateData(DeformerDataCache& cache) {
+	cache.invalidate(mDeformerGeoPrimHandle);
+	cache.invalidate(mCurvesGeoPrimHandle);
 }
 
 void BaseCurvesDeformer::showDebugGeometry(bool state) {

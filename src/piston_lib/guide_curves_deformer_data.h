@@ -170,6 +170,9 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			operator uint32_t() const { return raw_data; }
 		};
 
+	public:
+		GuideCurvesDeformerData();
+
 		const std::vector<PointBindData>& 			getPointBinds() const { return mPointBinds; }
 		const std::vector<PointSurfaceBindData>& 	getPointSurfaceBinds() const { return mPointSurfaceBinds; }
 		const std::vector<GuideOrigin>& 			getGuideOrigins() const { return mGuideOrigins; }
@@ -177,6 +180,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		BindMode        							getBindMode() const { return mBindMode; }
 		void  										setBindMode(const BindMode& mode);
 
+		virtual bool isValid() const override { return mIsValid; };
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
@@ -203,6 +207,8 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		std::vector<int> 					mSkinPrimIndices;
 
 		bool                                mKeepRootsOnSurface = true;
+
+		bool                                mIsValid;
 
 		friend class GuideCurvesDeformer;
 };

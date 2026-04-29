@@ -10,8 +10,9 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <mutex>
+#include <functional>
 
 
 namespace Piston {
@@ -22,27 +23,18 @@ namespace Piston {
 class DeformerDataCache {
 	public:
 	struct Key {
-		std::type_index 	type_idx;
-		pxr::SdfPath 		path;
-		size_t              topology_hash;
-		PxrTopologyVariant 	topology_variant;
+		std::type_index 			type_idx;
+		std::vector<pxr::SdfPath> 	ordered_paths;
+		size_t              		topologies_hash_sum;
+		std::vector<size_t>			topology_indices;
 
-		bool operator==(const Key& other) const {
-			if(type_idx != other.type_idx) return false;
-			if(path == other.path) return true;
-
-			if(topology_hash == other.topology_hash) {
-				return topology_variant == other.topology_variant;
-			}
-			return false;
-		}
-
+/*
 		bool operator<(const Key& other) const {
         	if (type_idx != other.type_idx) return type_idx < other.type_idx;
 
         	if (path == other.path) return false;
 
-        	if (topology_hash != other.topology_hash) return topology_hash < other.topology_hash;
+        	if (topology_hash_sum != other.topology_hash_sum) return topology_hash_sum < other.topology_hash_sum;
 
         	if (topology_variant == other.topology_variant) return false; 
 
@@ -50,11 +42,65 @@ class DeformerDataCache {
 
         	return path < other.path;
 		}
+*/
+
+		bool operator==(const Key& other) const {
+			printf("!\n");
+        	if(type_idx != other.type_idx || ordered_paths.size() != other.ordered_paths.size() || topologies_hash_sum != other.topologies_hash_sum) return false;
+
+        	if(ordered_paths != other.ordered_paths) {
+        		static const auto& cache = DeformerDataCache::getInstance();
+        		return cache.topologiesAreEqual(topology_indices, other.topology_indices);
+        	}
+        	
+        	return true;
+    	}
 
 		Key(const std::type_index& _type_idx, const UsdPrimHandle& handle);
+		Key(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles);
 	};
 
-	using MapType = std::map<Key, std::shared_ptr<SerializableDeformerDataBase>>; // we dont's expect large number of entries here. Also we might opt fo std::string as a key so we use std::map for now  
+	struct KeyComparator {
+		bool operator()(const Key& lhs, const Key& rhs) const {
+			printf("$\n");
+			if(lhs.type_idx != rhs.type_idx || lhs.ordered_paths.size() != rhs.ordered_paths.size() || lhs.topologies_hash_sum != rhs.topologies_hash_sum) return false;
+
+        	if(lhs.ordered_paths != rhs.ordered_paths) {
+        		static const auto& cache = DeformerDataCache::getInstance();
+        		return cache.topologiesAreEqual(lhs.topology_indices, rhs.topology_indices);
+        	}
+        	
+        	return true;
+		}
+	};
+
+	struct KeyHasher {
+		std::size_t operator()(const Piston::DeformerDataCache::Key& k) const {
+			std::size_t seed = 0;
+
+			auto hash_combine = [](std::size_t& s, std::size_t h) {
+				s ^= h + 0x9e3779b9 + (s << 6) + (s >> 2);
+			};
+
+			hash_combine(seed, k.type_idx.hash_code());
+			hash_combine(seed, k.ordered_paths.size());
+			hash_combine(seed, k.topologies_hash_sum);
+			/*
+			static const auto& pool = DeformerDataCache::getInstance().mTopologyPool;
+			hash_combine(seed, k.topologies_hash_sum);
+
+			size_t topologies_hash_sum = 0;
+			for(size_t i: k.topology_indices) {
+				assert(i < pool.size());
+				topologies_hash_sum += pool[i].topology_hash;
+			}
+			hash_combine(seed, topologies_hash_sum);
+			*/
+			return seed;
+		}
+	};
+
+	using MapType = std::unordered_map<Key, std::shared_ptr<SerializableDeformerDataBase>, KeyHasher, KeyComparator>;
 
 	public:
 		~DeformerDataCache();
@@ -65,23 +111,53 @@ class DeformerDataCache {
 		// Static method to get the CurvesDeformerFactory instance
 		static DeformerDataCache& getInstance();
 
-//		template< class T>
-//		std::shared_ptr<T> getOrCreateData(const std::string& name);
+		template< class T>
+		std::shared_ptr<T> getOrCreateData(const UsdPrimHandle& handle, bool& created);
 
 		template< class T>
-		std::shared_ptr<T> getOrCreateData(const UsdPrimHandle& handle);
+		std::shared_ptr<T> getOrCreateData(const std::vector<const UsdPrimHandle*>& handles, bool& created);
 
-//		template< class T>
-//		std::shared_ptr<T> getOrCreateData(const pxr::SdfPath& path);
+		void invalidate(const UsdPrimHandle& handle);
 
 	protected:
 		void clear();
 
 	private:
+		bool topologiesAreEqual(const std::vector<size_t>& indices_l, const std::vector<size_t>& indices_r) const {
+			assert(indices_l.size() == indices_r.size());
+			if(indices_l.size() != indices_r.size()) return false;
+			
+			const std::lock_guard<std::mutex> lock(mTopologyPoolMutex);
+
+			for(size_t i = 0; i < indices_l.size(); ++i) {
+        		if( mTopologyPool[indices_l[i]] != mTopologyPool[indices_r[i]]) return false;
+        	}
+
+        	return true;
+		}
+
+		size_t getTopologyIndexFromPool(const Topology& topology) {
+			const std::lock_guard<std::mutex> lock(mTopologyPoolMutex);
+
+			auto lambda = [topology](const Topology& t) { return t.topology_hash == topology.topology_hash && t.topology_variant == topology.topology_variant; };
+
+			auto it = std::find_if(mTopologyPool.begin(), mTopologyPool.end(), lambda);
+
+			if (it != mTopologyPool.end()) {
+		        return std::distance(mTopologyPool.begin(), it);
+		    } 
+		    
+		    mTopologyPool.push_back(topology);
+		    return mTopologyPool.size() - 1;
+		}
+
+	private:
 		MapType mDataMap;
+		std::vector<Topology> mTopologyPool;
 
 		// Mutex to ensure thread safety
 		static std::mutex mMutex;
+		static std::mutex mTopologyPoolMutex;
 
 		// Static pointer to the CurvesDeformerFactory instance
 		static DeformerDataCache* mInstancePtr;

@@ -38,9 +38,11 @@ struct Topology {
 	}
 
 	bool operator==(const Topology& other) const {
-		if(topology_hash != other.topology_hash) return false;
+		return topology_hash == other.topology_hash && topology_variant == other.topology_variant;
+	}
 
-		return topology_variant == other.topology_variant;
+	bool operator!=(const Topology& other) const {
+		return topology_hash != other.topology_hash || !(topology_variant == other.topology_variant);
 	}
 };
 

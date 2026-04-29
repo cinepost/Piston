@@ -34,8 +34,9 @@ bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
+	bool adjacency_data_created;
 	if(!mpAdjacencyData) {
-		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mDeformerGeoPrimHandle);
+		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mDeformerGeoPrimHandle, adjacency_data_created);
 	}
 
 	// Get primitive adjacency json data if present
@@ -52,8 +53,9 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 		return false;
 	}
 
+	bool trimesh_data_created;
 	if(!mpPhantomTrimeshData) {
-		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mDeformerGeoPrimHandle);
+		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mDeformerGeoPrimHandle, trimesh_data_created);
 	}
 
 	// Get phantom mesh json data if present
@@ -71,6 +73,12 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 	}
 	
 	return true;
+}
+
+void BaseMeshCurvesDeformer::invalidateData(DeformerDataCache& cache) {
+	BaseCurvesDeformer::invalidateData(cache);
+	cache.invalidate(mpAdjacencyData);
+	cache.invalidate(mpPhantomTrimeshData);
 }
 
 const std::string& BaseMeshCurvesDeformer::toString() const {

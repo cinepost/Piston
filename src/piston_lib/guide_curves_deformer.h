@@ -69,6 +69,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 
+		virtual void invalidateData(DeformerDataCache& cache);
+
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
