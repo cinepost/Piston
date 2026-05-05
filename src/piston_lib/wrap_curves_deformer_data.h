@@ -37,9 +37,12 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 		BindMode        					getBindMode() const { return mBindMode; }
 		void  								setBindMode(const BindMode& mode);
 
+		virtual bool isValid() const override { const std::lock_guard<std::mutex> lock(mMutex); return mIsValid; };
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
+
+		WrapCurvesDeformerData(): mIsValid(false) {};
 
 	protected:
 		virtual bool dumpToJSON(json& j) const override;
@@ -48,10 +51,12 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 		virtual void clearData() override;
 
 	private:
-		size_t calcHash() const;
+		size_t 	calcHash() const;
+		void 	setValid(bool state) { const std::lock_guard<std::mutex> lock(mMutex); mIsValid = state; }
 
 		BindMode                                mBindMode = BindMode::DIST;
 		std::vector<PointBindData>              mPointBinds;
+		bool 									mIsValid;
 
 		friend class WrapCurvesDeformer;
 };

@@ -5,12 +5,10 @@
 
 namespace Piston {
 
-SerializableDeformerDataBase::SerializableDeformerDataBase(): mIsPopulated(false) {
-
-}
+SerializableDeformerDataBase::SerializableDeformerDataBase() { }
 
 bool SerializableDeformerDataBase::serialize(BSON& v_bson) const {
-	if(!isPopulated()) {
+	if(!isValid()) {
 		LOG_ERR << "Can't serialize empty deformer data !";
 		return false;
 	}
@@ -61,14 +59,11 @@ bool SerializableDeformerDataBase::deserialize(const BSON& v_bson) {
 		return false;
 	}
 
-	mIsPopulated = true;
-	return true;
+	return isValid();
 }
 
 void SerializableDeformerDataBase::clear() {
-	const std::lock_guard<std::mutex> lock(mMutex);
 	clearData();
-	mIsPopulated = false;
 }
 
 }  // namespace Falcor

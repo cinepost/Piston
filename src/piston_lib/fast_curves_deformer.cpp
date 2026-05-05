@@ -218,7 +218,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
 		calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
 		
-		mpFastCurvesDeformerData->setPopulated(true);
+		mpFastCurvesDeformerData->setValid(true);
 	}
 
 	mLiveVertexNormals.resize(mpFastCurvesDeformerData->getRestVertexNormals().size());

@@ -1,5 +1,6 @@
 #include "curves_container.h"
 
+
 namespace Piston {
 
 
@@ -14,7 +15,7 @@ PxrCurvesContainer::PxrCurvesContainer(PxrCurvesContainer& other) {
 	mCurveVectors = other.mCurveVectors;
 }
 
-bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
+bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code) {
 	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
 	if(!geom_curves) {
 		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
@@ -28,11 +29,13 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	}
 
 	// Curves. points
-	pxr::VtArray<pxr::GfVec3f> curvePoints;
+	pxr::VtArray<pxr::GfVec3f> curve_points;
 
-	if(!geom_curves.GetPointsAttr().Get(&curvePoints, rest_time_code)) {
-		std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
-		return false;
+	if(rest_attr_name.empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(rest_attr_name, curve_points, rest_time_code)) {
+		if(!prim_handle.getPoints(curve_points, rest_time_code)) {
+			std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
+			return false;
+		}
 	}
 
 	// Curves. Counts/offsets
@@ -56,12 +59,12 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	mCurveRootPositions.resize(mCurvesCount);
 	mCurveVectors.resize(total_vertex_count);
 	for(size_t i = 0; i < mCurvesCount; ++i) {
-		mCurveRootPositions[i] = curvePoints[mCurveOffsets[i]];
+		mCurveRootPositions[i] = curve_points[mCurveOffsets[i]];
 		
 		mCurveVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
 
 		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			mCurveVectors[mCurveOffsets[i] + j] = curvePoints[mCurveOffsets[i] + j] - mCurveRootPositions[i];
+			mCurveVectors[mCurveOffsets[i] + j] = curve_points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
 		}
 	}
 
@@ -74,9 +77,9 @@ PxrCurvesContainer::UniquePtr PxrCurvesContainer::create() {
 	return PxrCurvesContainer::UniquePtr(new PxrCurvesContainer());
 }
 
-PxrCurvesContainer::UniquePtr PxrCurvesContainer::create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
+PxrCurvesContainer::UniquePtr PxrCurvesContainer::create(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code) {
 	PxrCurvesContainer::UniquePtr pResult = PxrCurvesContainer::UniquePtr(new PxrCurvesContainer());
-	if(!pResult->init(prim_handle, rest_time_code)) return nullptr;
+	if(!pResult->init(prim_handle, rest_attr_name, rest_time_code)) return nullptr;
 
 	return pResult;
 }

@@ -24,6 +24,8 @@ using json = nlohmann::json;
 
 namespace Piston {
 
+class BaseCurvesDeformer;
+
 using PxrTopologyVariant = std::variant<pxr::HdMeshTopology, pxr::HdBasisCurvesTopology>;
 
 struct Topology {
@@ -69,21 +71,22 @@ class UsdPrimHandle {
 	public:
 		UsdPrimHandle();
 		UsdPrimHandle(const pxr::UsdPrim& pPrim);
+		UsdPrimHandle(const std::shared_ptr<BaseCurvesDeformer>& pDeformer);
 		UsdPrimHandle(UsdPrimHandle&& other) noexcept;
 
 		UsdPrimHandle& operator=(UsdPrimHandle&& other) noexcept;
 
 		const pxr::UsdPrim& getPrim() const;
 
-		bool isValid() const { return mPrim.IsValid(); }
+		bool isValid() const { return getPrim().IsValid(); }
 
-		bool isMeshGeoPrim() const { return Piston::isMeshGeoPrim(mPrim); }
-		bool isBasisCurvesGeoPrim() const { return Piston::isBasisCurvesGeoPrim(mPrim); }
+		bool isMeshGeoPrim() const { return Piston::isMeshGeoPrim(getPrim()); }
+		bool isBasisCurvesGeoPrim() const { return Piston::isBasisCurvesGeoPrim(getPrim()); }
 
 		std::string  getFullName() const { return getPath().GetText(); }
 		std::string  getName() const { return getPath().GetName(); }
-		pxr::SdfPath getPath() const { return mPrim.GetPath(); }
-		pxr::UsdStageWeakPtr getStage() const { return mPrim.GetStage(); }
+		pxr::SdfPath getPath() const { return getPrim().GetPath(); }
+		pxr::UsdStageWeakPtr getStage() const { return getPrim().GetStage(); }
 
 		bool getDataFromBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const;
 		bool writeDataToBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const;
@@ -98,6 +101,8 @@ class UsdPrimHandle {
 		template<typename T>
 		bool fetchAttributeValues(const std::string& attribute_name, std::vector<T>& vec, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
 
+		bool getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
 
 		double getStageFPS() const;
@@ -110,15 +115,19 @@ class UsdPrimHandle {
 		void clear();
 
 		bool operator==(const pxr::UsdPrim& prim) const;
-		explicit operator bool() const { return mPrim.IsValid(); };
+		explicit operator bool() const { return isValid(); };
 
 		friend std::ostream& operator<<( std::ostream& os, const UsdPrimHandle& prim_handle ) {
         	os << prim_handle.getPath();
         	return os;
   		}
 
+  	private:
+  		bool prepareDataIfNeeded(pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+
 	private:
 		pxr::UsdPrim     mPrim;
+		std::shared_ptr<BaseCurvesDeformer> mpDeformer;
 		mutable std::unique_ptr<Topology> mpTopology;
 
 };

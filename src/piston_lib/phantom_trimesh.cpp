@@ -86,6 +86,7 @@ bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positio
 		LOG_ERR << "Mesh has less than 4 vertices !";
 		return false;
 	}
+	LOG_DBG << "PhantomTrimesh::buildTetrahedrons(...) for " << positions.size() << " points.";
 
 	std::vector< std::pair<CGAL_Point, uint32_t> > points;
 	for(size_t i = 0; i < points_count; ++i) {
@@ -284,10 +285,14 @@ SerializablePhantomTrimesh::SerializablePhantomTrimesh() {
 bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
-	const std::lock_guard<std::mutex> lock(mMutex);
-	if(isPopulated()) return true;
+	if(isValid()) {
+		// Trimesh data is still valid. No rebuild.
+		return true;
+	}
 
 	clearData();
+
+	const std::lock_guard<std::mutex> lock(mMutex);
 
 	if(!mpTrimesh) {
 		mpTrimesh = PhantomTrimesh::create();
@@ -299,12 +304,11 @@ bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, 
 		mpTrimesh->invalidate();
 	}
 
-	setPopulated(result);
 	return result;
 }
 
 void SerializablePhantomTrimesh::clearData() {
-	setPopulated(false); 
+	const std::lock_guard<std::mutex> lock(mMutex);
 	if(mpTrimesh) {
 		mpTrimesh->invalidate();
 	}
@@ -313,6 +317,7 @@ void SerializablePhantomTrimesh::clearData() {
 bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 	if(!mpTrimesh || !mpTrimesh->isValid()) return false;
 
+	const std::lock_guard<std::mutex> lock(mMutex);
 	j[kJFaces] = mpTrimesh->mFaces;
 	j[kJFaceMap] = mpTrimesh->mFaceMap;
 	j[kJFaceFlags] = mpTrimesh->mFaceFlags;
@@ -323,6 +328,8 @@ bool SerializablePhantomTrimesh::dumpToJSON(json& j) const {
 }
 
 bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	mpTrimesh = std::make_unique<PhantomTrimesh>();
 	mpTrimesh->mValid = false;
 
@@ -356,11 +363,11 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 }
 
 PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {
-	return isPopulated() ? mpTrimesh.get() : nullptr;
+	return isValid() ? mpTrimesh.get() : nullptr;
 }
 
 const PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() const {
-	return isPopulated() ? mpTrimesh.get() : nullptr;
+	return isValid() ? mpTrimesh.get() : nullptr;
 }
 
 const std::string& SerializablePhantomTrimesh::typeName() const {

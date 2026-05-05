@@ -497,7 +497,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
 
-	if(!mpGuideCurvesContainer->init(mDeformerGeoPrimHandle, rest_time_code)) {
+	if(!mpGuideCurvesContainer->init(mDeformerGeoPrimHandle, getDeformerRestAttrName(), rest_time_code)) {
 		DLOG_ERR << "Error initializing guide curves container !";
 		return false;
 	}
@@ -557,7 +557,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 				break;
 		}
 
-		mpGuideCurvesDeformerData->setPopulated(result);
+		mpGuideCurvesDeformerData->setValid(result);
 	}
 
 	return result;
@@ -678,7 +678,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
         		neighbour_search::KDTree<float, 3>::ReturnType closest_tetra_centroid;
         		closest_tetra_centroid.first = neighbour_search::KDTree<float, 3>::kInvalidIndex;
 
-        		// If point os not boud by previous method we test it against closest tetraheron centroid
+        		// If point is not bound by previous method we test it against closest tetraheron centroid
         		if(bind.encoded_id == PointBindData::kInvalid) {
         			closest_tetra_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
 					
@@ -1152,7 +1152,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	bool skin_adjacency_data_created;
 	if(!mpSkinAdjacencyData) {
-		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(mGuidesSkinGeoPrimHandle, skin_adjacency_data_created);
+		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mGuidesSkinGeoPrimHandle, skin_adjacency_data_created);
 		assert(mpSkinAdjacencyData);
 	}
 
@@ -1165,7 +1165,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	bool skin_trimesh_data_created;
 	if(!mpSkinPhantomTrimeshData) {
-		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(mGuidesSkinGeoPrimHandle, skin_trimesh_data_created);
+		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, skin_trimesh_data_created);
 		assert(mpSkinPhantomTrimeshData);
 	}
 

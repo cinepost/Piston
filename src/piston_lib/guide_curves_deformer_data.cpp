@@ -41,16 +41,14 @@ inline void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
 	o.raw_data = j.at(0).template get<uint32_t>();
 }
 
-GuideCurvesDeformerData::GuideCurvesDeformerData(): mIsValid(false) {
-
-}
-
 void GuideCurvesDeformerData::clearData() {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	mPointBinds.clear();
 	mPointSurfaceBinds.clear();
 	mGuideOrigins.clear();
 	mSkinPrimPath = "";
-	setPopulated(false);
+	mIsValid = false;
 }
 
 size_t GuideCurvesDeformerData::calcHash() const {
@@ -88,6 +86,8 @@ static const char* kJSkinPrimPath = "skin_prim_path";
 static const char* kJSkinPrimIndices = "skin_prim_indices";
 
 bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	static const std::vector<GuideOrigin> kEmptyGuideOrigins;
 	j[kJMode] = static_cast<uint8_t>(mBindMode);
 	j[kJPointBinds] = mPointBinds;
@@ -101,19 +101,10 @@ bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 	return true;
 }
 
-/*
-		std::vector<PointBindData> 			mPointBinds;
-		std::vector<GuideOrigin> 			mGuideOrigins;
-		std::vector<PointSurfaceBindData> 	mPointSurfaceBinds;
-		BindMode                    		mBindMode = BindMode::NTB;
-		std::string                 		mSkinPrimPath;
-		std::vector<int> 					mSkinPrimIndices;
-
-		bool                                mKeepRootsOnSurface = true;
-*/
-
 bool GuideCurvesDeformerData::readFromJSON(const json& j) {
-	clearData();
+	const std::lock_guard<std::mutex> lock(mMutex);
+
+	mIsValid = false;
 
 	const BindMode bind_mode = static_cast<GuideCurvesDeformerData::BindMode>(j[kJMode].template get<uint8_t>());
 
@@ -144,7 +135,7 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 
 	LOG_DBG << "GuideCurvesDeformerData data read from json payload !";
 
-	setPopulated(true);
+	mIsValid = true;
 	return true;
 }
 

@@ -171,7 +171,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		};
 
 	public:
-		GuideCurvesDeformerData();
+		GuideCurvesDeformerData(): mIsValid(false) {}
 
 		const std::vector<PointBindData>& 			getPointBinds() const { return mPointBinds; }
 		const std::vector<PointSurfaceBindData>& 	getPointSurfaceBinds() const { return mPointSurfaceBinds; }
@@ -180,7 +180,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		BindMode        							getBindMode() const { return mBindMode; }
 		void  										setBindMode(const BindMode& mode);
 
-		virtual bool isValid() const override { return mIsValid; };
+		virtual bool isValid() const override { const std::lock_guard<std::mutex> lock(mMutex); return mIsValid; };
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
@@ -197,7 +197,8 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		void setSkinPrimPath(const std::string& prim_path);
 
 	private:
-		size_t calcHash() const;
+		size_t 	calcHash() const;
+		void 	setValid(bool state) { const std::lock_guard<std::mutex> lock(mMutex); mIsValid = state;}
 
 		std::vector<PointBindData> 			mPointBinds;
 		std::vector<GuideOrigin> 			mGuideOrigins;

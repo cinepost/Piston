@@ -24,9 +24,6 @@ BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const s
 	DLOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
 
 	mUniqueName = toString() + mName + std::to_string(mID);
-
-	makeDirty();
-	mpTempStage = pxr::UsdStage::CreateInMemory();
 }
 
 void BaseCurvesDeformer::setDataPrimPath(const std::string& path) {
@@ -53,7 +50,7 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 	
 	if(!validateDeformerGeoPrim(prim)) {
 		mDeformerGeoPrimHandle.clear();
-		DLOG_ERR << "Deformer " << mName << " invalid geometry prim " << prim << " type!";
+		DLOG_ERR << "Invalid geometry prim " << prim << " type!";
 		return;
 	}
 
@@ -71,7 +68,39 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 		makeDirty();
 	}
 
-	DLOG_DBG << "Deformer " << mName << " geometry prim " << prim << " is set to: " << mDeformerGeoPrimHandle;
+	DLOG_DBG << "Deformer geometry prim is set to: " << mDeformerGeoPrimHandle;
+}
+
+void BaseCurvesDeformer::setDeformerGeoPrim(const BaseCurvesDeformer::SharedPtr& pDeformer) {
+	assert(pDeformer);
+
+	const auto& deformer_prim = pDeformer->getOutputPrimHandle().getPrim();
+
+	if(!deformer_prim.IsValid() || mDeformerGeoPrimHandle == deformer_prim) {
+		return;
+	}
+
+	if(!validateDeformerGeoPrim(deformer_prim)) {
+		mDeformerGeoPrimHandle.clear();
+		DLOG_ERR << "Invalid geometry prim " << deformer_prim << " type!";
+		return;
+	}
+
+	if(mCurvesGeoPrimHandle == deformer_prim) {
+		mDeformerGeoPrimHandle.clear();
+		DLOG_ERR << "Can't use the same prim " << deformer_prim << " for curves and deformer geometry !!!";
+		return;
+	}
+
+	auto new_handle = UsdPrimHandle(pDeformer);
+	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle) : false;
+
+	mDeformerGeoPrimHandle = std::move(new_handle);
+	if(!same_topology) {
+		makeDirty();
+	}
+
+	DLOG_DBG << "Deformer prim is set to " << pDeformer->getName();
 }
 
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
@@ -100,6 +129,14 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 	DLOG_DBG << "Curves geometry prim is set to: " << mCurvesGeoPrimHandle;
 }
 
+const pxr::UsdPrim& BaseCurvesDeformer::getDeformerGeoPrim() const {
+	mDeformerGeoPrimHandle.getPrim();
+}
+
+const pxr::UsdPrim& BaseCurvesDeformer::getCurvesGeoPrim() const {
+	mCurvesGeoPrimHandle.getPrim();
+}
+
 void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
 	if(mDeformerRestAttrName == name) return;
 	mDeformerRestAttrName = name;
@@ -111,6 +148,8 @@ void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
 void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
 	if(mCurvesRestAttrName == name) return;
 	mCurvesRestAttrName = name;
+
+	mpCurvesContainer = nullptr;
 	makeDirty();
 
 	DLOG_DBG << "Curves geometry rest attribute name is set to: " << name;
@@ -161,7 +200,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 	SimpleProfiler::clear();
 
 	if(!mDeformerGeoPrimHandle) {
-		DLOG_ERR << "No mesh UsdPrim is set !!!";
+		DLOG_ERR << "No deformer UsdPrim is set !!!";
 		return false;
 	}
 
@@ -171,13 +210,13 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 	}
 
 	if(!mpCurvesContainer) {
-		mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, rest_time_code);
+		mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, getCurvesRestAttrName(), rest_time_code);
 		if(!mpCurvesContainer) {
 			DLOG_ERR << "Error creating curves container for prim " << mCurvesGeoPrimHandle << " !";
 			return false;
 		}
 	} else {
-		if(!mpCurvesContainer->init(mCurvesGeoPrimHandle, rest_time_code)) {
+		if(!mpCurvesContainer->init(mCurvesGeoPrimHandle, getCurvesRestAttrName(), rest_time_code)) {
 			DLOG_ERR << "Error initializing curves container for prim " << mCurvesGeoPrimHandle << " !";
 			return false;
 		}
@@ -221,6 +260,12 @@ void BaseCurvesDeformer::setPointsCacheUsageState(bool state) {
 	}
 }
 
+void BaseCurvesDeformer::setInstancingState(bool state) {
+	if(mInstancingEnabled == state) return;
+	mInstancingEnabled = state;
+	makeDirty();
+}
+
 bool BaseCurvesDeformer::getPointsCacheUsageState() const {
 	return mUsePointsCache && CurvesDeformerFactory::getInstance().getPointsCacheUsageState();
 }
@@ -232,7 +277,7 @@ bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code) {
 bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
 	DLOG_DBG << "Deform at time code: " << time_code.GetValue();
 		
-	const pxr::UsdTimeCode bind_time_code = time_code.IsDefault() ? getRestTimeCode() : time_code;
+	const pxr::UsdTimeCode bind_time_code = getRestTimeCode();
 	if(!buildDeformerData(bind_time_code, multi_threaded)) {
 		return false;
 	}
@@ -403,6 +448,7 @@ void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
 
 
 void BaseCurvesDeformer::makeDirty() {
+	DLOG_TRC << "BaseCurvesDeformer::makeDirty()";
 	mStats.clear();
 	mDirty = true;
 	mDeformerDataWritten = false;
@@ -410,7 +456,8 @@ void BaseCurvesDeformer::makeDirty() {
 	static auto& cache = DeformerDataCache::getInstance();
 
 	clearLRUCaches();
-	invalidateData(cache);
+	invalidateData(DeformerDataCache::getInstance());
+	DLOG_TRC << "BaseCurvesDeformer::makeDirty() done";
 }
 
 void BaseCurvesDeformer::clearLRUCaches() {
@@ -421,8 +468,10 @@ void BaseCurvesDeformer::clearLRUCaches() {
 }
 
 void BaseCurvesDeformer::invalidateData(DeformerDataCache& cache) {
+	DLOG_TRC << "BaseCurvesDeformer::invalidateData()";
 	cache.invalidate(mDeformerGeoPrimHandle);
 	cache.invalidate(mCurvesGeoPrimHandle);
+	DLOG_TRC << "BaseCurvesDeformer::invalidateData() done";
 }
 
 void BaseCurvesDeformer::showDebugGeometry(bool state) {

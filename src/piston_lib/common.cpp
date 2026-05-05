@@ -3,6 +3,7 @@
 #include "topology.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
+#include "base_curves_deformer.h"
 #include "logging.h"
 
 #include <pxr/base/tf/token.h>
@@ -109,15 +110,23 @@ const char *stringifyMemSize(size_t bytes) {
 	return output;
 }
 
-UsdPrimHandle::UsdPrimHandle(): UsdPrimHandle(pxr::UsdPrim()) {}
+UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()), mpDeformer(nullptr), mpTopology(nullptr) {}
 
-UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim): mPrim(prim), mpTopology(nullptr) { }
+UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim): UsdPrimHandle() {  
+	mPrim = prim; 
+}
 
-UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : mPrim(std::move(other.mPrim)), mpTopology(std::move(other.mpTopology)) { }
+UsdPrimHandle::UsdPrimHandle(const BaseCurvesDeformer::SharedPtr& pDeformer): UsdPrimHandle() {
+	assert(pDeformer);
+	mpDeformer = pDeformer;
+}
+
+UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : mPrim(std::move(other.mPrim)), mpDeformer(std::move(other.mpDeformer)), mpTopology(std::move(other.mpTopology)) { }
 
 UsdPrimHandle& UsdPrimHandle::operator=(UsdPrimHandle&& other) noexcept {
 	if (this != &other) {
 		mPrim = std::move(other.mPrim);
+		mpDeformer = std::move(other.mpDeformer);
 		mpTopology = std::move(other.mpTopology);
 	}
 	return *this;
@@ -125,11 +134,15 @@ UsdPrimHandle& UsdPrimHandle::operator=(UsdPrimHandle&& other) noexcept {
 
 const pxr::UsdPrim& UsdPrimHandle::getPrim() const {
 	static const pxr::UsdPrim sNullPrim;
+	if(mpDeformer) {
+		return mpDeformer->getOutputPrimHandle().getPrim();
+	}
 	return mPrim.IsValid() ? mPrim : sNullPrim;
 }
 
 void UsdPrimHandle::clear() {
 	mPrim = pxr::UsdPrim();
+	mpDeformer = nullptr;
 	mpTopology = nullptr;
 }
 
@@ -147,6 +160,14 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 	}
 
 	return getStage()->GetTimeCodesPerSecond();
+}
+
+bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code) const {
+	if(mpDeformer && !mpDeformer->deform(time_code)) {
+		LOG_FTL << "Unable to execute " << mpDeformer->getName() << ".deform(...) for " << getPath() << " !!!";
+		return false;
+	}
+	return true;
 }
 
 template<typename T>
@@ -169,6 +190,9 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr:
 	}
 
 	array.clear();
+
+	if(!prepareDataIfNeeded(time_code)) return false;
+
 	if(!primVar.GetAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting " << getPath() << " \"" << attribute_name << "\" values !";
 		return false;
@@ -198,11 +222,32 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std:
 	return true;
 }
 
+bool UsdPrimHandle::getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code) const {
+	const auto& prim = getPrim();
+
+	auto geom = pxr::UsdGeomPointBased(prim);
+	if(!geom) {
+		LOG_ERR << "Error getting point based geometry from " << getPath() << " !";
+		return false;
+	}
+
+	if(!prepareDataIfNeeded(time_code)) return false;
+
+	if(!geom.GetPointsAttr().Get(&array, time_code)) {
+		LOG_ERR << "Error getting points from " << getPath() << " !";
+		return false;
+	}
+
+	return true;
+}
+
 template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<int>& array, pxr::UsdTimeCode time_code) const;
 template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<uint32_t>& array, pxr::UsdTimeCode time_code) const;
+template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code) const;
 
 template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<int>& vec, pxr::UsdTimeCode time_code) const;
 template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<uint32_t>& vec, pxr::UsdTimeCode time_code) const;
+template bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std::vector<pxr::GfVec3f>& vec, pxr::UsdTimeCode time_code) const;
 
 bool UsdPrimHandle::getDataFromBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const {
 	assert(pDeformerData);
@@ -244,7 +289,7 @@ bool UsdPrimHandle::getBsonFromPrim(const pxr::SdfPath& prim_path, const std::st
 		return false;
 	}
 
-	auto pStage = mPrim.GetStage();
+	auto pStage = getPrim().GetStage();
 	assert(pStage); 
 
 	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(prim_path);
@@ -279,7 +324,7 @@ bool UsdPrimHandle::getBsonFromPrim(const pxr::SdfPath& prim_path, const std::st
 }
 
 void UsdPrimHandle::clearPrimBson(const pxr::SdfPath& prim_path, const std::string& identifier) const {
-	auto pStage = mPrim.GetStage();
+	auto pStage = getPrim().GetStage();
 	assert(pStage); 
 
 	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(prim_path);
@@ -295,19 +340,20 @@ void UsdPrimHandle::clearPrimBson(const pxr::SdfPath& prim_path, const std::stri
 }
 
 const Topology& UsdPrimHandle::getTopology(pxr::UsdTimeCode time_code) const {
-	assert(mPrim.IsValid());
+	assert(isValid());
 	if(!mpTopology || (mpTopology->time_code != time_code)) {
+		const auto& _prim = getPrim();
 		if(isMeshGeoPrim()) {
-			const auto topology = computeMeshTopology(pxr::UsdGeomMesh(mPrim), time_code);
+			const auto topology = computeMeshTopology(pxr::UsdGeomMesh(_prim), time_code);
 			const size_t topology_hash = topology.ComputeHash();
 			mpTopology = std::make_unique<Topology>(topology_hash, std::move(topology));
 		} else if(isBasisCurvesGeoPrim()) {
-			const auto topology = computeCurvesTopology(pxr::UsdGeomBasisCurves(mPrim), time_code);
+			const auto topology = computeCurvesTopology(pxr::UsdGeomBasisCurves(_prim), time_code);
 			const size_t topology_hash = topology.ComputeHash();
 			mpTopology = std::make_unique<Topology>(topology_hash, std::move(topology));
 		} else {
 			assert(false);
-			LOG_FTL << "Unsupported usd primitive type: " <<  mPrim.GetTypeName().GetText();
+			LOG_FTL << "Unsupported usd primitive type: " <<  _prim.GetTypeName().GetText();
 		}
 
 		assert(mpTopology);
@@ -358,7 +404,7 @@ bool UsdPrimHandle::setBsonToPrim(const pxr::SdfPath& prim_path, const std::stri
 		return false;
 	}
 
-	auto pStage = mPrim.GetStage();
+	auto pStage = getPrim().GetStage();
 	assert(pStage); 
 
 	pxr::UsdPrim data_prim = pStage->GetPrimAtPath(prim_path);
@@ -395,20 +441,24 @@ bool UsdPrimHandle::setBsonToPrim(const pxr::SdfPath& prim_path, const std::stri
 }
 
 bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
-	if(mPrim.IsValid() != prim.IsValid()) {
+	const pxr::UsdPrim& _prim = getPrim();
+
+	if(_prim.IsValid() != prim.IsValid()) {
 		return false;
 	}
 
-	if(mPrim.GetPath() != prim.GetPath()) {
+	if(_prim.GetPath() != prim.GetPath()) {
 		return false;
 	}
 
-	if(mPrim.GetStage() != prim.GetStage()) {
+	if(_prim.GetStage() != prim.GetStage()) {
 		return false;
 	}
 
 	return true;
 }
+
+// PointsList
 
 PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), true) {
 	assert(size > 0);

@@ -30,9 +30,13 @@ class FastCurvesDeformerData : public SerializableDeformerDataBase {
 		const std::vector<pxr::GfVec3f>&        					getPerBindRestNormals() const { return mPerBindRestNormals; }
 		const std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& 	getPerBindRestTBs()	const { return mPerBindRestTBs; }
 
+		virtual bool isValid() const override { const std::lock_guard<std::mutex> lock(mMutex); return mIsValid; }
+
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
+
+		FastCurvesDeformerData(): mIsValid(false) {};
 
 	protected:
 		virtual bool dumpToJSON(json& j) const override;
@@ -42,11 +46,14 @@ class FastCurvesDeformerData : public SerializableDeformerDataBase {
 
 	private:
 		size_t calcHash() const;
+		void setValid(bool state) { const std::lock_guard<std::mutex> lock(mMutex); mIsValid = state; }
 
 		std::vector<CurveBindData>              			mCurveBinds;
 		std::vector<pxr::GfVec3f> 							mRestVertexNormals;
 		std::vector<pxr::GfVec3f>               			mPerBindRestNormals;
 		std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>   mPerBindRestTBs; // per curve-bind binormal and bangent vector pairs
+
+		bool mIsValid;
 
 		friend class FastCurvesDeformer;
 };

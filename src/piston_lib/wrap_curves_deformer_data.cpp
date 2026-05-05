@@ -8,7 +8,10 @@ namespace Piston {
 static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 0u);
 
 void WrapCurvesDeformerData::clearData() {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	mPointBinds.clear();
+	mIsValid = false;
 }
 
 size_t WrapCurvesDeformerData::calcHash() const {
@@ -28,6 +31,8 @@ static constexpr const char* kJDataHash = "data_hash";
 
 
 bool WrapCurvesDeformerData::dumpToJSON(json& j) const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	
 	j[kJPointBinds] = mPointBinds;
 	j[kJMode] = to_string(mBindMode);
 	j[kJDataHash] = calcHash();
@@ -36,6 +41,10 @@ bool WrapCurvesDeformerData::dumpToJSON(json& j) const {
 }
 
 bool WrapCurvesDeformerData::readFromJSON(const json& j) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
+	mIsValid = false;
+
 	const BindMode bind_mode = from_string(j[kJMode].template get<std::string>());
 
 	if(bind_mode != mBindMode) {
@@ -52,12 +61,12 @@ bool WrapCurvesDeformerData::readFromJSON(const json& j) {
 
 	LOG_DBG << "WrapCurvesDeformerData data read from json payload !";
 
+	mIsValid = true;
 	return true;
 }
 
 void  WrapCurvesDeformerData::setBindMode(const WrapCurvesDeformerData::BindMode& mode) {
 	if(mBindMode == mode) return;
-
 	mBindMode = mode;
 	clear();
 }

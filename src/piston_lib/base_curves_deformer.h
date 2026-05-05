@@ -26,7 +26,9 @@ namespace Piston {
 
 namespace {
 	const std::string kVelocitiAttrName = "velocities";
-	const std::string kDeformerRestPositionAttrName = "rest_p";
+	const std::string kDeformerRestPositionAttrName = "";
+	const std::string kCurvesRestPositionAttrName = "";
+
 	const std::string kСurvesSkinPrimAttrName = ""; //"skinprim"
 }
 
@@ -56,6 +58,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		 * @param prim The USD primitive to be used for deformation.
 		 */
 		void setDeformerGeoPrim(const pxr::UsdPrim& prim);
+		void setDeformerGeoPrim(const BaseCurvesDeformer::SharedPtr& pDeformer);
+		const pxr::UsdPrim& getDeformerGeoPrim() const;
 
 		// DocString: setCurvesGeoPrim
 		/**
@@ -63,9 +67,13 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		 * @param prim The USD curves primitive to be deformed.
 		 */		
 		void setCurvesGeoPrim(const pxr::UsdPrim& prim);
+		const pxr::UsdPrim& getCurvesGeoPrim() const;
 
 		void setPointsCacheUsageState(bool state);
 		bool getPointsCacheUsageState() const;
+
+		void setInstancingState(bool state);
+		bool getInstancingState() const { return mInstancingEnabled; };
 
 		void setDataPrimPath(const std::string& path);
 		const pxr::SdfPath& getDataPrimPath() const;
@@ -122,6 +130,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		virtual void invalidateData(DeformerDataCache& cache);
 
+		const UsdPrimHandle& getCurvesGeoPrimHandle() const { return mCurvesGeoPrimHandle; }
+		const UsdPrimHandle& getOutputPrimHandle() const { return mCurvesGeoPrimHandle; }
+
 		void makeDirty();
 		void clearLRUCaches();
 
@@ -130,14 +141,15 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		bool mShowDebugGeometry = false;
 		bool mDirty = true;
 		bool mDeformerDataWritten = false;
+		bool mInstancingEnabled = true;
 		
 		UsdPrimHandle 	mDeformerGeoPrimHandle;
 		UsdPrimHandle 	mCurvesGeoPrimHandle;
 
 		std::string 	mDeformerRestAttrName = kDeformerRestPositionAttrName;
+		std::string 	mCurvesRestAttrName = kCurvesRestPositionAttrName;
 		std::string 	mSkinPrimAttrName = kСurvesSkinPrimAttrName;
-		std::string 	mCurvesRestAttrName;
-
+		
 		std::string   	mVelocityAttrName = kVelocitiAttrName;
 		
 		PxrCurvesContainer::UniquePtr 	mpCurvesContainer;
@@ -171,8 +183,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		uint32_t mID;
 		std::string mUniqueName;
 
-		pxr::UsdStageRefPtr mpTempStage;
-
 		bool mCalcMotionVectors = false;
 		MotionBlurDirection mMotionBlurDirection = MotionBlurDirection::TRAILING;
 
@@ -181,6 +191,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;
+
+		friend class UsdPrimHandle;
 };
 
 } // namespace Piston

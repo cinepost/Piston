@@ -105,7 +105,11 @@ BOOST_PYTHON_MODULE(_piston) {
     ;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
-		.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim, "@DocString(setDeformerGeoPrim)")
+		//.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim, "@DocString(setDeformerGeoPrim)")
+
+		.def("setDeformerGeoPrim", static_cast<void (BaseCurvesDeformer::*)(const pxr::UsdPrim&)>(&BaseCurvesDeformer::setDeformerGeoPrim), "@DocString(setDeformerGeoPrim)")
+		.def("setDeformerGeoPrim", static_cast<void (BaseCurvesDeformer::*)(const BaseCurvesDeformer::SharedPtr&)>(&BaseCurvesDeformer::setDeformerGeoPrim))
+
 		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim, "@DocString(setCurvesGeoPrim)")
 
 		.def("setDeformerRestAttrName", &BaseCurvesDeformer::setDeformerRestAttrName)
@@ -221,4 +225,9 @@ BOOST_PYTHON_MODULE(_piston) {
 	def("getLogger", &Logger::getInstance, return_value_policy<reference_existing_object>());
 	def("setLogLevel", _setLogLevel);
 	def("runTests", &Tests::runTests);	
+
+	implicitly_convertible<BaseMeshCurvesDeformer::SharedPtr, BaseCurvesDeformer::SharedPtr>();
+	implicitly_convertible<FastCurvesDeformer::SharedPtr, BaseMeshCurvesDeformer::SharedPtr>();
+	implicitly_convertible<WrapCurvesDeformer::SharedPtr, BaseMeshCurvesDeformer::SharedPtr>();
+	implicitly_convertible<GuideCurvesDeformer::SharedPtr, BaseCurvesDeformer::SharedPtr>();
 }

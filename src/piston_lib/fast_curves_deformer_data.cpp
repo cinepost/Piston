@@ -8,10 +8,13 @@ namespace Piston {
 static const SerializableDeformerDataBase::DataVersion kFastBindingDataVersion( 0u, 0u, 1u);
 
 void FastCurvesDeformerData::clearData() {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	mCurveBinds.clear();
 	mRestVertexNormals.clear();
 	mPerBindRestNormals.clear();
 	mPerBindRestTBs.clear();
+	mIsValid = false;
 }
 
 size_t FastCurvesDeformerData::calcHash() const {
@@ -49,6 +52,8 @@ static constexpr const char* kJDataHash = "data_hash";
 
 
 bool FastCurvesDeformerData::dumpToJSON(json& j) const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	j[kJCurveBinds] = mCurveBinds;
 	
 	to_json(j[kJRestVertexNormals], mRestVertexNormals);
@@ -61,6 +66,9 @@ bool FastCurvesDeformerData::dumpToJSON(json& j) const {
 }
 
 bool FastCurvesDeformerData::readFromJSON(const json& j) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
+	mIsValid = false;
 	mCurveBinds = j[kJCurveBinds].template get<std::vector<CurveBindData>>();
 
 	from_json(j[kJRestVertexNormals], mRestVertexNormals);
@@ -74,6 +82,7 @@ bool FastCurvesDeformerData::readFromJSON(const json& j) {
 
 	LOG_DBG << "FastCurvesDeformerData data read from json payload !";
 
+	mIsValid = true;
 	return true;
 }
 

@@ -271,14 +271,15 @@ SerializableUsdGeomMeshFaceAdjacency::SerializableUsdGeomMeshFaceAdjacency(): Se
 }
 
 void SerializableUsdGeomMeshFaceAdjacency::clearData() { 
-	setPopulated(false); 
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	if(mpAdjacency) {
 		mpAdjacency->invalidate();
 	}
 }
 
 const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacency() const {
-	if(!isPopulated()) return nullptr;
+	if(!isValid()) return nullptr;
 
 	return mpAdjacency.get();
 }
@@ -286,10 +287,14 @@ const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacen
 bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& prim_handle) {
 	assert(prim_handle.isMeshGeoPrim());
 
-	const std::lock_guard<std::mutex> lock(mMutex);
-	if(isPopulated()) return true;
-	
+	if(isValid()) {
+		// Data is valid. No need to rebuild it.
+		return true;
+	}
+
 	clearData();
+
+	const std::lock_guard<std::mutex> lock(mMutex);
 
 	if(!mpAdjacency) {
 		mpAdjacency = UsdGeomMeshFaceAdjacency::create();
@@ -301,7 +306,6 @@ bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& pri
 		mpAdjacency->invalidate();
 	}
 
-	setPopulated(result);
 	return result;
 }
 
@@ -321,6 +325,8 @@ static constexpr const char* kJSrcFaceVertexCounts = "srcfacevtxcounts";
 static constexpr const char* kJDataHash = "data_hash";
 
 bool SerializableUsdGeomMeshFaceAdjacency::dumpToJSON(json& j) const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	if(!mpAdjacency || !mpAdjacency->isValid()) return false;
 
 	j[kJFaceCount] = mpAdjacency->mFaceCount;
@@ -343,6 +349,8 @@ bool SerializableUsdGeomMeshFaceAdjacency::dumpToJSON(json& j) const {
 }
 
 bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
 	mpAdjacency->mFaceCount = j[kJFaceCount];
 	mpAdjacency->mVertexCount = j[kJVertexCount];
 	mpAdjacency->mMaxFaceVertexCount = j[kJMaxFaceCount];

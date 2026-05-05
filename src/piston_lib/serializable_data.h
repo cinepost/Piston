@@ -43,25 +43,17 @@ class SerializableDeformerDataBase: public std::enable_shared_from_this<Serializ
 		bool deserialize(const BSON& v_bson);
 		void clear();
 
-		virtual bool isPopulated() const { return mIsPopulated; }
-
 		virtual bool isValid() const = 0;
 		virtual const std::string& typeName() const = 0;
 		virtual const std::string& jsonDataKey() const = 0;
 		virtual const DataVersion& jsonDataVersion() const = 0;
 		
 	protected:
-		void setPopulated(bool state) { mIsPopulated = state; }
-
 		virtual bool dumpToJSON(json& j) const = 0;
 		virtual bool readFromJSON(const json& j) = 0;
 		virtual void clearData() = 0;
 
-		std::mutex mMutex;
-
-	private:
-		bool mIsPopulated;
-
+		mutable std::mutex mMutex;
 };
 
 inline std::string to_string(const SerializableDeformerDataBase::ErrorCode& err) {

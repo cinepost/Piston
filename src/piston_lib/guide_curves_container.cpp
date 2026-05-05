@@ -12,7 +12,7 @@ GuideCurvesContainer::UniquePtr GuideCurvesContainer::create() {
 	return GuideCurvesContainer::UniquePtr(new GuideCurvesContainer());
 }
 
-bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt) {
+bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt) {
 	if(!prim_handle.isBasisCurvesGeoPrim()) {
 		return false;
 	}
@@ -41,9 +41,11 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 		mExternalRestPointDataSource = true;
 	} else {
 		// Curve rest points
-		if(!geom_curves.GetPointsAttr().Get(&mRestCurvePoints, rest_time_code)) {
-			LOG_ERR << "Error getting curves \"rest\" points from " << prim_handle.getName() << " !";
-			return false;
+		if(rest_attr_name.empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(rest_attr_name, mRestCurvePoints, rest_time_code)) {
+			if(!prim_handle.getPoints(mRestCurvePoints, rest_time_code)) {
+				LOG_ERR << "Error getting curves \"rest\" points from " << prim_handle.getName() << " !";
+				return false;
+			}
 		}
 	}
 
@@ -69,17 +71,24 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
 	assert(!mExternalLivePointDataSource);
 	assert(prim_handle.isBasisCurvesGeoPrim());
 
-	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
-	if(!geom_curves) {
-		LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
+	// Curve live point positions
+	if(!prim_handle.getPoints(mLiveCurvePoints, time_code)) {
+		LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
 		return false;
 	}
 
 	// Curve live points
-	if(!geom_curves.GetPointsAttr().Get(&mLiveCurvePoints, time_code)) {
-		LOG_ERR << "Error getting curves points from " << prim_handle.getName() << " !";
-		return false;
-	}
+
+	//auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
+	//if(!geom_curves) {
+	//	LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
+	//	return false;
+	//}
+
+	//if(!geom_curves.GetPointsAttr().Get(&mLiveCurvePoints, time_code)) {
+	//	LOG_ERR << "Error getting curves points from " << prim_handle.getName() << " !";
+	//	return false;
+	//}
 
 	if(mLiveCurvePoints.size() != mRestCurvePoints.size()) {
 		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !";

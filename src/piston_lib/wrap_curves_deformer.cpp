@@ -257,10 +257,10 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 			DLOG_TRC << "WrapCurvesDeformer::buildDeformerDataImpl() finished in " << threads_timer.toString();
 		}
 
-		mpWrapCurvesDeformerData->setPopulated(result);
+		mpWrapCurvesDeformerData->setValid(true);
 	}
 
-	return mpWrapCurvesDeformerData->isPopulated();
+	return mpWrapCurvesDeformerData->isValid();
 }
 
 static std::unique_ptr<neighbour_search::KDTree<float, 3>> buildTrimeshCentroidsKDTree(const MeshContainer* pMeshContainer, const PhantomTrimesh* pTrimesh, bool threaded_kdtree_creation) {

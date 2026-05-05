@@ -27,9 +27,9 @@ class PxrCurvesContainer {
 		using CurveDataConstPtr = std::pair<int, const pxr::GfVec3f*>;  // curve <count, ptr> pair
 
 		static UniquePtr create();
-		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
+		static UniquePtr create(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
-		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode reference_time_code);
+		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode reference_time_code);
 
 		bool empty() const { return mCurvesCount == 0; }
 
