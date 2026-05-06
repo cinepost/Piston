@@ -76,7 +76,10 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 }
 
 void BaseMeshCurvesDeformer::invalidateData(DeformerDataCache& cache) {
-	BaseCurvesDeformer::invalidateData(cache);
+	//if(mpAdjacencyData && mpAdjacencyData->isValid()) cache.invalidate<SerializableUsdGeomMeshFaceAdjacency>(mDeformerGeoPrimHandle);
+	//if(mpPhantomTrimeshData && mpPhantomTrimeshData->isValid()) cache.invalidate<SerializablePhantomTrimesh>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle});
+	cache.invalidate(mpAdjacencyData);
+	cache.invalidate(mpPhantomTrimeshData);
 }
 
 const std::string& BaseMeshCurvesDeformer::toString() const {

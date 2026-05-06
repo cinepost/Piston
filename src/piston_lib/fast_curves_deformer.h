@@ -42,6 +42,8 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) override;
 
+		virtual void invalidateData(DeformerDataCache& cache) override;
+
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
@@ -56,7 +58,7 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 
 		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind, bool ignore_face_boundaries);
 
-		std::unique_ptr<FastCurvesDeformerData>             mpFastCurvesDeformerData;
+		std::shared_ptr<FastCurvesDeformerData>             mpFastCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 							mLiveVertexNormals;
 		std::vector<pxr::GfVec3f>               			mPerBindLiveNormals; // we keep memory to save on per-frame reallocations

@@ -73,8 +73,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		bool getPointsCacheUsageState() const;
 
 		void setInstancingState(bool state);
-		bool getInstancingState() const { return mInstancingEnabled; };
-
+		bool getInstancingState() const;
+		
 		void setDataPrimPath(const std::string& path);
 		const pxr::SdfPath& getDataPrimPath() const;
 
@@ -128,7 +128,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
 
-		virtual void invalidateData(DeformerDataCache& cache);
+		virtual void invalidateData(DeformerDataCache& cache) = 0;
 
 		const UsdPrimHandle& getCurvesGeoPrimHandle() const { return mCurvesGeoPrimHandle; }
 		const UsdPrimHandle& getOutputPrimHandle() const { return mCurvesGeoPrimHandle; }

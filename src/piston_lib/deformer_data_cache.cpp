@@ -6,6 +6,8 @@
 
 #include "fast_curves_deformer.h"
 #include "fast_curves_deformer_data.h"
+#include "wrap_curves_deformer_data.h"
+#include "guide_curves_deformer_data.h"
 
 
 namespace Piston {
@@ -60,7 +62,7 @@ template< class T>
 std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created) {
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
-	std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
+	const std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
 	return getOrCreateData<T>(pDeformer, handle_ptrs, created);
 }
 
@@ -83,11 +85,11 @@ std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* 
 
 		auto it = mDataMap.find(key);
 		if (it != mDataMap.end()) {
-			LOG_DBG << "Data " << typeid(T).name() << " found in cache";
+			LOG_TRC << "Data " << typeid(T).name() << " found in cache";
 			return std::dynamic_pointer_cast<T>(it->second);
 		}
 
-		LOG_DBG << "Data " << typeid(T).name() << " placed in cache";
+		LOG_TRC << "Data " << typeid(T).name() << " placed in cache";
 		auto result = mDataMap.emplace(key, std::make_shared<T>());
 		created = true;
 		return std::dynamic_pointer_cast<T>(result.first->second);
@@ -103,11 +105,32 @@ void DeformerDataCache::clear() {
 	}
 }
 
+template< class T>
 void DeformerDataCache::invalidate(const UsdPrimHandle& handle) {
+	LOG_DBG << " DeformerDataCache::invalidate(...) " << handle;
+
+	const std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
+	invalidate<T>(handle_ptrs);
+}
+
+template< class T>
+void DeformerDataCache::invalidate(const std::vector<const UsdPrimHandle*>& handles) {
+	const DeformerDataCache::Key key(std::type_index(typeid(T)), handles);
+
 	const std::lock_guard<std::mutex> lock(mMutex);
 	const std::lock_guard<std::mutex> topo_lock(mTopologyPoolMutex);
 
-	LOG_ERR << "DeformerDataCache::invalidate(const UsdPrimHandle& handle) UNIMPLEMENTED !!!";
+	auto it = mDataMap.find(key);
+	if (it != mDataMap.end()) {
+		assert(it->second);
+		it->second->clear();
+	}
+}
+
+template< class T>
+void DeformerDataCache::invalidate(const std::shared_ptr<T>& pData) {
+	if(!pData || !pData->isValid()) return;
+	LOG_DBG << "Invalidate " << pData->typeName();
 }
 
 DeformerDataCache::~DeformerDataCache() { }
@@ -116,15 +139,21 @@ DeformerDataCache::DeformerDataCache() {
 	mUseDataInstancing = CurvesDeformerFactory::getInstance().getDataInstancingState();
 }
 
+// Specialization Macro
+#define SPECIALIZE_TYPE_NAME(type) \
+template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created); \
+template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created); \
+template void DeformerDataCache::invalidate<type>(const UsdPrimHandle& handle); \
+template void DeformerDataCache::invalidate<type>(const std::vector<const UsdPrimHandle*>& handles); \
+template void DeformerDataCache::invalidate(const std::shared_ptr<type>& pData);
 
-template std::shared_ptr<SerializablePhantomTrimesh> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created);
-template std::shared_ptr<SerializablePhantomTrimesh> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created);
+SPECIALIZE_TYPE_NAME(SerializablePhantomTrimesh)
+SPECIALIZE_TYPE_NAME(SerializableUsdGeomMeshFaceAdjacency)
+SPECIALIZE_TYPE_NAME(FastCurvesDeformerData)
+SPECIALIZE_TYPE_NAME(WrapCurvesDeformerData)
+SPECIALIZE_TYPE_NAME(GuideCurvesDeformerData)
 
-template std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created);
-template std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created);
-
-template std::shared_ptr<FastCurvesDeformerData> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created);
-template std::shared_ptr<FastCurvesDeformerData> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created);
+#undef SPECIALIZE_TYPE_NAME
 
 } // namespace Piston
 

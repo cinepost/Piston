@@ -14,7 +14,7 @@
 
 
 #ifdef PISTON_DEBUG
-#define PROFILE(NAME) Piston::SimpleProfiler(NAME)
+#define PROFILE(NAME) auto __profiler__ = Piston::SimpleProfiler(NAME)
 #define PROFILE_PRINT() Piston::SimpleProfiler::printReport()
 #else
 #define PROFILE(NAME) {}

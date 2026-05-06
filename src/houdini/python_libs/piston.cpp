@@ -132,6 +132,9 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setPointsCacheUsageState", &BaseCurvesDeformer::setPointsCacheUsageState)
 		.def("getPointsCacheUsageState", &BaseCurvesDeformer::getPointsCacheUsageState)
 
+		.def("setInstancingState", &BaseCurvesDeformer::setInstancingState)
+		.def("getInstancingState", &BaseCurvesDeformer::getInstancingState)
+
 		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
 		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_dbg_overloads(args("time_code")))
 

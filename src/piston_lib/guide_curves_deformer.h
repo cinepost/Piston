@@ -69,7 +69,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 
-		virtual void invalidateData(DeformerDataCache& cache);
+		virtual void invalidateData(DeformerDataCache& cache) override;
 
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
@@ -95,7 +95,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
-		std::unique_ptr<GuideCurvesDeformerData>   				mpGuideCurvesDeformerData;
+		std::shared_ptr<GuideCurvesDeformerData>   				mpGuideCurvesDeformerData;
 		GuideCurvesContainer::UniquePtr 						mpGuideCurvesContainer;
 		MeshContainer::UniquePtr                                mpSkinMeshContainer;
 		
@@ -115,6 +115,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		pxr::VtArray<int> 										mGuideIndices;
 
 		float                                       			mFalloff = .0f;
+		BindMode                                                mBindMode;
 
 		std::vector<pxr::GfVec3f>               				mTempSkinFaceLiveNormals; // temporary to save on per-frame reallocations
 };

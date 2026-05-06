@@ -21,8 +21,7 @@ static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
 WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
-	mpWrapCurvesDeformerData = std::make_unique<WrapCurvesDeformerData>();
-	mpWrapCurvesDeformerData->setBindMode(BindMode::DIST);
+	mBindMode = BindMode::DIST;
 }
 
 WrapCurvesDeformer::SharedPtr WrapCurvesDeformer::create(const std::string& name) {
@@ -34,17 +33,24 @@ const std::string& WrapCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
+void WrapCurvesDeformer::invalidateData(DeformerDataCache& cache) {
+	BaseMeshCurvesDeformer::invalidateData(cache);
+	//if(mpWrapCurvesDeformerData && mpWrapCurvesDeformerData->isValid()) cache.invalidate<WrapCurvesDeformerData>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle});
+	cache.invalidate(mpWrapCurvesDeformerData);
+}
+
+
 bool WrapCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	PROFILE("WrapCurvesDeformer::deformImpl");
 	return __deform__(points, false, time_code);
 }
 
 bool WrapCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	PROFILE("WrapCurvesDeformer::deformMtImpl");
 	return __deform__(points, true, time_code);
 }
 
 bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
-	PROFILE(multi_threaded ? "WrapCurvesDeformer::deformMtImpl" : "WrapCurvesDeformer::deformImpl");
-
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
@@ -169,6 +175,7 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 }
 
 bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	PROFILE("WrapCurvesDeformer::buildDeformerDataImpl");
 
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
@@ -177,87 +184,93 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	
-	// Clear deformer data
-	mpWrapCurvesDeformerData->clear();
 
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
-		// Build deformer data in place if no json data present or not needed
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+	bool deformer_data_created;
+	if(!mpWrapCurvesDeformerData) {
+		mpWrapCurvesDeformerData = dataCache.getOrCreateData<WrapCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, deformer_data_created);
+		mpWrapCurvesDeformerData->setBindMode(mBindMode);
+	}
 
-		// First triangulate using simple "fan" triangulation
-		const uint32_t src_mesh_face_count = pAdjacency->getFaceCount();
+	if(!mpWrapCurvesDeformerData->isValid()) {
+		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
+			// Build deformer data in place if no json data present or not needed
 
-		for(uint32_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
-			const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
-			
-			if(face_vertex_count < 3 ) {
-				DLOG_ERR << "Source mesh polygon " << face_id << " is invalid !!!";
-				continue;
-			}
-			
-			const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
+			// First triangulate using simple "fan" triangulation
+			const uint32_t src_mesh_face_count = pAdjacency->getFaceCount();
 
-			switch(face_vertex_count) {
-				case 3:
-					pPhantomTrimesh->getOrCreateFaceID(
-						pAdjacency->getFaceVertex(face_id, 0), 
-						pAdjacency->getFaceVertex(face_id, 1),
-						pAdjacency->getFaceVertex(face_id, 2)
-					);
-					break;
-				default:
-					for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
+			for(uint32_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
+				const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
+				
+				if(face_vertex_count < 3 ) {
+					DLOG_ERR << "Source mesh polygon " << face_id << " is invalid !!!";
+					continue;
+				}
+				
+				const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
+
+				switch(face_vertex_count) {
+					case 3:
 						pPhantomTrimesh->getOrCreateFaceID(
 							pAdjacency->getFaceVertex(face_id, 0), 
-							pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
-							pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
+							pAdjacency->getFaceVertex(face_id, 1),
+							pAdjacency->getFaceVertex(face_id, 2)
 						);
-					}
+						break;
+					default:
+						for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
+							pPhantomTrimesh->getOrCreateFaceID(
+								pAdjacency->getFaceVertex(face_id, 0), 
+								pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
+								pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
+							);
+						}
+						break;
+				}
+			}
+
+			const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
+
+			DLOG_DBG << src_mesh_face_count << " source mesh faces triangulated to " << tri_face_count << " triangles.";
+
+			std::vector<pxr::GfVec3f> rest_vertex_normals;
+			buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, mpDeformerMeshContainer->getRestPositions(), (multi_threaded ? &mPool : nullptr));
+			mLiveVertexNormals.resize(rest_vertex_normals.size());
+
+			// Bind curve points
+			DLOG_DBG << "Binding " << mpCurvesContainer->getCurvesCount() << " curves (" << mpCurvesContainer->getTotalVertexCount() << " total vertices).";	
+			DLOG_DBG << "Using " << to_string(mpWrapCurvesDeformerData->getBindMode()) << " search method.";
+
+			bool result = false;
+			auto threads_timer = Timer();
+			threads_timer.start();
+
+			// Build bind data
+			switch(mpWrapCurvesDeformerData->getBindMode()) {
+				case BindMode::SPACE:
+					result = buildDeformerData_SpaceMode(multi_threaded, rest_vertex_normals, rest_time_code);
+					break;
+				default:
+					result = buildDeformerData_DistMode(multi_threaded, rest_vertex_normals, rest_time_code);
 					break;
 			}
+
+			auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
+			assert(face_flags.size() == pPhantomTrimesh->getFaceCount());
+
+			for(const auto& bind: mpWrapCurvesDeformerData->getPointBinds()) {
+				if(bind.isValid()) face_flags[bind.face_id] = PhantomTrimesh::TriFace::Flags::Bound;
+			}
+
+			threads_timer.stop();
+			if(multi_threaded) {
+				DLOG_TRC << "WrapCurvesDeformer::buildDeformerDataImpl() " << mPool.get_thread_count() << " threads finished in " << threads_timer.toString();
+			} else {
+				DLOG_TRC << "WrapCurvesDeformer::buildDeformerDataImpl() finished in " << threads_timer.toString();
+			}
+
+			mpWrapCurvesDeformerData->setValid(true);
 		}
-
-		const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
-
-		DLOG_DBG << src_mesh_face_count << " source mesh faces triangulated to " << tri_face_count << " triangles.";
-
-		std::vector<pxr::GfVec3f> rest_vertex_normals;
-		buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, mpDeformerMeshContainer->getRestPositions(), (multi_threaded ? &mPool : nullptr));
-		mLiveVertexNormals.resize(rest_vertex_normals.size());
-
-		// Bind curve points
-		DLOG_DBG << "Binding " << mpCurvesContainer->getCurvesCount() << " curves (" << mpCurvesContainer->getTotalVertexCount() << " total vertices).";	
-		DLOG_DBG << "Using " << to_string(mpWrapCurvesDeformerData->getBindMode()) << " search method.";
-
-		bool result = false;
-		auto threads_timer = Timer();
-		threads_timer.start();
-
-		// Build bind data
-		switch(mpWrapCurvesDeformerData->getBindMode()) {
-			case BindMode::SPACE:
-				result = buildDeformerData_SpaceMode(multi_threaded, rest_vertex_normals, rest_time_code);
-				break;
-			default:
-				result = buildDeformerData_DistMode(multi_threaded, rest_vertex_normals, rest_time_code);
-				break;
-		}
-
-		auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
-		assert(face_flags.size() == pPhantomTrimesh->getFaceCount());
-
-		for(const auto& bind: mpWrapCurvesDeformerData->getPointBinds()) {
-			if(bind.isValid()) face_flags[bind.face_id] = PhantomTrimesh::TriFace::Flags::Bound;
-		}
-
-		threads_timer.stop();
-		if(multi_threaded) {
-			DLOG_TRC << "WrapCurvesDeformer::buildDeformerDataImpl() " << mPool.get_thread_count() << " threads finished in " << threads_timer.toString();
-		} else {
-			DLOG_TRC << "WrapCurvesDeformer::buildDeformerDataImpl() finished in " << threads_timer.toString();
-		}
-
-		mpWrapCurvesDeformerData->setValid(true);
 	}
 
 	return mpWrapCurvesDeformerData->isValid();
@@ -671,16 +684,14 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 }
 
 void WrapCurvesDeformer::setBindMode(WrapCurvesDeformer::BindMode mode) {
-	assert(mpWrapCurvesDeformerData);
-	if(mpWrapCurvesDeformerData->getBindMode() == mode) return;
+	if(mBindMode == mode) return;
 
-	mpWrapCurvesDeformerData->setBindMode(mode);
+	mBindMode = mode;
 	makeDirty();
 }
 
 WrapCurvesDeformer::BindMode WrapCurvesDeformer::getBindMode() const {
-	assert(mpWrapCurvesDeformerData);
-	return mpWrapCurvesDeformerData->getBindMode();
+	return mBindMode;
 }
 
 WrapCurvesDeformer::~WrapCurvesDeformer() {

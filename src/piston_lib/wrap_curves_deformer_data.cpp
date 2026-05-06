@@ -7,6 +7,10 @@ namespace Piston {
 
 static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 0u);
 
+WrapCurvesDeformerData::WrapCurvesDeformerData(): mIsValid(false), mBindMode(WrapCurvesDeformerData::BindMode::DIST) {
+
+};
+
 void WrapCurvesDeformerData::clearData() {
 	const std::lock_guard<std::mutex> lock(mMutex);
 

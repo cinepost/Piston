@@ -174,6 +174,8 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
 
+		void setValid(bool state);
+
 	protected:
 		virtual bool dumpToJSON(json& j) const override;
 		virtual bool readFromJSON(const json& j) override;

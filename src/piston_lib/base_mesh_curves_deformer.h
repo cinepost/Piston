@@ -35,7 +35,7 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false);
 		virtual bool writeJsonDataToPrimImpl() const;
 
-		virtual void invalidateData(DeformerDataCache& cache);
+		virtual void invalidateData(DeformerDataCache& cache) override;
 };
 
 } // namespace Piston

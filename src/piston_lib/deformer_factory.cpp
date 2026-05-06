@@ -192,6 +192,8 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 }
 
 CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaultDataToPrimStorage), mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), mDefaultDataPrimPath(sDefaultPrimPath), mDataInstancingState(sDataInstancingDefaultState) {
+	std::cout << std::endl;
+	
 	bool enable_cache = true;
 	std::string cache_var_value;
 	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
@@ -212,7 +214,7 @@ CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaul
 			mDataInstancingState = true;
 		}
 	}
-	LOG_INF << "Data instancing is " << (mDataInstancingState ? "ON" : "OFF");
+	LOG_INF << "Deformers data instancing is " << (mDataInstancingState ? "ON" : "OFF");
 
 	std::string tpose_default_frame_string;
 	if(getEnvVar("PISTON_DEFAULT_TPOSE_FRAME", tpose_default_frame_string)) {

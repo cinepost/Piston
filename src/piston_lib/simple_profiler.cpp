@@ -10,12 +10,6 @@ namespace Piston {
 
 namespace {
 
-template<typename T>
-void updateMaximum(std::atomic<T>& maximum_value, T const& value) noexcept {
-	T prev_value = maximum_value;
-	while(prev_value < value && !maximum_value.compare_exchange_weak(prev_value, value)) {}
-}
-
 } // namespace
 
 
@@ -56,7 +50,10 @@ ScopedTimeMeasure::~ScopedTimeMeasure() {
 }
 
 SimpleProfiler::SimpleProfiler( const char* name ): mName(name) {
-	updateMaximum(mCallerNameWidth, mName.size());
+	const size_t caller_width = mName.size();
+	size_t current = mCallerNameWidth.load(std::memory_order_relaxed);
+	while (current < caller_width && !mCallerNameWidth.compare_exchange_weak(current, caller_width)) {}
+
 	mTimeStart = Clock::now();
 }
 
@@ -85,13 +82,16 @@ void SimpleProfiler::printReport() {
 	if(mMap.empty()) return;
 	
 	printf("SimpleProfiler report...\n");
-	printf("%42s Calls\tMean (secs)\tStdDev\tTotal (secs)\n","Scope");
+
+	const int caller_width = static_cast<int>(SimpleProfiler::mCallerNameWidth);
+
+	printf("%*s Calls\tMean (secs)\tStdDev\tTotal (secs)\n", caller_width, "Scope");
 	for(std::map<std::string, acc_t>::iterator p = mMap.begin(); p != mMap.end(); p++ ) {
 		double _avg = sa::mean(p->second);
 		double _std = sa::stdv(p->second, _avg);
 		size_t _sum = sa::summ(p->second);
 
-		printf("%42s %lu\t%f\t%f\t%f\n", p->first.c_str(), p->second.size(), static_cast<float>(_avg) * 0.001f, static_cast<float>(_std) * 0.001f, float(_sum) * 0.001f);
+		printf("%*s %lu\t%f\t%f\t%f\n", caller_width, p->first.c_str(), p->second.size(), static_cast<float>(_avg) * 0.001f, static_cast<float>(_std) * 0.001f, float(_sum) * 0.001f);
 	}
 	printf("\n");
 }

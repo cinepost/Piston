@@ -24,8 +24,6 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 namespace Piston {
 
 FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
-	mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
-
 	mpDebugGeo = DebugGeo::create(name);
 }
 
@@ -38,17 +36,24 @@ const std::string& FastCurvesDeformer::toString() const {
 	return kFastDeformerString;
 }
 
+void FastCurvesDeformer::invalidateData(DeformerDataCache& cache) {
+	BaseMeshCurvesDeformer::invalidateData(cache);
+	//if(mpFastCurvesDeformerData && mpFastCurvesDeformerData->isValid()) cache.invalidate<FastCurvesDeformerData>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle});
+	cache.invalidate(mpFastCurvesDeformerData);
+}
+
+
 bool FastCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	PROFILE("FastCurvesDeformer::deformImpl");
 	return __deform__(points, false, time_code);
 }
 
 bool FastCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	PROFILE("FastCurvesDeformer::deformMtImpl");
 	return __deform__(points, true, time_code);
 }
 
 bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
-	PROFILE("FastCurvesDeformer::__deform__");
-
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
@@ -187,38 +192,41 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 		return false;
 	}
 
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+	bool deformer_data_created;
 	if(!mpFastCurvesDeformerData) {
-		mpFastCurvesDeformerData = std::make_unique<FastCurvesDeformerData>();
+		mpFastCurvesDeformerData = dataCache.getOrCreateData<FastCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, deformer_data_created);
 	}
-	mpFastCurvesDeformerData->clear();
 
 	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
-		// Build deformer data in place if no json data present or not needed
+	if(!mpFastCurvesDeformerData->isValid()) {
+		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
+			// Build deformer data in place if no json data present or not needed
 
-		if(!buildCurvesBindingData(rest_time_code, multi_threaded)) {
-			return false;
+			if(!buildCurvesBindingData(rest_time_code, multi_threaded)) {
+				return false;
+			}
+
+			const size_t binds_count = mpFastCurvesDeformerData->getCurveBinds().size();
+
+			mpFastCurvesDeformerData->mRestVertexNormals.resize(binds_count);
+			mpFastCurvesDeformerData->mPerBindRestNormals.resize(binds_count);
+			mpFastCurvesDeformerData->mPerBindRestTBs.resize(binds_count);
+
+			// Additional per-bind rest normals if needed
+			const bool build_live = false; // build using rest data
+			std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
+			const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
+
+			buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
+			calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
+			calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
+			
+			mpFastCurvesDeformerData->setValid(true);
 		}
-
-		const size_t binds_count = mpFastCurvesDeformerData->getCurveBinds().size();
-
-		mpFastCurvesDeformerData->mRestVertexNormals.resize(binds_count);
-		mpFastCurvesDeformerData->mPerBindRestNormals.resize(binds_count);
-		mpFastCurvesDeformerData->mPerBindRestTBs.resize(binds_count);
-
-		// Additional per-bind rest normals if needed
-		const bool build_live = false; // build using rest data
-		std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
-		const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
-
-		buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
-		calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
-		calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
-		
-		mpFastCurvesDeformerData->setValid(true);
 	}
 
 	mLiveVertexNormals.resize(mpFastCurvesDeformerData->getRestVertexNormals().size());
@@ -228,7 +236,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	// transform curves to NTB spaces
 	transformCurvesToNTB();
 
-	return true; 
+	return mpFastCurvesDeformerData->isValid(); 
 }
 
 void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pPhantomTrimesh, const std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool) {

@@ -39,6 +39,7 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		WrapCurvesDeformer(const std::string& name);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
+		virtual void invalidateData(DeformerDataCache& cache) override;
 
 		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_DistMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
@@ -52,10 +53,12 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		bool buildDeformerData_SpaceMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
-		std::unique_ptr<WrapCurvesDeformerData> mpWrapCurvesDeformerData;
+		std::shared_ptr<WrapCurvesDeformerData> mpWrapCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 				mLiveVertexNormals;
 		std::vector<pxr::GfVec3f> 				mLiveTriFaceNormals;
+
+		BindMode                                mBindMode;
 };
 
 } // namespace Piston

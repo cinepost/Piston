@@ -106,6 +106,34 @@ class DeformerDataCache {
 			}
 		};
 
+		class BiMap {
+			std::unordered_map<Key, std::shared_ptr<SerializableDeformerDataBase>, KeyHasher, KeyComparator> mKeyToValMap;
+			std::unordered_map<std::shared_ptr<SerializableDeformerDataBase>, Key> mValToKeyMap;
+
+			public:
+				void insert(const Key& k, const std::shared_ptr<SerializableDeformerDataBase>& v) {
+					mKeyToValMap[k] = v;
+					//mValToKeyMap[v] = k;
+					mValToKeyMap.insert_or_assign(v, k);
+				}
+
+				void eraseByKey(const Key& k) {
+					auto it = mKeyToValMap.find(k);
+					if (it != mKeyToValMap.end()) {
+			    		mValToKeyMap.erase(it->second);
+			    		mKeyToValMap.erase(it);
+					}
+				}
+
+				void eraseByValue(const std::shared_ptr<SerializableDeformerDataBase>& v) {
+					auto it = mValToKeyMap.find(v);
+					if (it != mValToKeyMap.end()) {
+			    		mKeyToValMap.erase(it->second);
+			    		mValToKeyMap.erase(it);
+					}
+				}
+		};
+
 		using MapType = std::unordered_map<Key, std::shared_ptr<SerializableDeformerDataBase>, KeyHasher, KeyComparator>;
 
 	public:
@@ -123,7 +151,14 @@ class DeformerDataCache {
 		template< class T>
 		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created);
 
+		template< class T>
 		void invalidate(const UsdPrimHandle& handle);
+
+		template< class T>
+		void invalidate(const std::vector<const UsdPrimHandle*>& handles);
+
+		template< class T>
+		void invalidate(const std::shared_ptr<T>& pData);
 
 	protected:
 		void clear();

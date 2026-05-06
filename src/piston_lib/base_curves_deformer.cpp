@@ -263,7 +263,17 @@ void BaseCurvesDeformer::setPointsCacheUsageState(bool state) {
 void BaseCurvesDeformer::setInstancingState(bool state) {
 	if(mInstancingEnabled == state) return;
 	mInstancingEnabled = state;
+
+	if(mInstancingEnabled && !CurvesDeformerFactory::getDataInstancingState()) {
+		DLOG_WRN << "Deformers data instancing is disabled!";
+		return;
+	}
+
 	makeDirty();
+}
+
+bool BaseCurvesDeformer::getInstancingState() const { 
+	return CurvesDeformerFactory::getDataInstancingState() && mInstancingEnabled; 
 }
 
 bool BaseCurvesDeformer::getPointsCacheUsageState() const {
@@ -465,13 +475,6 @@ void BaseCurvesDeformer::clearLRUCaches() {
 		pPointsLRUCache->removeByName(uniqueName());
 		pPointsLRUCache->removeByName(velocityKeyName());
 	}
-}
-
-void BaseCurvesDeformer::invalidateData(DeformerDataCache& cache) {
-	DLOG_TRC << "BaseCurvesDeformer::invalidateData()";
-	cache.invalidate(mDeformerGeoPrimHandle);
-	cache.invalidate(mCurvesGeoPrimHandle);
-	DLOG_TRC << "BaseCurvesDeformer::invalidateData() done";
 }
 
 void BaseCurvesDeformer::showDebugGeometry(bool state) {

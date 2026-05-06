@@ -18,8 +18,7 @@
 namespace Piston {
 
 GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::GUIDES, name) {
-	mpGuideCurvesDeformerData = std::make_unique<GuideCurvesDeformerData>();
-	mpGuideCurvesContainer = GuideCurvesContainer::create();
+	mBindMode = BindMode::NTB;
 }
 
 GuideCurvesDeformer::SharedPtr GuideCurvesDeformer::create(const std::string& name) {
@@ -81,10 +80,12 @@ void GuideCurvesDeformer::setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim) {
 }
 
 bool GuideCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	PROFILE("GuideCurvesDeformer::deformImpl");
 	return __deform__(points, false, time_code);
 }
 
 bool GuideCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
+	PROFILE("GuideCurvesDeformer::deformMtImpl");
 	return __deform__(points, true, time_code);
 }
 
@@ -494,296 +495,316 @@ bool GuideCurvesDeformer::guideIndicesNeeded() const {
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	assert(mpGuideCurvesDeformerData);
-	assert(mpGuideCurvesContainer);
+	PROFILE("GuideCurvesDeformer::buildDeformerDataImpl");
+
+	if(!mpGuideCurvesContainer) {
+		mpGuideCurvesContainer = GuideCurvesContainer::create();
+	}
 
 	if(!mpGuideCurvesContainer->init(mDeformerGeoPrimHandle, getDeformerRestAttrName(), rest_time_code)) {
 		DLOG_ERR << "Error initializing guide curves container !";
 		return false;
 	}
 
-	bool result = false;
-
-	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuideCurvesDeformerData.get())) {
-
-		const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
-		const auto total_curves_count = mpCurvesContainer->getCurvesCount();
-
-		if(guideIndicesNeeded()) {
-			if(mGuideIDPrimAttrName.empty()) {
-				DLOG_ERR << "No guide id (clump_id) attribute name set but needed !";
-				return false;
-			}
-
-			if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
-				DLOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
-				return false;
-			}
-			assert(mGuideIndices.size() == total_curves_count);
-
-			// check guide indices are not out of range
-			int max_guide_index = 0;
-			for(const int idx: mGuideIndices) {
-				max_guide_index = std::max(max_guide_index, idx);
-			}
-
-			if(max_guide_index >= total_guides_count) {
-				DLOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
-				return false;
-			}
-		}
-
-		if(getBindRootsToSkinSurface()) {
-			if(!buildSkinPrimData(multi_threaded)) {
-				DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
-				return false;
-			}
-
-			if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
-				DLOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
-				return false;
-			}
-		}
-
-		switch(getBindMode()) {
-			case BindMode::SPACE:
-				result = buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
-				break;
-			case BindMode::NTB:
-				result = buildDeformerDataNTBMode(rest_time_code, multi_threaded);
-				break;
-			default:
-				result = buildDeformerDataAngleMode(rest_time_code, multi_threaded);
-				break;
-		}
-
-		mpGuideCurvesDeformerData->setValid(result);
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+	bool deformer_data_created;
+	if(!mpGuideCurvesDeformerData) {
+		mpGuideCurvesDeformerData = dataCache.getOrCreateData<GuideCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, deformer_data_created);
+		mpGuideCurvesDeformerData->setBindMode(mBindMode);
 	}
 
-	return result;
+	if(!mpGuideCurvesDeformerData->isValid()) {
+		if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuideCurvesDeformerData.get())) {
+
+			bool result = false;
+			const auto total_guides_count = mpGuideCurvesContainer->getCurvesCount();
+			const auto total_curves_count = mpCurvesContainer->getCurvesCount();
+
+			if(guideIndicesNeeded()) {
+				if(mGuideIDPrimAttrName.empty()) {
+					DLOG_ERR << "No guide id (clump_id) attribute name set but needed !";
+					return false;
+				}
+
+				if(!mCurvesGeoPrimHandle.fetchAttributeValues(mGuideIDPrimAttrName, mGuideIndices, rest_time_code)) {
+					DLOG_ERR << "Error getting curves " << mCurvesGeoPrimHandle << " \"" << mGuideIDPrimAttrName << "\" guide indices !";
+					return false;
+				}
+				assert(mGuideIndices.size() == total_curves_count);
+
+				// check guide indices are not out of range
+				int max_guide_index = 0;
+				for(const int idx: mGuideIndices) {
+					max_guide_index = std::max(max_guide_index, idx);
+				}
+
+				if(max_guide_index >= total_guides_count) {
+					DLOG_ERR << "Curves " << mCurvesGeoPrimHandle << " guide indices are out of range !"; 
+					return false;
+				}
+			}
+
+			if(getBindRootsToSkinSurface()) {
+				if(!buildSkinPrimData(multi_threaded)) {
+					DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
+					return false;
+				}
+
+				if(!buildCurvesRootsBindDeformerData(rest_time_code, multi_threaded)) {
+					DLOG_ERR << "Error building curves roots bind data for " << mCurvesGeoPrimHandle << "!";
+					return false;
+				}
+			}
+
+			switch(getBindMode()) {
+				case BindMode::SPACE:
+					result = buildDeformerDataSpaceMode(rest_time_code, multi_threaded);
+					break;
+				case BindMode::NTB:
+					result = buildDeformerDataNTBMode(rest_time_code, multi_threaded);
+					break;
+				default:
+					result = buildDeformerDataAngleMode(rest_time_code, multi_threaded);
+					break;
+			}
+
+			mpGuideCurvesDeformerData->setValid(result);
+		}
+	}
+
+	return mpGuideCurvesDeformerData->isValid();
 }
 
 bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+	bool guides_trimesh_data_created;
 	if(!mpGuidesPhantomTrimeshData) {
-		mpGuidesPhantomTrimeshData = std::make_unique<SerializablePhantomTrimesh>();
+		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, guides_trimesh_data_created);
 	}
 
-	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
-		// Build in place if no json data present or not needed
-		if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
-			DLOG_ERR << "Error building phantom mesh data!";
-			return false;
+
+	if(!mpGuidesPhantomTrimeshData->isValid()) {
+
+		if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
+			// Build in place if no json data present or not needed
+			if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
+				DLOG_ERR << "Error building phantom mesh data!";
+				return false;
+			}
 		}
-	}
+		mpGuidesPhantomTrimeshData->setValid(false);
 
-	PhantomTrimesh* pPhantomTrimesh = mpGuidesPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
+		PhantomTrimesh* pPhantomTrimesh = mpGuidesPhantomTrimeshData->getTrimesh();
+		assert(pPhantomTrimesh);
 
-	assert(mpDeformerMeshContainer);
-	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
-
-	if(!pPhantomTrimesh->hasTetrahedrons()) {
 		assert(mpDeformerMeshContainer);
-		if(!pPhantomTrimesh->buildTetrahedrons(mpDeformerMeshContainer->getRestPositions())) {
-			DLOG_ERR << "Error building tetrahedrons!";
-			return false;
-		}
-	}
+		const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 
-	const std::vector<PhantomTrimesh::Tetrahedron>& tetrahedrons = pPhantomTrimesh->getTetrahedrons();
-
-	// Build kdtree
-	auto buildTetrahedronsRestCentroidsKDTree = [&](bool multi_threaded) {
-		pxr::VtArray<pxr::GfVec3f> centroids(tetrahedrons.size());
-		for(uint32_t t_id = 0; t_id < tetrahedrons.size(); ++t_id) {
-			centroids[t_id] = pDeformerMeshContainer->getTetrahedronRestCentroid(pPhantomTrimesh->getTetrahedron(t_id));
+		if(!pPhantomTrimesh->hasTetrahedrons()) {
+			assert(mpDeformerMeshContainer);
+			if(!pPhantomTrimesh->buildTetrahedrons(mpDeformerMeshContainer->getRestPositions())) {
+				DLOG_ERR << "Error building tetrahedrons!";
+				return false;
+			}
 		}
 
-		return neighbour_search::KDTree<float, 3>(centroids, multi_threaded);
-	};
+		const std::vector<PhantomTrimesh::Tetrahedron>& tetrahedrons = pPhantomTrimesh->getTetrahedrons();
 
-	auto buildRestPositionsKDTree = [&](bool multi_threaded) {
-		return neighbour_search::KDTree<float, 3>(pDeformerMeshContainer->getRestPositions(), multi_threaded);
-	};
+		// Build kdtree
+		auto buildTetrahedronsRestCentroidsKDTree = [&](bool multi_threaded) {
+			pxr::VtArray<pxr::GfVec3f> centroids(tetrahedrons.size());
+			for(uint32_t t_id = 0; t_id < tetrahedrons.size(); ++t_id) {
+				centroids[t_id] = pDeformerMeshContainer->getTetrahedronRestCentroid(pPhantomTrimesh->getTetrahedron(t_id));
+			}
 
-	neighbour_search::KDTree<float, 3> centroids_kdtree = buildTetrahedronsRestCentroidsKDTree(multi_threaded);
-	neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = buildRestPositionsKDTree(multi_threaded);
+			return neighbour_search::KDTree<float, 3>(centroids, multi_threaded);
+		};
 
-	const size_t curves_count = mpCurvesContainer->getCurvesCount();
+		auto buildRestPositionsKDTree = [&](bool multi_threaded) {
+			return neighbour_search::KDTree<float, 3>(pDeformerMeshContainer->getRestPositions(), multi_threaded);
+		};
 
-	assert(mpGuideCurvesDeformerData);
-	auto& pointBinds = mpGuideCurvesDeformerData->mPointBinds;
-	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
+		neighbour_search::KDTree<float, 3> centroids_kdtree = buildTetrahedronsRestCentroidsKDTree(multi_threaded);
+		neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = buildRestPositionsKDTree(multi_threaded);
 
-	std::atomic<size_t> total_points = 0;
-	std::atomic<size_t> bound_points = 0;
-	std::atomic<size_t> unboud_points = 0;
-	
-	auto bind_func = [&](const std::size_t start, const std::size_t end) {
-    	if(multi_threaded) {
-    		const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
-    		LOG_TRC << "Binding curves from " << start << " to " << end << " by thread id #" << *thread_index;
-    	}
+		const size_t curves_count = mpCurvesContainer->getCurvesCount();
 
-    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> sorted_tetra_centroids; // sorted tetrahedron centroids for brute force search
-    	sorted_tetra_centroids.reserve(tetrahedrons.size());
+		assert(mpGuideCurvesDeformerData);
+		auto& pointBinds = mpGuideCurvesDeformerData->mPointBinds;
+		pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
-    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
+		std::atomic<size_t> total_points = 0;
+		std::atomic<size_t> bound_points = 0;
+		std::atomic<size_t> unboud_points = 0;
+		
+		auto bind_func = [&](const std::size_t start, const std::size_t end) {
+	    	if(multi_threaded) {
+	    		const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
+	    		LOG_TRC << "Binding curves from " << start << " to " << end << " by thread id #" << *thread_index;
+	    	}
 
-    	const auto& faces = pPhantomTrimesh->getFaces();
+	    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> sorted_tetra_centroids; // sorted tetrahedron centroids for brute force search
+	    	sorted_tetra_centroids.reserve(tetrahedrons.size());
 
-		for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
-    		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx);
+	    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
 
-    		const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+	    	const auto& faces = pPhantomTrimesh->getFaces();
 
-        	const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_idx);
-        	const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_idx);
+			for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
+	    		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx);
 
-        	float u, v, w, x;
+	    		const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
 
-        	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
-        		total_points++;
+	        	const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_idx);
+	        	const uint32_t curve_vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_idx);
 
-        		const size_t curr_point_index = curve_vertex_offset + i;
-        		auto& bind = pointBinds[curr_point_index];
-        		bind.encoded_id = PointBindData::kInvalid;
+	        	float u, v, w, x;
 
-        		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
+	        	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
+	        		total_points++;
 
-        		//findKNearestNeighboursWithinRadiusSquared(const PointType &target, std::size_t k, CoordinateType radius_squared, std::vector<ReturnType> &result)
+	        		const size_t curr_point_index = curve_vertex_offset + i;
+	        		auto& bind = pointBinds[curr_point_index];
+	        		bind.encoded_id = PointBindData::kInvalid;
 
-        		// First try to find tetrahedron is connected to cleset point in point cloud
-        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = deformer_restpoints_kdtree.findNearestNeighbour(curr_pt);
-        		const size_t point_connected_tetras_count = pPhantomTrimesh->getPointConnectedTetrahedronsCount(nearest_pt.first);
+	        		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
 
-        		for(size_t lti = 0; lti < point_connected_tetras_count; ++lti) {
-        			uint32_t tetra_index = pPhantomTrimesh->getPointConnectedTetrahedronIndex(nearest_pt.first, lti);
+	        		//findKNearestNeighboursWithinRadiusSquared(const PointType &target, std::size_t k, CoordinateType radius_squared, std::vector<ReturnType> &result)
 
-        			pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(tetra_index), curr_pt, u, v, w, x);
+	        		// First try to find tetrahedron is connected to cleset point in point cloud
+	        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = deformer_restpoints_kdtree.findNearestNeighbour(curr_pt);
+	        		const size_t point_connected_tetras_count = pPhantomTrimesh->getPointConnectedTetrahedronsCount(nearest_pt.first);
 
-        			if(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
-        			   u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f ) {
-        				// neighbour test failed;
-        				continue;
-        			}
+	        		for(size_t lti = 0; lti < point_connected_tetras_count; ++lti) {
+	        			uint32_t tetra_index = pPhantomTrimesh->getPointConnectedTetrahedronIndex(nearest_pt.first, lti);
 
-        			// bound by nerest point cloud vertex;
-        			bind.encodeID_modeSPACE(tetra_index, true /* is tetra id */, false /* data is 3x32bit floats */);
-        			bind.setData(u, v, w);
-        			bound_points++;
-        			break;
-        		}
+	        			pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(tetra_index), curr_pt, u, v, w, x);
 
-        		neighbour_search::KDTree<float, 3>::ReturnType closest_tetra_centroid;
-        		closest_tetra_centroid.first = neighbour_search::KDTree<float, 3>::kInvalidIndex;
+	        			if(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+	        			   u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f ) {
+	        				// neighbour test failed;
+	        				continue;
+	        			}
 
-        		// If point is not bound by previous method we test it against closest tetraheron centroid
-        		if(bind.encoded_id == PointBindData::kInvalid) {
-        			closest_tetra_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
-					
-					pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(closest_tetra_centroid.first), curr_pt, u, v, w, x);
-        			if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
-        			   	 u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f )) {
-        				// bound by nearest tetra centroid
-        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
-        				bind.setData(u, v, w);
-        				bound_points++;
-        			}
-        		}
+	        			// bound by nerest point cloud vertex;
+	        			bind.encodeID_modeSPACE(tetra_index, true /* is tetra id */, false /* data is 3x32bit floats */);
+	        			bind.setData(u, v, w);
+	        			bound_points++;
+	        			break;
+	        		}
 
-        		// Brute force search for contaning centroid
-        		if(bind.encoded_id == PointBindData::kInvalid) {
-        			const bool sort = false;
-        			centroids_kdtree.findAllNearestNeighboursWithinRadiusSquared(curr_pt, sorted_tetra_centroids, sort);
-					
-					float x;
-        			for(const auto& centroid: sorted_tetra_centroids) {
-						pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(centroid.first), curr_pt, u, v, w, x);
-        				if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
-        			   	     u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f)) {
-        				   	// bound by brute force search
-        				   	bind.encodeID_modeSPACE(centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
-        				   	bind.setData(u, v, w);
-        					bound_points++;
-        					break;
-        				}
-        			}
-        		}
+	        		neighbour_search::KDTree<float, 3>::ReturnType closest_tetra_centroid;
+	        		closest_tetra_centroid.first = neighbour_search::KDTree<float, 3>::kInvalidIndex;
 
-        		// Now for any unbound point we bind it to closest triface or tetra (depends on user choice)
+	        		// If point is not bound by previous method we test it against closest tetraheron centroid
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			closest_tetra_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
+						
+						pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(closest_tetra_centroid.first), curr_pt, u, v, w, x);
+	        			if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+	        			   	 u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f )) {
+	        				// bound by nearest tetra centroid
+	        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
+	        				bind.setData(u, v, w);
+	        				bound_points++;
+	        			}
+	        		}
 
-        		const bool bindMissingToTriface = true;
-        		
-        		if(bind.encoded_id == PointBindData::kInvalid) {
-        			if(bindMissingToTriface) {
+	        		// Brute force search for contaning centroid
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			const bool sort = false;
+	        			centroids_kdtree.findAllNearestNeighboursWithinRadiusSquared(curr_pt, sorted_tetra_centroids, sort);
+						
+						float x;
+	        			for(const auto& centroid: sorted_tetra_centroids) {
+							pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(centroid.first), curr_pt, u, v, w, x);
+	        				if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+	        			   	     u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f)) {
+	        				   	// bound by brute force search
+	        				   	bind.encodeID_modeSPACE(centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
+	        				   	bind.setData(u, v, w);
+	        					bound_points++;
+	        					break;
+	        				}
+	        			}
+	        		}
 
-        				// TODO: make separate point clouds (root and tip guide points) to avoid binding to same guide points
+	        		// Now for any unbound point we bind it to closest triface or tetra (depends on user choice)
 
-        				deformer_restpoints_kdtree.findKNearestNeighbours(curr_pt, 3, closest_deformer_points);
+	        		const bool bindMissingToTriface = true;
+	        		
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			if(bindMissingToTriface) {
 
-        				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(closest_deformer_points[0].first, closest_deformer_points[1].first, closest_deformer_points[2].first);
-        				const auto& face = faces[face_id];
+	        				// TODO: make separate point clouds (root and tip guide points) to avoid binding to same guide points
 
-						const pxr::GfVec3f& p0 = pDeformerMeshContainer->getRestPointPosition(face.indices[0]);
-						const pxr::GfVec3f& p1 = pDeformerMeshContainer->getRestPointPosition(face.indices[1]);
-						const pxr::GfVec3f& p2 = pDeformerMeshContainer->getRestPointPosition(face.indices[2]);
+	        				deformer_restpoints_kdtree.findKNearestNeighbours(curr_pt, 3, closest_deformer_points);
 
-						const auto& face_normal = pDeformerMeshContainer->getFaceRestNormal(face);
-						const Plane face_plane(p0, face_normal);
-						const float face_distance = distance(face_plane, curr_pt);
+	        				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(closest_deformer_points[0].first, closest_deformer_points[1].first, closest_deformer_points[2].first);
+	        				const auto& face = faces[face_id];
 
-						const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
+							const pxr::GfVec3f& p0 = pDeformerMeshContainer->getRestPointPosition(face.indices[0]);
+							const pxr::GfVec3f& p1 = pDeformerMeshContainer->getRestPointPosition(face.indices[1]);
+							const pxr::GfVec3f& p2 = pDeformerMeshContainer->getRestPointPosition(face.indices[2]);
 
-						const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
-						float d00 = pxr::GfDot(v0, v0);
-						float d01 = pxr::GfDot(v0, v1);
-						float d11 = pxr::GfDot(v1, v1);
-						float d20 = pxr::GfDot(v2, v0);
-						float d21 = pxr::GfDot(v2, v1);
-						float denom = d00 * d11 - d01 * d01;
+							const auto& face_normal = pDeformerMeshContainer->getFaceRestNormal(face);
+							const Plane face_plane(p0, face_normal);
+							const float face_distance = distance(face_plane, curr_pt);
 
-						u = (d11 * d20 - d01 * d21) / denom;
-						v = (d00 * d21 - d01 * d20) / denom;
-						w = face_distance;
-						bind.encodeID_modeSPACE(face_id, false /* not a tetra id */, false /* data is 3x32bit floats */);
-						bind.setData(u, v, w);
-        				bound_points++;
-        			} else {
-        				
-        				// TODO: this needs to be checked. (weird shit happens)
+							const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
 
-        				pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(closest_tetra_centroid.first), curr_pt, u, v, w, x);
-        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, true /* data is 4x24bit floats */);
-        				bind.setData(u, v, w, x);
-        				bound_points++;
-        			}
-        			
-        		}
+							const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
+							float d00 = pxr::GfDot(v0, v0);
+							float d01 = pxr::GfDot(v0, v1);
+							float d11 = pxr::GfDot(v1, v1);
+							float d20 = pxr::GfDot(v2, v0);
+							float d21 = pxr::GfDot(v2, v1);
+							float denom = d00 * d11 - d01 * d01;
 
-        		if(bind.encoded_id == PointBindData::kInvalid) {
-        			// We should not be here
-        			assert((1 == 2) && "What the f..ck !?");
-        			unboud_points++;
-        		}
-        	}
-    	}
-	};
+							u = (d11 * d20 - d01 * d21) / denom;
+							v = (d00 * d21 - d01 * d20) / denom;
+							w = face_distance;
+							bind.encodeID_modeSPACE(face_id, false /* not a tetra id */, false /* data is 3x32bit floats */);
+							bind.setData(u, v, w);
+	        				bound_points++;
+	        			} else {
+	        				
+	        				// TODO: this needs to be checked. (weird shit happens)
 
-	DLOG_INF << "Binding curves to guides using SPACE mode.";
+	        				pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(closest_tetra_centroid.first), curr_pt, u, v, w, x);
+	        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, true /* data is 4x24bit floats */);
+	        				bind.setData(u, v, w, x);
+	        				bound_points++;
+	        			}
+	        			
+	        		}
 
-	if(multi_threaded) {
-		mPool.detach_blocks(0u, curves_count, bind_func);
-		mPool.wait();
-	} else {
-		bind_func(0u, curves_count);
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			// We should not be here
+	        			assert((1 == 2) && "What the f..ck !?");
+	        			unboud_points++;
+	        		}
+	        	}
+	    	}
+		};
+
+		DLOG_INF << "Binding curves to guides using SPACE mode.";
+
+		if(multi_threaded) {
+			mPool.detach_blocks(0u, curves_count, bind_func);
+			mPool.wait();
+		} else {
+			bind_func(0u, curves_count);
+		}
+
+		DLOG_TRC << "Total points: " << total_points.load();
+		DLOG_TRC << "Bound points: " << bound_points.load();
+		DLOG_TRC << "Unbound points: " << unboud_points.load();
+
+		mpGuidesPhantomTrimeshData->setValid(true);
 	}
 
-	DLOG_TRC << "Total points: " << total_points.load();
-	DLOG_TRC << "Bound points: " << bound_points.load();
-	DLOG_TRC << "Unbound points: " << unboud_points.load();
-
-	return true;
+	return mpGuidesPhantomTrimeshData->isValid();
 }
 
 bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bool multi_threaded, bool build_live) {
@@ -1228,20 +1249,25 @@ void GuideCurvesDeformer::setBindRootsToSkinSurface(bool bind) {
 }
 
 void GuideCurvesDeformer::invalidateData(DeformerDataCache& cache) {
-	BaseCurvesDeformer::invalidateData(cache);
-	cache.invalidate(mGuidesSkinGeoPrimHandle);
+	//if(mpGuideCurvesDeformerData && mpGuideCurvesDeformerData->isValid()) cache.invalidate<GuideCurvesDeformerData>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle});
+	//if(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid()) cache.invalidate<SerializablePhantomTrimesh>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle});
+	//if(mpGuidesPhantomTrimeshData && mpGuidesPhantomTrimeshData->isValid()) cache.invalidate<SerializablePhantomTrimesh>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle});
+
+	cache.invalidate(mpGuideCurvesDeformerData);
+
+	cache.invalidate(mpSkinAdjacencyData);
+	cache.invalidate(mpSkinPhantomTrimeshData);
+	cache.invalidate(mpGuidesPhantomTrimeshData);
 }
 
 void GuideCurvesDeformer::setBindMode(GuideCurvesDeformer::BindMode mode) {
-	assert(mpGuideCurvesDeformerData);
-	if(mpGuideCurvesDeformerData->getBindMode() == mode) return;
-	mpGuideCurvesDeformerData->setBindMode(mode);
+	if(mBindMode == mode) return;
+	mBindMode = mode;
 	makeDirty();
 }
 
 GuideCurvesDeformer::BindMode GuideCurvesDeformer::getBindMode() const {
-	assert(mpGuideCurvesDeformerData);
-	return mpGuideCurvesDeformerData->getBindMode();
+	return mBindMode;
 }
 
 

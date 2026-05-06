@@ -362,6 +362,18 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	return true;
 }
 
+void SerializablePhantomTrimesh::setValid(bool state) {
+	if(!mpTrimesh) return;
+
+	const std::lock_guard<std::mutex> lock(mMutex); 
+	const std::lock_guard<std::mutex> trimesh_facemap_lock(mpTrimesh->mFaceMapMutex);
+
+	if(mpTrimesh->mValid != state) {
+		// TODO: check if we need to update other states... Anyways this is kinda ugly
+		mpTrimesh->mValid = state;
+	}
+}
+
 PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {
 	return isValid() ? mpTrimesh.get() : nullptr;
 }

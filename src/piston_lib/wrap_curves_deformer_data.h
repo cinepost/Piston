@@ -42,7 +42,7 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
 
-		WrapCurvesDeformerData(): mIsValid(false) {};
+		WrapCurvesDeformerData();
 
 	protected:
 		virtual bool dumpToJSON(json& j) const override;
