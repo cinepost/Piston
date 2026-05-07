@@ -31,6 +31,19 @@ _piston.DeformerFactory.getInstance()
 # Additional module unctions
 #
 
+def setDataInstancingState(state):
+	_piston.DeformerFactory.setDataInstancingState(state)
+
+def getDataInstancingState():
+	return _piston.DeformerFactory.getDataInstancingState()
+
+def setPointsCacheUsageState(state):
+	_piston.DeformerFactory.setPointsCacheUsageState(state)
+
+def getPointsCacheUsageState():
+	return _piston.DeformerFactory.getPointsCacheUsageState()
+
+
 # Clear all module data
 def clearAll(stage = None):
 

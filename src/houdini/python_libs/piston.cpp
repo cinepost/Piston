@@ -91,8 +91,17 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
 		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
 		.def("getGuidesDeformer", &CurvesDeformerFactory::getGuidesDeformer)
+
+		.def("setDataInstancingState", &CurvesDeformerFactory::setDataInstancingState)
+		.staticmethod("setDataInstancingState")
+		.def("getDataInstancingState", &CurvesDeformerFactory::getDataInstancingState)
+		.staticmethod("getDataInstancingState")
+
 		.def("setPointsCacheUsageState", &CurvesDeformerFactory::setPointsCacheUsageState)
+		.staticmethod("setPointsCacheUsageState")
 		.def("getPointsCacheUsageState", &CurvesDeformerFactory::getPointsCacheUsageState)
+		.staticmethod("getPointsCacheUsageState")
+
 		.def("__iter__", range(&CurvesDeformerFactory::begin, &CurvesDeformerFactory::end))
 		.def("deformers", &CurvesDeformerFactory::deformers, return_value_policy<reference_existing_object>())
 		.def("clear", &CurvesDeformerFactory::clear)

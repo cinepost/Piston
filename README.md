@@ -62,7 +62,7 @@ Initializes the default state of the interactive points cache when the `piston` 
 
 *   **Supported Values:** `ON`/`OFF`, `TRUE`/`FALSE`, or `1`/`0`.
 *   **Behavior:** This variable is **case-insensitive** (e.g., `off`, `Off`, and `OFF` are all valid).
-*   **Usage:** Setting this to `OFF` or `0` will disable defromers instancing globally.
+*   **Usage:** Setting this to `OFF` or `0` will disable defromers instancing by default.
     
 ---
 
