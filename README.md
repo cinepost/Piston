@@ -56,6 +56,13 @@ This environment variable determines how Piston stores data on a Pixar USD primi
 *   **Behavior:** This variable is **case-insensitive**. 
     *   Setting this to `attribute` writes data as a standard USD attribute. 
     *   Setting this to `metadata` writes the data as custom metadata on the primitive.
+
+#### `PISTON_DATA_INSTANCING`
+Initializes the default state of the interactive points cache when the `piston` module is first loaded.
+
+*   **Supported Values:** `ON`/`OFF`, `TRUE`/`FALSE`, or `1`/`0`.
+*   **Behavior:** This variable is **case-insensitive** (e.g., `off`, `Off`, and `OFF` are all valid).
+*   **Usage:** Setting this to `OFF` or `0` will disable defromers instancing globally.
     
 ---
 
