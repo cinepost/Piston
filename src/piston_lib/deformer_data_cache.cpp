@@ -24,10 +24,10 @@ DeformerDataCache& DeformerDataCache::getInstance() {
     return *mInstancePtr;
 }
 
-DeformerDataCache::Key::Key(const std::type_index& _type_idx, const UsdPrimHandle& handle): type_idx(_type_idx) {
+DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const UsdPrimHandle& handle): type_idx(_type_idx) {
 	const auto path(handle.getPath());
 	assert(path.IsAbsolutePath());
-	ordered_paths.emplace_back(std::move(path));
+	paths.emplace_back(std::move(path));
 	const auto& topology = handle.getTopology();
 	topologies_hash_sum = topology.topology_hash;
 
@@ -35,11 +35,11 @@ DeformerDataCache::Key::Key(const std::type_index& _type_idx, const UsdPrimHandl
 	topology_indices.push_back(cache.getTopologyIndexFromPool(topology));
 }
 
-DeformerDataCache::Key::Key(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles):type_idx(_type_idx) {
+DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles):type_idx(_type_idx) {
 	assert(!handles.empty());
 	
 	const size_t handles_count = handles.size();
-	ordered_paths.resize(handles_count);
+	paths.resize(handles_count);
 	topology_indices.resize(handles_count);
 
 	static auto& cache = DeformerDataCache::getInstance();
@@ -49,13 +49,12 @@ DeformerDataCache::Key::Key(const std::type_index& _type_idx, const std::vector<
 		assert(pHandle);
 		const auto path(pHandle->getPath());
 		assert(path.IsAbsolutePath());
-		ordered_paths[i] = std::move(path);
+		paths[i] = std::move(path);
 		const auto& topology = pHandle->getTopology();
 		topologies_hash_sum += topology.topology_hash;
 		topology_indices.push_back(cache.getTopologyIndexFromPool(topology));
 	}
 
-	std::sort(ordered_paths.begin(), ordered_paths.end());
 }
 
 template< class T>
@@ -71,31 +70,37 @@ std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* 
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
 	assert(pDeformer);
-	if(mUseDataInstancing && pDeformer->getInstancingState()) {
-		for(const auto* pHandle: handles) {
-			assert(pHandle);
-			if(!pHandle->getPath().IsAbsolutePath()) {
-				std::cerr << "Invalid handle path: " << pHandle->getPath() << "! DeformerDataCache relative keys are not supported !" << std::endl;
-				return nullptr;
-			}
+
+	for(const auto* pHandle: handles) {
+		assert(pHandle);
+		if(!pHandle->getPath().IsAbsolutePath()) {
+			LOG_ERR << "Invalid handle path: " << pHandle->getPath() << "! DeformerDataCache relative keys are not supported !";
+			return nullptr;
 		}
-
-		const DeformerDataCache::Key key(std::type_index(typeid(T)), handles);
-		const std::lock_guard<std::mutex> lock(mMutex);
-
-		auto it = mDataMap.find(key);
-		if (it != mDataMap.end()) {
-			LOG_TRC << "Data " << typeid(T).name() << " found in cache";
-			return std::dynamic_pointer_cast<T>(it->second);
-		}
-
-		LOG_TRC << "Data " << typeid(T).name() << " placed in cache";
-		auto result = mDataMap.emplace(key, std::make_shared<T>());
-		created = true;
-		return std::dynamic_pointer_cast<T>(result.first->second);
-	} else {
-		return std::dynamic_pointer_cast<T>(std::make_shared<T>());
 	}
+
+	created = false;
+	const std::lock_guard<std::mutex> lock(mMutex);
+	MapType::iterator it = mDataMap.end();
+	KeyVariant key;
+
+	if(mUseDataInstancing && pDeformer->getInstancingState()) {
+		key = Key(std::type_index(typeid(T)), handles);
+		it = mDataMap.find(key);
+	} else {
+		key = KeyStrict(std::type_index(typeid(T)), handles);
+		it = mDataMap.find(key);
+	}
+
+	if (it != mDataMap.end()) {
+		LOG_TRC << "Data " << typeid(T).name() << " found in cache";
+		return std::dynamic_pointer_cast<T>(it->second);
+	}
+
+	LOG_TRC << "Data " << typeid(T).name() << " placed in cache";
+	auto result = mDataMap.emplace(key, std::make_shared<T>());
+	created = true;
+	return std::dynamic_pointer_cast<T>(result.first->second);
 }
 
 void DeformerDataCache::clear() {
@@ -115,10 +120,9 @@ void DeformerDataCache::invalidate(const UsdPrimHandle& handle) {
 
 template< class T>
 void DeformerDataCache::invalidate(const std::vector<const UsdPrimHandle*>& handles) {
-	const DeformerDataCache::Key key(std::type_index(typeid(T)), handles);
+	const DeformerDataCache::KeyStrict key(std::type_index(typeid(T)), handles);
 
 	const std::lock_guard<std::mutex> lock(mMutex);
-	const std::lock_guard<std::mutex> topo_lock(mTopologyPoolMutex);
 
 	auto it = mDataMap.find(key);
 	if (it != mDataMap.end()) {
@@ -129,8 +133,25 @@ void DeformerDataCache::invalidate(const std::vector<const UsdPrimHandle*>& hand
 
 template< class T>
 void DeformerDataCache::invalidate(const std::shared_ptr<T>& pData) {
-	if(!pData || !pData->isValid()) return;
-	LOG_DBG << "Invalidate " << pData->typeName();
+	if(!pData) return;
+
+	const std::lock_guard<std::mutex> lock(mMutex);
+	for (auto it = mDataMap.begin(); it != mDataMap.end(); ++it) {
+		if (it->second == pData) {
+			it->second->clear();
+		}
+	}
+}
+
+void DeformerDataCache::cleanup() {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	for (auto it = mDataMap.begin(); it != mDataMap.end(); ) {
+		if (it->second.use_count() == 1) {
+			mDataMap.erase(it);
+		} else {
+			++it;
+		} 
+	}
 }
 
 DeformerDataCache::~DeformerDataCache() { }

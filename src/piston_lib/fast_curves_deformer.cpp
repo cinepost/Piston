@@ -186,8 +186,6 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 }
 
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	PROFILE("FastCurvesDeformer::buildDeformerDataImpl");
-
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
 	}

@@ -72,6 +72,9 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 		return false;
 	}
 	
+	assert(mpAdjacencyData);
+	assert(mpPhantomTrimeshData);
+
 	return true;
 }
 

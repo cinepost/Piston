@@ -495,8 +495,6 @@ bool GuideCurvesDeformer::guideIndicesNeeded() const {
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	PROFILE("GuideCurvesDeformer::buildDeformerDataImpl");
-
 	if(!mpGuideCurvesContainer) {
 		mpGuideCurvesContainer = GuideCurvesContainer::create();
 	}

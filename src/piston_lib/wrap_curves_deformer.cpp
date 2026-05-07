@@ -175,8 +175,6 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 }
 
 bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	PROFILE("WrapCurvesDeformer::buildDeformerDataImpl");
-
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
 	}

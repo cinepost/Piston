@@ -238,7 +238,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 
 	{
 		const std::string entry_name_str = toString() + ":" + getName() + ":buildDeformerData";
-		Piston::SimpleProfiler(entry_name_str.c_str());
+		PROFILE(entry_name_str.c_str());
 
 		if(!buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 			DLOG_ERR << "Error building " << mName <<" deformer data !";
