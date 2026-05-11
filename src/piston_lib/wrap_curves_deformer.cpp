@@ -62,6 +62,8 @@ bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(mpAdjacencyData);
 	assert(mpDeformerMeshContainer);
 
+	mpDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code);
+
 	buildVertexNormals(mpAdjacencyData->getAdjacency(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
 
 	bool result = false;

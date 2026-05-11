@@ -399,9 +399,19 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 
 			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mDeformerGeoPrimHandle.getStageTimeCodesPerSecond());
 
-			for(size_t i = 0; i < tmp_velicities_list_ptr->size(); ++i) {
-				(*tmp_velicities_list_ptr)[i] = (p_pts_to_ptr[i] - p_pts_from_ptr[i]) * k;
+			auto calcVectorsFunc = [&](const std::size_t start, const std::size_t end) {
+				for(size_t i = start; i < end; ++i) {
+					(*tmp_velicities_list_ptr)[i] = (p_pts_to_ptr[i] - p_pts_from_ptr[i]) * k;
+				}
+			};
+
+			if(multi_threaded) {
+				mPool.detach_blocks(0u, tmp_velicities_list_ptr->size(), calcVectorsFunc);
+				mPool.wait();
+			} else {
+				calcVectorsFunc(0u, tmp_velicities_list_ptr->size());
 			}
+
 			veolcities_list_ptr = (const PointsList*)tmp_velicities_list_ptr;
 		}
 

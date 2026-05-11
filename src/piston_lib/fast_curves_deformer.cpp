@@ -71,6 +71,8 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 
 	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 
+	pDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code);
+
 	const bool build_live = true; // build using live data
 	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
 	const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
