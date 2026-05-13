@@ -22,7 +22,7 @@ PhantomTrimesh::UniquePtr PhantomTrimesh::create() {
 	return std::make_unique<PhantomTrimesh>();
 }
 
-PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mValid(false) {
+PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mIsValid(false) {
 	static const size_t reserve_size = 1024;
 
 	mFaceMap.reserve(reserve_size);
@@ -31,7 +31,7 @@ PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mValid(false) {
 }
 
 bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
-	mValid = false;
+	mIsValid = false;
 
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
@@ -61,9 +61,7 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	}
 
 	mPointsCount = points.size();
-
-	mValid = true;
-	return mValid;
+	return true;
 }
 
 #ifdef USE_CGAL
@@ -158,7 +156,7 @@ uint32_t PhantomTrimesh::getPointConnectedTetrahedronIndex(size_t pt_index, size
 }
 
 void PhantomTrimesh::invalidate() {
-	mValid = false;
+	mIsValid = false;
 
 	// Tetrahedrons
 	mTetrahedronCounts.clear();
@@ -175,19 +173,21 @@ void PhantomTrimesh::invalidate() {
 	mTmpVertices.clear();
 }
 
+bool PhantomTrimesh::isValid() const { 
+	return mIsValid && !mFaces.empty(); 
+}
+
 uint32_t PhantomTrimesh::getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const {
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
 
 	{
-
 		std::scoped_lock lock(mFaceMapMutex);
 
 		auto it = mFaceMap.find(indices);
 		if(it != mFaceMap.end()) {
 			return static_cast<uint32_t>(it->second);
 		}
-
 	}
 
 	return kInvalidTriFaceID;
@@ -331,7 +331,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
 	mpTrimesh = std::make_unique<PhantomTrimesh>();
-	mpTrimesh->mValid = false;
+	mpTrimesh->mIsValid = false;
 
 	mpTrimesh->mFaces = j[kJFaces].template get<std::vector<PhantomTrimesh::TriFace>>();
 	mpTrimesh->mFaceMap = j[kJFaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
@@ -355,7 +355,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 		mpTrimesh->mTmpVertices.insert(vtx);
 	}
 
-	mpTrimesh->mValid = true;
+	mpTrimesh->mIsValid = true;
 
 	LOG_DBG << "PhantomTrimesh data read from json payload.";
 
@@ -368,18 +368,18 @@ void SerializablePhantomTrimesh::setValid(bool state) {
 	const std::lock_guard<std::mutex> lock(mMutex); 
 	const std::lock_guard<std::mutex> trimesh_facemap_lock(mpTrimesh->mFaceMapMutex);
 
-	if(mpTrimesh->mValid != state) {
+	if(mpTrimesh->mIsValid != state) {
 		// TODO: check if we need to update other states... Anyways this is kinda ugly
-		mpTrimesh->mValid = state;
+		mpTrimesh->mIsValid = state;
 	}
 }
 
 PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {
-	return isValid() ? mpTrimesh.get() : nullptr;
+	return mpTrimesh ? mpTrimesh.get() : nullptr;
 }
 
 const PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() const {
-	return isValid() ? mpTrimesh.get() : nullptr;
+	return mpTrimesh ? mpTrimesh.get() : nullptr;
 }
 
 const std::string& SerializablePhantomTrimesh::typeName() const {

@@ -33,10 +33,10 @@ class MeshContainer {
 		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
 		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions.AsConst(); }
 
-		const pxr::GfVec3f& getRestPointPosition(size_t i) const { assert(i < mUsdMeshRestPositions.size()); return mUsdMeshRestPositions.AsConst()[i]; }
-		const pxr::GfVec3f& getLivePointPosition(size_t i) const { assert(i < mUsdMeshLivePositions.size()); return mUsdMeshLivePositions.AsConst()[i]; }
+		const pxr::GfVec3f& getRestPointPosition(size_t i) const { assert(i < mUsdMeshRestPositions.AsConst().size()); return mUsdMeshRestPositions.AsConst()[i]; }
+		const pxr::GfVec3f& getLivePointPosition(size_t i) const { assert(i < mUsdMeshLivePositions.AsConst().size()); return mUsdMeshLivePositions.AsConst()[i]; }
 
-		size_t getPointsCount() const { return mUsdMeshRestPositions.size(); }
+		size_t getPointsCount() const { return mUsdMeshRestPositions.AsConst().size(); }
 
 		bool projectPoint(const pxr::GfVec3f& pt, const PhantomTrimesh::TriFace& face, float& u, float& v) const;
 		bool projectPoint(const pxr::GfVec3f& pt, const PhantomTrimesh::TriFace& face, float& u, float& v, float& dist) const;

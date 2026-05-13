@@ -135,7 +135,9 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 	auto face_normal_func = [&](const std::size_t start, const std::size_t end) {
 		const auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
 		for(uint32_t face_id = static_cast<uint32_t>(start); face_id < static_cast<uint32_t>(end); ++face_id) {
+			assert(face_id < face_flags.size());
 			if(is_set(face_flags[face_id], PhantomTrimesh::TriFace::Flags::Bound)) {
+				assert(face_id < mLiveTriFaceNormals.size());
 				mLiveTriFaceNormals[face_id] = pDeformerMeshContainer->getFaceLiveNormal(pPhantomTrimesh->getFace(face_id));
 			}
 		}
@@ -146,6 +148,7 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 			const auto& bind = pointBinds[i];
 			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
 
+			assert(bind.face_id < mLiveTriFaceNormals.size());
 			const pxr::GfVec3f& face_normal = mLiveTriFaceNormals[bind.face_id];
 			points[i] = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v) + (face_normal * bind.dist);
 		}
@@ -188,12 +191,12 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpWrapCurvesDeformerData) {
-		mpWrapCurvesDeformerData = dataCache.getOrCreateData<WrapCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, deformer_data_created);
+		mpWrapCurvesDeformerData = dataCache.getOrCreateData<WrapCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, deformer_data_created);
 		mpWrapCurvesDeformerData->setBindMode(mBindMode);
 	}
 
-	if(!mpWrapCurvesDeformerData->isValid()) {
-		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
+	if(deformer_data_created || !mpWrapCurvesDeformerData->isValid() || !mpPhantomTrimeshData->isValid()) {
+		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get())) {
 			// Build deformer data in place if no json data present or not needed
 
 			// First triangulate using simple "fan" triangulation
@@ -271,6 +274,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 
 			mpWrapCurvesDeformerData->setValid(true);
 		}
+		mpPhantomTrimeshData->setValid(mpWrapCurvesDeformerData->isValid());
 	}
 
 	return mpWrapCurvesDeformerData->isValid();

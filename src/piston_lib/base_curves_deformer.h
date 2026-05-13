@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "common.h"
+#include "points_list.h"
 #include "curves_container.h"
 #include "mesh_container.h"
 #include "deformer_stats.h"
@@ -166,7 +167,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		std::unique_ptr<PointsList> mpTempVelocitiesList;
 
 	protected:
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded = false) = 0;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) {};

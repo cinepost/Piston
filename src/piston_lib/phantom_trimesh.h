@@ -5,6 +5,7 @@
 #include "common.h"
 #include "kdtree.hpp"
 #include "serializable_data.h"
+#include "logging.h"
 
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/base/gf/matrix3f.h>
@@ -110,13 +111,18 @@ class PhantomTrimesh {
 		uint32_t getOrCreateFaceID(const std::array<PxrIndexType, 3>& a);
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
-		const TriFace& getFace(const uint32_t id) const { assert(id < mFaces.size()); return mFaces[id]; }
+		const TriFace& getFace(const uint32_t id) const { 
+			if(id >= mFaces.size() ) {
+				LOG_WRN << "PhantomTrimesh::getFace(" << id << ") while mFace.size() is " << mFaces.size();
+			} 
+			assert(id < mFaces.size()); return mFaces[id]; 
+		}
 		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 
 		const std::vector<PxrIndexType>& getVertices() const { return mVertices; }
 		size_t getVertexCount() const { return mVertices.size(); }
 
-		bool isValid() const { return mValid; }
+		bool isValid() const;
 		void invalidate();
 
 		bool buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions);
@@ -149,7 +155,7 @@ class PhantomTrimesh {
 		std::vector<PxrIndexType> 								mVertices;
 		std::unordered_set<PxrIndexType> 						mTmpVertices; // this is used only to insert unused vertices into mVertices
 
-		bool                                        			mValid;
+		bool                                        			mIsValid;
 
 		friend class SerializablePhantomTrimesh;
 };

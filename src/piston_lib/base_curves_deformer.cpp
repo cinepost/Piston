@@ -61,7 +61,7 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 	}
 
 	auto new_handle = UsdPrimHandle(prim);
-	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle) : false;
+	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle, getRestTimeCode()) : false;
 
 	mDeformerGeoPrimHandle = std::move(new_handle);
 	if(!same_topology) {
@@ -93,7 +93,7 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const BaseCurvesDeformer::SharedPtr&
 	}
 
 	auto new_handle = UsdPrimHandle(pDeformer);
-	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle) : false;
+	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle, getRestTimeCode()) : false;
 
 	mDeformerGeoPrimHandle = std::move(new_handle);
 	if(!same_topology) {
@@ -119,7 +119,7 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 	}
 
 	auto new_handle = UsdPrimHandle(prim);
-	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle, new_handle) : false;
+	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle, new_handle, getRestTimeCode()) : false;
 
 	mCurvesGeoPrimHandle = std::move(new_handle);
 	if(!same_topology) {
@@ -364,15 +364,15 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 	const PxrPointsLRUCache::CompositeKey curr_key = {uniqueName(), time_code};
 	PxrPointsLRUCache* pPointsLRUCache = mUsePointsCache ? CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr() : nullptr;
 
+	const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::LEADING) ? (time_code.GetValue() - 1.0) : time_code};
+	const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::TRAILING) ? (time_code.GetValue() + 1.0) : time_code};
+
 	PxrPointsLRUCacheShrinkLock cache_shrink_lock(pPointsLRUCache); // avoid cache shrinking during deformation stage
 	if(cache_shrink_lock.isValid()) DLOG_TRC << "pPointsLRUCache locked";
 
 	const PointsList* deformed_points_list_ptr = pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key) : getDeformedPoints(mpDeformedPointsList, multi_threaded, mpCurvesContainer.get(), time_code);
 
 	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	if(!curves.GetPointsAttr().Set(deformed_points_list_ptr->getVtArray(), time_code)) {
-		return false;
-	}
 
 	if(mCalcMotionVectors) {
 		const PxrPointsLRUCache::CompositeKey key_vel = {velocityKeyName(), time_code};
@@ -380,9 +380,6 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 
 		if(!veolcities_list_ptr) {
 			PointsList* tmp_velicities_list_ptr = pPointsLRUCache ? pPointsLRUCache->put(key_vel, mpCurvesContainer->getTotalVertexCount()) : getTempVelocitiesList(mpCurvesContainer->getTotalVertexCount());
-
-			const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::LEADING) ? (time_code.GetValue() - 1.0) : time_code};
-			const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::TRAILING) ? (time_code.GetValue() + 1.0) : time_code};
 
 			DLOG_DBG << "Motion blur: " <<  std::to_string(key_from.time.GetValue()) << " to " <<  std::to_string(key_to.time.GetValue());
 
@@ -427,6 +424,10 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded)
 		}
 	}
 
+	if(!curves.GetPointsAttr().Set(deformed_points_list_ptr->getVtArray(), time_code)) {
+		return false;
+	}
+
 	if(pPointsLRUCache) {
 		const std::string current_usage_str = pPointsLRUCache->getCacheUtilizationString();
 		if(gLRUCacheStatsLastUsageStr != current_usage_str) {
@@ -468,6 +469,8 @@ void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
 
 
 void BaseCurvesDeformer::makeDirty() {
+	if(mDirty) return;
+
 	DLOG_TRC << "BaseCurvesDeformer::makeDirty()";
 	mStats.clear();
 	mDirty = true;

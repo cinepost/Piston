@@ -35,38 +35,34 @@ class DeformerDataCache {
 			std::vector<size_t>			topology_indices;
 
 			KeyBase(): type_idx(typeid(KeyBase::empty_type)) {};
-			KeyBase(const std::type_index& _type_idx, const UsdPrimHandle& handle);
-			KeyBase(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles);
+			KeyBase(const std::type_index& _type_idx, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code);
+			KeyBase(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code);
 		};
 
 		struct KeyStrict: KeyBase {
 			KeyStrict(): KeyBase() {};
-			KeyStrict(const std::type_index& _type_idx, const UsdPrimHandle& handle): KeyBase(_type_idx, handle) {};
-			KeyStrict(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles): KeyBase(_type_idx, handles) {};
+			KeyStrict(const std::type_index& _type_idx, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handle, time_code) {};
+			KeyStrict(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handles, time_code) {};
 
 			bool operator==(const KeyStrict& other) const {
 				if(type_idx != other.type_idx || paths.size() != other.paths.size() || topologies_hash_sum != other.topologies_hash_sum) return false;
-
-				if(std::is_permutation(paths.begin(), paths.end(), other.paths.begin(), other.paths.end())) {
-					static const auto& cache = DeformerDataCache::getInstance();
-					return cache.topologiesAreEqual(topology_indices, other.topology_indices);
-				}
-				
-				return true;
+				static const auto& cache = DeformerDataCache::getInstance();
+				if(!cache.topologiesAreEqualStrict(topology_indices, other.topology_indices)) return false;
+				return paths == other.paths;
 			}
 		};
 
 		struct Key: public KeyBase {
 			Key(): KeyBase() {};
-			Key(const std::type_index& _type_idx, const UsdPrimHandle& handle): KeyBase(_type_idx, handle) {};
-			Key(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles): KeyBase(_type_idx, handles) {};
+			Key(const std::type_index& _type_idx, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handle, time_code) {};
+			Key(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handles, time_code) {};
 
 			bool operator==(const Key& other) const {
 				if(type_idx != other.type_idx || paths.size() != other.paths.size() || topologies_hash_sum != other.topologies_hash_sum) return false;
 
 				if(!std::is_permutation(paths.begin(), paths.end(), other.paths.begin(), other.paths.end())) {
 					static const auto& cache = DeformerDataCache::getInstance();
-					return cache.topologiesAreEqual(topology_indices, other.topology_indices);
+					return cache.topologiesAreEqualLoose(topology_indices, other.topology_indices);
 				}
 				
 				return true;
@@ -188,16 +184,16 @@ class DeformerDataCache {
 		static DeformerDataCache& getInstance();
 
 		template< class T>
-		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created);
+		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created);
 
 		template< class T>
-		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created);
+		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created);
 
 		template< class T>
-		void invalidate(const UsdPrimHandle& handle);
+		void invalidate(const UsdPrimHandle& handle, pxr::UsdTimeCode time_code);
 
 		template< class T>
-		void invalidate(const std::vector<const UsdPrimHandle*>& handles);
+		void invalidate(const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code);
 
 		// Remove data from cache completely
 		template< class T>
@@ -209,7 +205,26 @@ class DeformerDataCache {
 		void clear();
 
 	private:
-		bool topologiesAreEqual(const std::vector<size_t>& indices_l, const std::vector<size_t>& indices_r) const {
+		// Order independent topologies comparison
+		bool topologiesAreEqualLoose(const std::vector<size_t>& indices_l, const std::vector<size_t>& indices_r) const {
+			assert(indices_l.size() == indices_r.size());
+			if(indices_l.size() != indices_r.size()) return false;
+			
+			const std::lock_guard<std::mutex> lock(mTopologyPoolMutex);
+
+			std::multiset<Topology> msl;
+			std::multiset<Topology> msr;
+
+			for(size_t i = 0; i < indices_l.size(); ++i) {
+				msr.insert(mTopologyPool[indices_l[i]]);
+				msr.insert(mTopologyPool[indices_r[i]]);
+			}
+
+			return msl == msr;
+		}
+
+		// Order dependent topologies comparison
+		bool topologiesAreEqualStrict(const std::vector<size_t>& indices_l, const std::vector<size_t>& indices_r) const {
 			assert(indices_l.size() == indices_r.size());
 			if(indices_l.size() != indices_r.size()) return false;
 			
@@ -238,6 +253,8 @@ class DeformerDataCache {
 		}
 
 	private:
+		DeformerDataCache();
+
 		MapType mDataMap;
 		std::vector<Topology> mTopologyPool;
 
@@ -245,12 +262,12 @@ class DeformerDataCache {
 		static std::mutex mMutex;
 		static std::mutex mTopologyPoolMutex;
 
-		// Static pointer to the CurvesDeformerFactory instance
+		// Static pointer to the DeformerDataCache instance
 		static DeformerDataCache* mInstancePtr;
 
 		bool mUseDataInstancing = false;
 
-		DeformerDataCache();
+		friend class CurvesDeformerFactory;
 };
 
 } // namespace Piston

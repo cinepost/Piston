@@ -1,4 +1,5 @@
 #include "deformer_factory.h"
+#include "deformer_data_cache.h"
 #include "logging.h"
 
 #include <algorithm>

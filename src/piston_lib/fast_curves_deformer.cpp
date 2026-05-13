@@ -195,15 +195,15 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpFastCurvesDeformerData) {
-		mpFastCurvesDeformerData = dataCache.getOrCreateData<FastCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, deformer_data_created);
+		mpFastCurvesDeformerData = dataCache.getOrCreateData<FastCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, deformer_data_created);
 	}
 
 	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	
-	if(!mpFastCurvesDeformerData->isValid()) {
-		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
+	if(deformer_data_created || !mpFastCurvesDeformerData->isValid() || !mpPhantomTrimeshData->isValid()) {
+		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get())) {
 			// Build deformer data in place if no json data present or not needed
 
 			if(!buildCurvesBindingData(rest_time_code, multi_threaded)) {
@@ -497,6 +497,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			isBound = bindCurveToTriface(curve_index, face_id, bind, ignore_face_boundaries);
 		}
 
+		mpPhantomTrimeshData->setValid(isBound);
 		return isBound;
 	};
 
@@ -627,6 +628,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	DLOG_DBG << "KDtree bound curves count: " << size_t(kdtree_bound_curves_count.load());
 	DLOG_DBG << "Brute force bound curves count: " << size_t(bforce_bound_curves_count.load());
 
+	mpPhantomTrimeshData->setValid(true);
 	return true;
 }
 

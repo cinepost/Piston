@@ -121,22 +121,22 @@ pxr::GfVec3f MeshContainer::getPointPositionFromBarycentricTetrahedronLiveCoords
 }
 
 bool MeshContainer::projectPoint(const pxr::GfVec3f& pt, const PhantomTrimesh::TriFace& face, float& u, float& v) const {
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 	return rayTriangleIntersect(pt, -getFaceRestNormal(face), rest_positions[face.indices[0]], rest_positions[face.indices[1]], rest_positions[face.indices[2]], u, v);
 }
 
 bool MeshContainer::projectPoint(const pxr::GfVec3f& pt, const PhantomTrimesh::TriFace& face, float& u, float& v, float& dist) const {
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 	return rayTriangleIntersect(pt, -getFaceRestNormal(face), rest_positions[face.indices[0]], rest_positions[face.indices[1]], rest_positions[face.indices[2]], dist, u, v);
 }
 
 bool MeshContainer::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const PhantomTrimesh::TriFace& face, float& u, float& v) const {
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 	return rayTriangleIntersect(orig, dir, rest_positions[face.indices[0]], rest_positions[face.indices[1]], rest_positions[face.indices[2]], u, v);
 }
 
 bool MeshContainer::intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const PhantomTrimesh::TriFace& face, float& u, float& v, float& dist) const {
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 	return rayTriangleIntersect(orig, dir, rest_positions[face.indices[0]], rest_positions[face.indices[1]], rest_positions[face.indices[2]], dist, u, v);
 }
 
@@ -150,20 +150,20 @@ pxr::GfVec3f MeshContainer::getInterpolatedLivePosition(const PhantomTrimesh::Tr
 };
 
 pxr::GfVec3f MeshContainer::getInterpolatedRestPosition(const PhantomTrimesh::TriFace& face, const float u, const float v, const float w) const {
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 
 	return u * rest_positions[face.indices[1]] + v * rest_positions[face.indices[2]] + w * rest_positions[face.indices[0]];
 }
 
 pxr::GfVec3f MeshContainer::getInterpolatedLivePosition(const PhantomTrimesh::TriFace& face, const float u, const float v, const float w) const {
-	auto const& live_positions = mUsdMeshLivePositions.AsConst();
+	const auto& live_positions = mUsdMeshLivePositions.AsConst();
 
 	return u * live_positions[face.indices[1]] + v * live_positions[face.indices[2]] + w * live_positions[face.indices[0]];
 }
 
 pxr::GfVec3f MeshContainer::getFaceRestCentroid(const PhantomTrimesh::TriFace& face) const {
 	static constexpr float kInvThree = 1.f / 3.f;
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 
 	return (rest_positions[face.indices[0]] + rest_positions[face.indices[1]] + rest_positions[face.indices[2]]) * kInvThree;
 }
@@ -191,7 +191,7 @@ bool MeshContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode ti
 }
 
 const pxr::GfVec3f MeshContainer::getFaceRestNormal(const PhantomTrimesh::TriFace& face) const {
-	auto const& rest_positions = mUsdMeshRestPositions.AsConst();
+	const auto& rest_positions = mUsdMeshRestPositions.AsConst();
 
 	return pxr::GfGetNormalized(
 		pxr::GfCross(rest_positions[face.indices[1]] - rest_positions[face.indices[0]], rest_positions[face.indices[2]] - rest_positions[face.indices[0]])
@@ -199,7 +199,7 @@ const pxr::GfVec3f MeshContainer::getFaceRestNormal(const PhantomTrimesh::TriFac
 }
 
 pxr::GfVec3f MeshContainer::getFaceLiveNormal(const PhantomTrimesh::TriFace& face) const {
-	auto const& live_positions = mUsdMeshLivePositions.AsConst();
+	const auto& live_positions = mUsdMeshLivePositions.AsConst();
 
 	return pxr::GfGetNormalized(
 		pxr::GfCross(live_positions[face.indices[1]] - live_positions[face.indices[0]], live_positions[face.indices[2]] - live_positions[face.indices[0]])

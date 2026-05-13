@@ -15,13 +15,42 @@
 #include <stdio.h>
 #include <stdint.h>
 
-/*
-static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
-	pxr::Vt_ArrayForeignDataSource fd(nullptr, 1);
-	static const bool addRef = 1;
-	return {&fd, (uint8_t*)vec.data(), vec.size(), addRef};
+static auto compareVtArrays = [](const auto& a, const auto& b) {
+    if (a == b) return 0; // Optimization: COW check
+    return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end()) ? -1 : 1;
+};
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+bool operator<(const pxr::HdMeshTopology& lhs, const pxr::HdMeshTopology& rhs) {
+    if (lhs.GetScheme() != rhs.GetScheme()) return lhs.GetScheme() < rhs.GetScheme();
+    if (lhs.GetOrientation() != rhs.GetOrientation()) return lhs.GetOrientation() < rhs.GetOrientation();
+    if (lhs.GetRefineLevel() != rhs.GetRefineLevel()) return lhs.GetRefineLevel() < rhs.GetRefineLevel();
+
+    int res = ::compareVtArrays(lhs.GetFaceVertexCounts(), rhs.GetFaceVertexCounts());
+    if (res != 0) return res < 0;
+
+    res = ::compareVtArrays(lhs.GetFaceVertexIndices(), rhs.GetFaceVertexIndices());
+    if (res != 0) return res < 0;
+
+    return false;
 }
-*/	
+
+bool operator<(const HdBasisCurvesTopology& lhs, const HdBasisCurvesTopology& rhs) {
+    if (lhs.GetCurveType() != rhs.GetCurveType()) return lhs.GetCurveType() < rhs.GetCurveType();
+    if (lhs.GetCurveBasis() != rhs.GetCurveBasis())  return lhs.GetCurveBasis() < rhs.GetCurveBasis();
+    if (lhs.GetCurveWrap() != rhs.GetCurveWrap()) return lhs.GetCurveWrap() < rhs.GetCurveWrap();
+
+    int res = ::compareVtArrays(lhs.GetCurveVertexCounts(), rhs.GetCurveVertexCounts());
+    if (res != 0) return res < 0;
+
+    res = ::compareVtArrays(lhs.GetCurveIndices(), rhs.GetCurveIndices());
+    if (res != 0) return res < 0;
+
+    return false;
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE
 	
 namespace Piston {
 
@@ -456,33 +485,6 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	}
 
 	return true;
-}
-
-// PointsList
-
-PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), true) {
-	assert(size > 0);
-	calcSizeInBytes();
-}
-
-PointsList::PointsList(Piston::PointsList&& other): mPoints(std::move(other.mPoints)), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), false), mSizeInBytes(other.mSizeInBytes) {
-}
-
-void PointsList::resize(size_t new_size) {
-	if(size() == new_size) return;
-
-	mPoints.resize(new_size);
-	mVtArray.resize(new_size);
-	calcSizeInBytes();
-}
-
-void PointsList::fillWithZero() {
-	static const pxr::GfVec3f zero = {0.0, 0.0, 0.0};
-	std::fill(mPoints.begin(), mPoints.end(), zero);
-}
-
-void PointsList::calcSizeInBytes() const {
-	mSizeInBytes = mPoints.size() * sizeof(pxr::GfVec3f);
 }
 
 std::string bson_to_hex_string(const BSON& bson) {

@@ -24,18 +24,18 @@ DeformerDataCache& DeformerDataCache::getInstance() {
     return *mInstancePtr;
 }
 
-DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const UsdPrimHandle& handle): type_idx(_type_idx) {
+DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code): type_idx(_type_idx) {
 	const auto path(handle.getPath());
 	assert(path.IsAbsolutePath());
 	paths.emplace_back(std::move(path));
-	const auto& topology = handle.getTopology();
+	const auto& topology = handle.getTopology(time_code);
 	topologies_hash_sum = topology.topology_hash;
 
 	static auto& cache = DeformerDataCache::getInstance();
 	topology_indices.push_back(cache.getTopologyIndexFromPool(topology));
 }
 
-DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles):type_idx(_type_idx) {
+DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code):type_idx(_type_idx) {
 	assert(!handles.empty());
 	
 	const size_t handles_count = handles.size();
@@ -49,24 +49,34 @@ DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const std:
 		assert(pHandle);
 		const auto path(pHandle->getPath());
 		assert(path.IsAbsolutePath());
-		paths[i] = std::move(path);
-		const auto& topology = pHandle->getTopology();
-		topologies_hash_sum += topology.topology_hash;
-		topology_indices.push_back(cache.getTopologyIndexFromPool(topology));
+		paths[i] = std::move(path); 
 	}
 
+	// place topology hashes sorted by path
+	{
+		std::vector<const UsdPrimHandle*> vec(handles);
+		std::sort(vec.begin(), vec.end(), [](const UsdPrimHandle* a, const UsdPrimHandle* b) {
+       		return a->getPath() < b->getPath();
+    	});
+
+		for(const auto* pHandle: vec) {
+			const auto& topology = pHandle->getTopology(time_code);
+			topologies_hash_sum += topology.topology_hash;
+			topology_indices.push_back(cache.getTopologyIndexFromPool(topology));
+		}
+	}
 }
 
 template< class T>
-std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created) {
+std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created) {
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
 	const std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
-	return getOrCreateData<T>(pDeformer, handle_ptrs, created);
+	return getOrCreateData<T>(pDeformer, handle_ptrs, time_code, created);
 }
 
 template< class T>
-std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created) {
+std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created) {
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
 	assert(pDeformer);
@@ -85,10 +95,12 @@ std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* 
 	KeyVariant key;
 
 	if(mUseDataInstancing && pDeformer->getInstancingState()) {
-		key = Key(std::type_index(typeid(T)), handles);
+		key = Key(std::type_index(typeid(T)), handles, time_code);
+		LOG_TRC << "Getting " << typeid(T).name() << " using loose (topology similar) key with topologies_hash_sum " << std::get<Key>(key).topologies_hash_sum;
 		it = mDataMap.find(key);
 	} else {
-		key = KeyStrict(std::type_index(typeid(T)), handles);
+		key = KeyStrict(std::type_index(typeid(T)), handles, time_code);
+		LOG_TRC << "Getting " << typeid(T).name() << " using strict (prim exact paths) key with paths " << std::get<KeyStrict>(key).paths;
 		it = mDataMap.find(key);
 	}
 
@@ -104,23 +116,26 @@ std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* 
 }
 
 void DeformerDataCache::clear() {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	const std::lock_guard<std::mutex> topo_lock(mTopologyPoolMutex);
 	mDataMap.clear();
 	if(mDataMap.empty()) {
+
 		mTopologyPool.clear();
 	}
 }
 
 template< class T>
-void DeformerDataCache::invalidate(const UsdPrimHandle& handle) {
+void DeformerDataCache::invalidate(const UsdPrimHandle& handle, pxr::UsdTimeCode time_code) {
 	LOG_DBG << " DeformerDataCache::invalidate(...) " << handle;
 
 	const std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
-	invalidate<T>(handle_ptrs);
+	invalidate<T>(handle_ptrs, time_code);
 }
 
 template< class T>
-void DeformerDataCache::invalidate(const std::vector<const UsdPrimHandle*>& handles) {
-	const DeformerDataCache::KeyStrict key(std::type_index(typeid(T)), handles);
+void DeformerDataCache::invalidate(const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code) {
+	const DeformerDataCache::KeyStrict key(std::type_index(typeid(T)), handles, time_code);
 
 	const std::lock_guard<std::mutex> lock(mMutex);
 
@@ -162,10 +177,10 @@ DeformerDataCache::DeformerDataCache() {
 
 // Specialization Macro
 #define SPECIALIZE_TYPE_NAME(type) \
-template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, bool& created); \
-template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, bool& created); \
-template void DeformerDataCache::invalidate<type>(const UsdPrimHandle& handle); \
-template void DeformerDataCache::invalidate<type>(const std::vector<const UsdPrimHandle*>& handles); \
+template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created); \
+template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created); \
+template void DeformerDataCache::invalidate<type>(const UsdPrimHandle& handle, pxr::UsdTimeCode time_code); \
+template void DeformerDataCache::invalidate<type>(const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code); \
 template void DeformerDataCache::invalidate(const std::shared_ptr<type>& pData);
 
 SPECIALIZE_TYPE_NAME(SerializablePhantomTrimesh)

@@ -507,7 +507,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpGuideCurvesDeformerData) {
-		mpGuideCurvesDeformerData = dataCache.getOrCreateData<GuideCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, deformer_data_created);
+		mpGuideCurvesDeformerData = dataCache.getOrCreateData<GuideCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, deformer_data_created);
 		mpGuideCurvesDeformerData->setBindMode(mBindMode);
 	}
 
@@ -543,7 +543,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 			}
 
 			if(getBindRootsToSkinSurface()) {
-				if(!buildSkinPrimData(multi_threaded)) {
+				if(!buildSkinPrimData(multi_threaded, rest_time_code)) {
 					DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
 					return false;
 				}
@@ -577,7 +577,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool guides_trimesh_data_created;
 	if(!mpGuidesPhantomTrimeshData) {
-		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, guides_trimesh_data_created);
+		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, guides_trimesh_data_created);
 	}
 
 
@@ -945,7 +945,7 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	multi_threaded = false;
 
-	if(!buildSkinPrimData(multi_threaded)) {
+	if(!buildSkinPrimData(multi_threaded, rest_time_code)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
 		mpGuideCurvesDeformerData->setSkinPrimPath("");
 		DLOG_ERR << "Error building skin prim geometry data !";
@@ -1143,7 +1143,7 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
     return true;
 }
 
-bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
+bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCode rest_time_code) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
 	if(!mGuidesSkinGeoPrimHandle) {
@@ -1171,7 +1171,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	bool skin_adjacency_data_created;
 	if(!mpSkinAdjacencyData) {
-		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mGuidesSkinGeoPrimHandle, skin_adjacency_data_created);
+		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mGuidesSkinGeoPrimHandle, rest_time_code, skin_adjacency_data_created);
 		assert(mpSkinAdjacencyData);
 	}
 
@@ -1184,7 +1184,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	bool skin_trimesh_data_created;
 	if(!mpSkinPhantomTrimeshData) {
-		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, skin_trimesh_data_created);
+		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, skin_trimesh_data_created);
 		assert(mpSkinPhantomTrimeshData);
 	}
 

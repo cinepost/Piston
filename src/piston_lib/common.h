@@ -17,10 +17,17 @@
 #include <sstream>
 #include <iostream>
 #include <vector>
+#include <type_traits>
 
 
 using json = nlohmann::json;
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+bool operator<(const pxr::HdMeshTopology& lhs, const pxr::HdMeshTopology& rhs);
+bool operator<(const HdBasisCurvesTopology& lhs, const HdBasisCurvesTopology& rhs);
+
+PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace Piston {
 
@@ -39,12 +46,17 @@ struct Topology {
 		time_code = time;
 	}
 
+	bool operator<(const Topology& other) const {
+        return std::tie(topology_hash, topology_variant, time_code) <
+               std::tie(other.topology_hash, other.topology_variant, other.time_code);
+    }
+
 	bool operator==(const Topology& other) const {
-		return topology_hash == other.topology_hash && topology_variant == other.topology_variant;
+		return time_code == other.time_code && topology_hash == other.topology_hash && topology_variant == other.topology_variant;
 	}
 
 	bool operator!=(const Topology& other) const {
-		return topology_hash != other.topology_hash || !(topology_variant == other.topology_variant);
+		return time_code != other.time_code || topology_hash != other.topology_hash || !(topology_variant == other.topology_variant);
 	}
 };
 
@@ -108,8 +120,8 @@ class UsdPrimHandle {
 		double getStageFPS() const;
 		double getStageTimeCodesPerSecond() const;
 
-		const Topology& getTopology(pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
-		size_t getTopologyHash(pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+		const Topology& getTopology(pxr::UsdTimeCode time_code) const;
+		size_t getTopologyHash(pxr::UsdTimeCode time_code) const;
 
 		/* Invalidate handle */
 		void clear();
@@ -132,43 +144,25 @@ class UsdPrimHandle {
 
 };
 
-class PointsList {
-	public:
-		PointsList(size_t size);
-
-		PointsList(Piston::PointsList&& other);
-
-		size_t size() const { assert(mPoints.size() == mVtArray.size()); return mPoints.size(); }
-
-		pxr::GfVec3f& operator [](size_t idx) { return mPoints[idx]; }
-		const pxr::GfVec3f& operator [](size_t idx) const { return mPoints[idx]; }
-
-		pxr::GfVec3f* data() { return mPoints.data(); }
-		const pxr::GfVec3f* data() const { return mPoints.data(); }
-
-		std::vector<pxr::GfVec3f>& getVector() { return mPoints; }
-		const std::vector<pxr::GfVec3f>& getVector() const { return mPoints; }
-
-		const pxr::VtArray<pxr::GfVec3f>& getVtArray() const { return mVtArray; }
-
-		void resize(size_t new_size);
-
-		void fillWithZero();
-
-		size_t sizeInBytes() const { return mSizeInBytes; }
-
-	private:
-		std::vector<pxr::GfVec3f> 	mPoints;
-		pxr::VtArray<pxr::GfVec3f> 	mVtArray;
-		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
-
-		void calcSizeInBytes() const;
-
-		mutable size_t mSizeInBytes;
-};
-
 inline std::ostream& operator<<( std::ostream& os, const pxr::UsdPrim& prim ) {
 	os << prim.GetPath();
+	return os;
+}
+
+inline std::ostream& operator<<( std::ostream& os, const std::vector<pxr::SdfPath> paths) {
+	if(paths.empty()) return os;
+
+	size_t last_i = paths.size() - 1;
+	os << "{ ";
+	
+	size_t i = 0;
+	for(const auto& path: paths) {
+		os << path;
+		if (i++ != last_i) {
+            std::cout << ", ";
+        }
+	}
+	os << " }";
 	return os;
 }
 
