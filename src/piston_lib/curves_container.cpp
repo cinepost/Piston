@@ -1,10 +1,13 @@
 #include "curves_container.h"
+#include "logging.h"
 
+#include <omp.h>
+
+#include <limits>
 
 namespace Piston {
 
-
-PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0) {
+PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()) {
 
 }
 
@@ -13,18 +16,19 @@ PxrCurvesContainer::PxrCurvesContainer(PxrCurvesContainer& other) {
 	mCurveOffsets = other.mCurveOffsets;
 	mCurveRootPositions = other.mCurveRootPositions;
 	mCurveVectors = other.mCurveVectors;
+	mLastUpdateTimeCode = other.mLastUpdateTimeCode;
 }
 
 bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code) {
 	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
 	if(!geom_curves) {
-		std::cerr << "Error getting curves geometry from " << prim_handle.getName() << " !" << std::endl;
+		LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
 		return false;
 	}
 
 	mCurvesCount = geom_curves.GetCurveCount(rest_time_code);
 	if(mCurvesCount == 0) {
-		std::cerr << "No curves exist in primitive " << prim_handle.getName() << " !" << std::endl;
+		LOG_ERR << "No curves exist in primitive " << prim_handle.getName() << " !";
 		return false;
 	}
 
@@ -33,14 +37,14 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 
 	if(rest_attr_name.empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(rest_attr_name, curve_points, rest_time_code)) {
 		if(!prim_handle.getPoints(curve_points, rest_time_code)) {
-			std::cerr << "Error getting curves points from " << prim_handle.getName() << " !" << std::endl;
+			LOG_ERR << "Error getting curves points from " << prim_handle.getName() << " !";
 			return false;
 		}
 	}
 
 	// Curves. Counts/offsets
 	if(!geom_curves.GetCurveVertexCountsAttr().Get(&mCurveVertexCounts, rest_time_code)){
-		std::cerr << "Error getting curves vertices counts from " << prim_handle.getName() << "  !" << std::endl;
+		LOG_ERR << "Error getting curves vertices counts from " << prim_handle.getName() << "  !";
 		return false;
 	}
 
@@ -58,6 +62,8 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 	// Calc curves derivs
 	mCurveRootPositions.resize(mCurvesCount);
 	mCurveVectors.resize(total_vertex_count);
+
+	#pragma omp parallel for num_threads(2) schedule(static)
 	for(size_t i = 0; i < mCurvesCount; ++i) {
 		mCurveRootPositions[i] = curve_points[mCurveOffsets[i]];
 		
@@ -69,6 +75,50 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 	}
 
 	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
+
+	mLastUpdateTimeCode = rest_time_code;
+
+	return true;
+}
+
+bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) {
+	assert(prim_handle.isBasisCurvesGeoPrim());
+
+	if(!force) {
+		if(mLastUpdateTimeCode == time_code) return true;
+
+		if (!pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr().ValueMightBeTimeVarying()) return true;
+	}
+
+	// Curve live point positions
+	pxr::VtArray<pxr::GfVec3f> points;
+	if(!prim_handle.getPoints(points, time_code)) {
+		LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
+		return false;
+	}
+
+	assert(points.size() == getTotalVertexCount());
+
+	if(points.size() != getTotalVertexCount()) {
+		LOG_ERR << prim_handle.getPath() << " curve point positions count ( old " << getTotalVertexCount() << ", new " << points.size() << " ) mismatch !";
+		return false;
+	}
+
+	// Calc curves derivs
+	#pragma omp parallel for num_threads(2) schedule(static)
+	for(size_t i = 0; i < mCurvesCount; ++i) {
+		mCurveRootPositions[i] = points[mCurveOffsets[i]];
+		
+		mCurveVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
+
+		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
+			mCurveVectors[mCurveOffsets[i] + j] = points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
+		}
+	}
+
+	mLastUpdateTimeCode = time_code;
+
+	LOG_TRC << "PxrCurvesContainer updated at " << mLastUpdateTimeCode;
 
 	return true;
 }

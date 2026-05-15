@@ -81,9 +81,12 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
         }
     }
 
-    explicit KDTree(const pxr::VtArray<pxr::GfVec3f>& points, bool threaded = false) : KDTree(points, 0, points.size(), threaded) { }
+    template <typename T>
+    explicit KDTree(const T& points, bool threaded = false) : KDTree(points, 0, points.size(), threaded) { }
 
-    explicit KDTree(const pxr::VtArray<pxr::GfVec3f>& points, size_t start, size_t count, bool threaded = false) : root_(nullptr) {
+    template <typename T>
+    explicit KDTree(const T& points, size_t start, size_t count, bool threaded = false) : root_(nullptr) {
+        static_assert(std::is_same_v<T, std::vector<pxr::GfVec3f>> || std::is_same_v<T, pxr::VtArray<pxr::GfVec3f>>, "Only std::vector<pxr::GfVec3f> and pxr::VtArray<pxr::GfVec3f> types are permitted!");
         static_assert(number_of_dimensions == 3);
         static_assert(std::is_same<CoordinateType, float>::value);
         assert(start < points.size());

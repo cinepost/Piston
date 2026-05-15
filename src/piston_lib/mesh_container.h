@@ -19,56 +19,88 @@
 
 namespace Piston {
 
-class MeshContainer {
-	public:
-		using UniquePtr = std::unique_ptr<MeshContainer>;
+struct TemplatedMeshContainerBase {
+    using PointType = pxr::GfVec3f;
+};
 
-		MeshContainer();
+template <typename T>
+class TemplatedMeshContainer: public TemplatedMeshContainerBase {
+	public:
+		using UniquePtr = std::unique_ptr<TemplatedMeshContainer<T>>;
+		using ContainerType = T;
+
+		TemplatedMeshContainer();
+		TemplatedMeshContainer(const TemplatedMeshContainer<T>& other);
+		TemplatedMeshContainer(TemplatedMeshContainer<T>&& other);
+
+		bool operator==(const TemplatedMeshContainer<T>& other) const {
+			return mUsdMeshRestPositions == other.mUsdMeshRestPositions && mUsdMeshLivePositions == other.mUsdMeshLivePositions;
+		}
+
+		void makeUnique();
 
 	public:
-		static MeshContainer::UniquePtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		static UniquePtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		const pxr::VtArray<pxr::GfVec3f>& getRestPositions() const { return mUsdMeshRestPositions.AsConst(); }
-		const pxr::VtArray<pxr::GfVec3f>& getLivePositions() const { return mUsdMeshLivePositions.AsConst(); }
+		const T& getRestPositions() const {
+			if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
+				return mUsdMeshRestPositions.AsConst();
+			} else {
+				return mUsdMeshRestPositions;
+			}
+		}
+		
+		const T& getLivePositions() const { 
+			if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
+				return mUsdMeshLivePositions.AsConst(); 
+			} else {
+				return mUsdMeshLivePositions;
+			}
 
-		const pxr::GfVec3f& getRestPointPosition(size_t i) const { assert(i < mUsdMeshRestPositions.AsConst().size()); return mUsdMeshRestPositions.AsConst()[i]; }
-		const pxr::GfVec3f& getLivePointPosition(size_t i) const { assert(i < mUsdMeshLivePositions.AsConst().size()); return mUsdMeshLivePositions.AsConst()[i]; }
+		}
 
-		size_t getPointsCount() const { return mUsdMeshRestPositions.AsConst().size(); }
+		const PointType& getRestPointPosition(size_t i) const { assert(i < getRestPositions().size()); return getRestPositions()[i]; }
+		const PointType& getLivePointPosition(size_t i) const { assert(i < getLivePositions().size()); return getLivePositions()[i]; }
+
+		size_t getPointsCount() const { return getRestPositions().size(); }
 
 		bool projectPoint(const pxr::GfVec3f& pt, const PhantomTrimesh::TriFace& face, float& u, float& v) const;
 		bool projectPoint(const pxr::GfVec3f& pt, const PhantomTrimesh::TriFace& face, float& u, float& v, float& dist) const;
 		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const PhantomTrimesh::TriFace& face, float& u, float& v) const;
 		bool intersectRay(const pxr::GfVec3f& orig, const pxr::GfVec3f& dir, const PhantomTrimesh::TriFace& face, float& u, float& v, float& dist) const;
 
-		pxr::GfVec3f getInterpolatedRestPosition(const PhantomTrimesh::TriFace& face, const float u, const float v) const;
-		pxr::GfVec3f getInterpolatedLivePosition(const PhantomTrimesh::TriFace& face, const float u, const float v) const;
+		PointType getInterpolatedRestPosition(const PhantomTrimesh::TriFace& face, const float u, const float v) const;
+		PointType getInterpolatedLivePosition(const PhantomTrimesh::TriFace& face, const float u, const float v) const;
 
-		pxr::GfVec3f getInterpolatedRestPosition(const PhantomTrimesh::TriFace& face, const float u, const float v, const float w) const;
-		pxr::GfVec3f getInterpolatedLivePosition(const PhantomTrimesh::TriFace& face, const float u, const float v, const float w) const;
+		PointType getInterpolatedRestPosition(const PhantomTrimesh::TriFace& face, const float u, const float v, const float w) const;
+		PointType getInterpolatedLivePosition(const PhantomTrimesh::TriFace& face, const float u, const float v, const float w) const;
 
-		pxr::GfVec3f getFaceRestCentroid(const PhantomTrimesh::TriFace& face) const;
+		PointType getFaceRestCentroid(const PhantomTrimesh::TriFace& face) const;
 
-		const pxr::GfVec3f getFaceRestNormal(const PhantomTrimesh::TriFace& face) const;
-		pxr::GfVec3f getFaceLiveNormal(const PhantomTrimesh::TriFace& face) const;
+		const PointType getFaceRestNormal(const PhantomTrimesh::TriFace& face) const;
+		PointType getFaceLiveNormal(const PhantomTrimesh::TriFace& face) const;
 
-		pxr::GfVec3f getTetrahedronRestCentroid(const PhantomTrimesh::Tetrahedron& t) const;
+		PointType getTetrahedronRestCentroid(const PhantomTrimesh::Tetrahedron& t) const;
 		void barycentricTetrahedronRestCoords(const PhantomTrimesh::Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w, float& x) const;
 
 		void barycentricTetrahedronRestCoords(const PhantomTrimesh::Tetrahedron& t, const pxr::GfVec3f& p, float& u, float& v, float& w) const;
 
-		pxr::GfVec3f getPointPositionFromBarycentricTetrahedronLiveCoords(const PhantomTrimesh::Tetrahedron& t, float u, float v, float w, float x) const;
+		PointType getPointPositionFromBarycentricTetrahedronLiveCoords(const PhantomTrimesh::Tetrahedron& t, float u, float v, float w, float x) const;
 
-		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const;
+		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) const;
+
+		pxr::UsdTimeCode getLastUpdateTimeCode() const { return mLastUpdateTimeCode; }
 		
 	private:
 		mutable pxr::UsdTimeCode mLastUpdateTimeCode;
 
-		pxr::VtArray<pxr::GfVec3f> 								mUsdMeshRestPositions;
-		mutable pxr::VtArray<pxr::GfVec3f> 						mUsdMeshLivePositions;
+		T 			mUsdMeshRestPositions;
+		mutable T 	mUsdMeshLivePositions;
 };
+
+using MeshContainer = TemplatedMeshContainer<pxr::VtArray<TemplatedMeshContainerBase::PointType>>;
 
 } // namespace Piston
 

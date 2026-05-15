@@ -125,7 +125,9 @@ class PhantomTrimesh {
 		bool isValid() const;
 		void invalidate();
 
-		bool buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions);
+		template <typename T>
+		bool buildTetrahedrons(const T& positions);
+
 		bool hasTetrahedrons() const { return !mTetrahedrons.empty() && (mTetrahedronCounts.size() == mTetrahedronOffsets.size() == mPointsCount); }
 		const std::vector<Tetrahedron>& getTetrahedrons() const { return mTetrahedrons; }
 		const Tetrahedron& getTetrahedron(size_t i) const { assert(i < mTetrahedrons.size()); return mTetrahedrons[i]; }

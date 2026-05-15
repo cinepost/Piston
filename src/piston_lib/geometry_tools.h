@@ -193,7 +193,8 @@ bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const p
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &u, float &v);
 bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &dist, float &u, float &v);
 
-void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const pxr::VtArray<pxr::GfVec3f>& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
+template <typename T>
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const T& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 
 void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame> v);
 void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curve_points_count, const pxr::GfVec3f& root_tangent, const pxr::GfVec3f& root_up_vector, std::vector<NTBFrame>::iterator it_begin, std::vector<NTBFrame>::iterator it_end);

@@ -105,8 +105,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		 * @return something
 		 *
 		 */	
-		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
-		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
+		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
 
 		const std::string& getName() const { return mName; }
 
@@ -136,6 +136,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		void makeDirty();
 		void clearLRUCaches();
+
+		bool isDirty() const { return mDirty; }
 
 	protected:
 		bool mUsePointsCache = true;
@@ -171,6 +173,10 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) {};
+
+		bool canProduceOutputTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
+			return mDeformerGeoPrimHandle.hasPositionsTimeSamples(time_from, time_to);
+		}
 
 	private:
 		bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);

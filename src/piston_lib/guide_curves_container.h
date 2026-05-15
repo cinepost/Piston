@@ -21,7 +21,7 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode reference_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt = nullptr, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt = nullptr);
 
-		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code);
+		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force);
 
 		size_t getCurvesCount() const { return mCurvesCount; }
 		const pxr::VtArray<int>& getCurveVertexCounts() const { return mCurveVertexCounts.AsConst(); } 
@@ -49,6 +49,8 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 		pxr::VtArray<pxr::GfVec3f>              mLiveCurvePoints;
 		bool                                    mExternalRestPointDataSource = false;
 		bool                                    mExternalLivePointDataSource = false;
+
+		pxr::UsdTimeCode 						mLastUpdateTimeCode;
 };
 
 } // namespace Piston

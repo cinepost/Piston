@@ -12,8 +12,6 @@
 
 namespace Piston {
 
-static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
-
 DeformerDataCache& DeformerDataCache::getInstance() {
     if (mInstancePtr == nullptr) {
         std::lock_guard<std::mutex> lock(mMutex);

@@ -220,7 +220,7 @@ CurvesDeformerFactory::CurvesDeformerFactory(): mDataToPrimStorageMethod(sDefaul
 	std::string tpose_default_frame_string;
 	if(getEnvVar("PISTON_DEFAULT_TPOSE_FRAME", tpose_default_frame_string)) {
 		try {
-        	float d = std::stod(tpose_default_frame_string	);
+        	const double d = std::stod(tpose_default_frame_string	);
         	mDefaultRestTimeCode = d;
 		} catch (const std::invalid_argument& e) {
         	LOG_ERR << "Invalid \"PISTON_DEFAULT_TPOSE_FRAME\" environment variable: " << e.what();

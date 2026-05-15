@@ -9,6 +9,7 @@
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
+#include <pxr/usd/usd/attributeQuery.h>
 #include <pxr/imaging/hd/meshTopology.h>
 #include <pxr/imaging/hd/basisCurvesTopology.h>
 
@@ -107,13 +108,15 @@ class UsdPrimHandle {
 		bool setBsonToPrim(const pxr::SdfPath& prim_path, const std::string& identifier, const BSON& v_bson) const;
 		void clearPrimBson(const pxr::SdfPath& prim_path, const std::string& identifier) const;
 
-		template<typename T>
-		bool fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+		bool hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const;
 
 		template<typename T>
-		bool fetchAttributeValues(const std::string& attribute_name, std::vector<T>& vec, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+		bool fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code) const;
 
-		bool getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+		template<typename T>
+		bool fetchAttributeValues(const std::string& attribute_name, std::vector<T>& vec, pxr::UsdTimeCode time_code) const;
+
+		bool getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code) const;
 
 		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
 
@@ -135,7 +138,7 @@ class UsdPrimHandle {
   		}
 
   	private:
-  		bool prepareDataIfNeeded(pxr::UsdTimeCode time_code=pxr::UsdTimeCode::Default()) const;
+  		bool prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const;
 
 	private:
 		pxr::UsdPrim     mPrim;

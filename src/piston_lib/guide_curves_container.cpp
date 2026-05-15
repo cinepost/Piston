@@ -1,10 +1,12 @@
 #include "guide_curves_container.h"
 #include "logging.h"
 
+#include <limits>
+
 
 namespace Piston {
 
-GuideCurvesContainer::GuideCurvesContainer(): mCurvesCount(0), mExternalRestPointDataSource(false), mExternalLivePointDataSource(false) {
+GuideCurvesContainer::GuideCurvesContainer(): mCurvesCount(0), mExternalRestPointDataSource(false), mExternalLivePointDataSource(false), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()) {
 	mCurveOffsets.reserve(1024);
 }
 
@@ -52,6 +54,8 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::str
 	if(pLivePointsDataExt) {
 		mLiveCurvePoints = *pLivePointsDataExt;
 		mExternalLivePointDataSource = true;
+	} else {
+		mLiveCurvePoints = mRestCurvePoints;
 	}
 
 	// Calc offsets
@@ -63,13 +67,21 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::str
 	}
 
 	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
-
+	mLastUpdateTimeCode = rest_time_code;
 	return true;
 }
 
-bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
+bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) {
 	assert(!mExternalLivePointDataSource);
 	assert(prim_handle.isBasisCurvesGeoPrim());
+
+	if(!force) {
+		if(mLastUpdateTimeCode == time_code) return true;
+		
+		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
+		auto attr = mesh.GetPointsAttr();
+		if (!attr.ValueMightBeTimeVarying()) return true;
+	}
 
 	// Curve live point positions
 	if(!prim_handle.getPoints(mLiveCurvePoints, time_code)) {
@@ -77,23 +89,12 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
 		return false;
 	}
 
-	// Curve live points
-
-	//auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
-	//if(!geom_curves) {
-	//	LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
-	//	return false;
-	//}
-
-	//if(!geom_curves.GetPointsAttr().Get(&mLiveCurvePoints, time_code)) {
-	//	LOG_ERR << "Error getting curves points from " << prim_handle.getName() << " !";
-	//	return false;
-	//}
-
 	if(mLiveCurvePoints.size() != mRestCurvePoints.size()) {
-		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" mesh point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !";
+		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" curves point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !";
 		return false;
 	}
+
+	mLastUpdateTimeCode = time_code;
 	return true;
 }
 

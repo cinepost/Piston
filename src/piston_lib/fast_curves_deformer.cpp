@@ -71,11 +71,9 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 
 	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 
-	pDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code);
-
 	const bool build_live = true; // build using live data
 	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
-	const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
+	const MeshContainer::ContainerType& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
 
 	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
 	calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
@@ -143,7 +141,7 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 	if(mpDebugGeo) {
 		mpDebugGeo->clear();
 
-		const pxr::VtArray<pxr::GfVec3f>& positions = pDeformerMeshContainer->getLivePositions();
+		const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
 
 		for(const auto face: pPhantomTrimesh->getFaces()) {
 			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]);
@@ -444,7 +442,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
-	const pxr::VtArray<pxr::GfVec3f>& rest_positions = pDeformerMeshContainer->getRestPositions();
+	const MeshContainer::ContainerType& rest_positions = pDeformerMeshContainer->getRestPositions();
 
 	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_face_boundaries) {
 		bool isBound = false;

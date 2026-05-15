@@ -66,7 +66,9 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 
 #ifdef USE_CGAL
 
-bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions) {
+template <typename T>
+bool PhantomTrimesh::buildTetrahedrons(const T& positions) {
+	static_assert(std::is_same_v<T, std::vector<pxr::GfVec3f>> || std::is_same_v<T, pxr::VtArray<pxr::GfVec3f>>, "Only std::vector<pxr::GfVec3f> and pxr::VtArray<pxr::GfVec3f> types are permitted!"); 
 	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
 	using Vb =  CGAL::Triangulation_vertex_base_with_info_3<uint32_t, Kernel>;
 	using Tds = CGAL::Triangulation_data_structure_3<Vb>;
@@ -92,15 +94,15 @@ bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positio
   		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
   	}
 
-	Triangulation T(points.begin(), points.end());
+	Triangulation TR(points.begin(), points.end());
 
-	LOG_TRC << "T number of cells: " << (size_t)T.number_of_cells();
-	LOG_TRC << "T number of finite cells: " << (size_t)T.number_of_finite_cells();
+	LOG_TRC << "T number of cells: " << (size_t)TR.number_of_cells();
+	LOG_TRC << "T number of finite cells: " << (size_t)TR.number_of_finite_cells();
 
-	mTetrahedrons.resize(T.number_of_finite_cells());
+	mTetrahedrons.resize(TR.number_of_finite_cells());
 
 	size_t i = 0;
-	for(const CGAL_CellHandle& cell_handle: T.finite_cell_handles()) {
+	for(const CGAL_CellHandle& cell_handle: TR.finite_cell_handles()) {
 		mTetrahedrons[i].indices[0] = cell_handle->vertex(0)->info();
 		mTetrahedrons[i].indices[1] = cell_handle->vertex(1)->info();
 		mTetrahedrons[i].indices[2] = cell_handle->vertex(2)->info();
@@ -142,7 +144,8 @@ bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positio
 
 #else  // no USE_CGAL
 
-bool PhantomTrimesh::buildTetrahedrons() {
+template <typename T>
+bool PhantomTrimesh::buildTetrahedrons(const T& positions) {
 	LOG_ERR << "PhantomTrimesh::buildTetrahedrons() NOT IMPLEMENTED !!!";
 	return false;
 }
@@ -395,5 +398,8 @@ const std::string& SerializablePhantomTrimesh::jsonDataKey() const {
 const SerializableDeformerDataBase::DataVersion& SerializablePhantomTrimesh::jsonDataVersion() const {
 	return kTrimeshDataVersion;
 }
+
+template bool PhantomTrimesh::buildTetrahedrons(const std::vector<pxr::GfVec3f>& positions);
+template bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions);
 
 } // namespace Piston

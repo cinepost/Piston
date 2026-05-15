@@ -191,8 +191,8 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 	return getStage()->GetTimeCodesPerSecond();
 }
 
-bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code) const {
-	if(mpDeformer && !mpDeformer->deform(time_code)) {
+bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {
+	if(mpDeformer && !mpDeformer->deform(time_code, multi_threaded, true /* ignore velocities */)) {
 		LOG_FTL << "Unable to execute " << mpDeformer->getName() << ".deform(...) for " << getPath() << " !!!";
 		return false;
 	}
@@ -218,9 +218,7 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr:
 		return false;
 	}
 
-	array.clear();
-
-	if(!prepareDataIfNeeded(time_code)) return false;
+	if(!prepareDataIfNeeded(time_code, true /* use threads */)) return false;
 
 	if(!primVar.GetAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting " << getPath() << " \"" << attribute_name << "\" values !";
@@ -252,15 +250,13 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std:
 }
 
 bool UsdPrimHandle::getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code) const {
-	const auto& prim = getPrim();
-
-	auto geom = pxr::UsdGeomPointBased(prim);
+	auto geom = pxr::UsdGeomPointBased(getPrim());
 	if(!geom) {
 		LOG_ERR << "Error getting point based geometry from " << getPath() << " !";
 		return false;
 	}
 
-	if(!prepareDataIfNeeded(time_code)) return false;
+	if(!prepareDataIfNeeded(time_code, true /* use threads */)) return false;
 
 	if(!geom.GetPointsAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting points from " << getPath() << " !";
@@ -468,6 +464,22 @@ bool UsdPrimHandle::setBsonToPrim(const pxr::SdfPath& prim_path, const std::stri
 	}
 	return true;
 }
+
+bool UsdPrimHandle::hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
+	if(mpDeformer) return mpDeformer->canProduceOutputTimeSamples(time_from, time_to);
+
+	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
+	if (!attrQuery.ValueMightBeTimeVarying()) return false;
+
+	auto _hasTimeSample = [&attrQuery](double time) {
+		double lower, upper;
+		bool hasSamples;
+		attrQuery.GetBracketingTimeSamples(time, &lower, &upper, &hasSamples);
+		return hasSamples && lower == upper;
+	};
+
+	return _hasTimeSample(time_from.GetValue()) && _hasTimeSample(time_to.GetValue());
+};
 
 bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	const pxr::UsdPrim& _prim = getPrim();
