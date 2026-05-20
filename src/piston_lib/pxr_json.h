@@ -9,6 +9,7 @@
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/array.h>
+#include <pxr/base/gf/matrix3f.h>
 
 #include <nlohmann/json.hpp>
 
@@ -16,6 +17,12 @@
 using json = nlohmann::json;
 
 namespace Piston {
+
+void to_json(json& j, const pxr::GfVec3f& p);
+void from_json(const json& j, pxr::GfVec3f& p);
+
+void to_json(json& j, const std::vector<pxr::GfMatrix3f>& vec);
+void from_json(const json& j, std::vector<pxr::GfMatrix3f>& vec);
 
 void to_json(json& j, const std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& vec);
 void from_json(const json& j, std::vector<std::pair<pxr::GfVec3f,pxr::GfVec3f>>& vec);
@@ -25,9 +32,6 @@ void from_json(const json& j, std::vector<pxr::GfVec3f>& vec);
 
 void to_json(json& j, const pxr::VtArray<pxr::GfVec3f>& vec);
 void from_json(const json& j, pxr::VtArray<pxr::GfVec3f>& vec);
-
-void to_json(json& j, const pxr::GfVec3f& p);
-void from_json(const json& j, pxr::GfVec3f& p);
 
 } // namespace Piston
 

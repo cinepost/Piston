@@ -4,5 +4,11 @@
 		{
 			"path": "."
 		}
-	]
+	],
+
+	"settings": {
+		"ai_assistant": {
+			"cache_prefix": "/mnt/misc_hdd/dev/Piston/.openai_cache/" // Or any unique path
+		}
+	}
 }

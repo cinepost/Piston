@@ -58,6 +58,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
 	if(!pPhantomTrimesh) {
+		DLOG_ERR << "No phantom trimesh!";
 		return false;
 	}
 
@@ -66,6 +67,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(pAdjacency);
 
 	if(!pAdjacency) {
+		DLOG_ERR << "No adjacency data!";
 		return false;
 	}
 
@@ -78,6 +80,11 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
 	calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
 	calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
+
+	if(mpCurvesContainer->isUpdated()) {
+		DLOG_TRC << "Curves updated. Transform to NTB.";
+		transformCurvesToNTB();
+	}
 
 	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
 
@@ -332,6 +339,7 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 	const auto& perBindRestNormals = mpFastCurvesDeformerData->getPerBindRestNormals();
 	const auto& perBindRestTBs = mpFastCurvesDeformerData->getPerBindRestTBs();
 
+	#pragma omp parallel for num_threads(2) schedule(static)
 	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
 		PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 		const auto& bind = curveBinds[curve_index];

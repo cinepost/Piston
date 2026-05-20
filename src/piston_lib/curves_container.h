@@ -45,6 +45,10 @@ class PxrCurvesContainer {
 
 		const pxr::GfVec3f& getCurveRootPoint(size_t curve_idx) const;
 
+		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints.AsConst(); }
+
+		bool      	isUpdated() const { return mUpdated; }
+
 	private:
 		PxrCurvesContainer();
 		PxrCurvesContainer(PxrCurvesContainer& other);
@@ -57,8 +61,10 @@ class PxrCurvesContainer {
 		pxr::VtArray<pxr::GfVec3f>              mCurveVectors;
 
 		pxr::VtArray<pxr::GfVec3f> 				mTempCurvePoints;
+		pxr::VtArray<pxr::GfVec3f>              mRestCurvePoints;
 
 		pxr::UsdTimeCode                        mLastUpdateTimeCode;
+		bool                                    mUpdated;
 };
 
 } // namespace Piston

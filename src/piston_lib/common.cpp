@@ -465,11 +465,16 @@ bool UsdPrimHandle::setBsonToPrim(const pxr::SdfPath& prim_path, const std::stri
 	return true;
 }
 
+bool UsdPrimHandle::positionsMightBeTimeVarying() const {
+	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
+	return attrQuery.ValueMightBeTimeVarying();
+}
+
 bool UsdPrimHandle::hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
 	if(mpDeformer) return mpDeformer->canProduceOutputTimeSamples(time_from, time_to);
 
 	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
-	if (!attrQuery.ValueMightBeTimeVarying()) return false;
+	if (!mightBeTimeVarying(attrQuery)) return false;
 
 	auto _hasTimeSample = [&attrQuery](double time) {
 		double lower, upper;

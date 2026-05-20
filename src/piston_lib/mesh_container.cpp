@@ -229,10 +229,7 @@ bool TemplatedMeshContainer<T>::update(const UsdPrimHandle& prim_handle, pxr::Us
 
 	if(!force) {
 		if(mLastUpdateTimeCode == time_code) return true;
-		
-		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
-		attr = mesh.GetPointsAttr();
-		if (!attr.ValueMightBeTimeVarying()) return true;
+		//if(!prim_handle.hasPositionsTimeSamples(mLastUpdateTimeCode, time_code)) return true;
 	}
 
 	if(!attr) attr = pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr();

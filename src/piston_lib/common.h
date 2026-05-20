@@ -108,6 +108,7 @@ class UsdPrimHandle {
 		bool setBsonToPrim(const pxr::SdfPath& prim_path, const std::string& identifier, const BSON& v_bson) const;
 		void clearPrimBson(const pxr::SdfPath& prim_path, const std::string& identifier) const;
 
+		bool positionsMightBeTimeVarying() const;
 		bool hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const;
 
 		template<typename T>
@@ -139,6 +140,7 @@ class UsdPrimHandle {
 
   	private:
   		bool prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const;
+  		bool mightBeTimeVarying(const pxr::UsdAttributeQuery& attrQuery) const { return attrQuery.ValueMightBeTimeVarying(); }
 
 	private:
 		pxr::UsdPrim     mPrim;

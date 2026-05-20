@@ -77,10 +77,7 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
 
 	if(!force) {
 		if(mLastUpdateTimeCode == time_code) return true;
-		
-		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
-		auto attr = mesh.GetPointsAttr();
-		if (!attr.ValueMightBeTimeVarying()) return true;
+		//if(!prim_handle.hasPositionsTimeSamples(mLastUpdateTimeCode, time_code)) return true;
 	}
 
 	// Curve live point positions

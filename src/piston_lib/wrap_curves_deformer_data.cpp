@@ -5,7 +5,7 @@
 
 namespace Piston {
 
-static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 0u);
+static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 1u);
 
 WrapCurvesDeformerData::WrapCurvesDeformerData(): mIsValid(false), mBindMode(WrapCurvesDeformerData::BindMode::DIST) {
 
@@ -24,6 +24,7 @@ size_t WrapCurvesDeformerData::calcHash() const {
 	for(const auto& bind: mPointBinds) {
 		hash += static_cast<size_t>(bind.face_id * (bind.u + bind.v + bind.dist));
 	}
+
 	hash += mPointBinds.size();
 
 	return hash;
@@ -57,7 +58,6 @@ bool WrapCurvesDeformerData::readFromJSON(const json& j) {
 	}
 
 	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
-
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		LOG_ERR << typeName() << " json data hash mismatch !";
 		return false;

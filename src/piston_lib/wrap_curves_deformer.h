@@ -53,10 +53,15 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		bool buildDeformerData_SpaceMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 
+		bool buildCurvesLocalAnimVectors(bool multi_threaded);
+
 		std::shared_ptr<WrapCurvesDeformerData> mpWrapCurvesDeformerData;
 
 		std::vector<pxr::GfVec3f> 				mLiveVertexNormals;
 		std::vector<pxr::GfVec3f> 				mLiveTriFaceNormals;
+
+		std::vector<pxr::GfMatrix3f>            mTmpFaceNTBMatrices;
+		std::vector<pxr::GfVec3f>               mTmpCurvesLocalAnimVectors;
 
 		BindMode                                mBindMode;
 };

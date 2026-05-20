@@ -9,9 +9,6 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/curves.h>
 
-#include <glm/vec3.hpp> // glm::vec3
-
-
 namespace Piston {
 
 class WrapCurvesDeformer;

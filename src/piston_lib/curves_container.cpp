@@ -7,7 +7,7 @@
 
 namespace Piston {
 
-PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()) {
+PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()), mUpdated(false) {
 
 }
 
@@ -32,11 +32,9 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 		return false;
 	}
 
-	// Curves. points
-	pxr::VtArray<pxr::GfVec3f> curve_points;
-
-	if(rest_attr_name.empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(rest_attr_name, curve_points, rest_time_code)) {
-		if(!prim_handle.getPoints(curve_points, rest_time_code)) {
+	// Get rest curve points
+	if(rest_attr_name.empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(rest_attr_name, mRestCurvePoints, rest_time_code)) {
+		if(!prim_handle.getPoints(mRestCurvePoints, rest_time_code)) {
 			LOG_ERR << "Error getting curves points from " << prim_handle.getName() << " !";
 			return false;
 		}
@@ -65,12 +63,12 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 
 	#pragma omp parallel for num_threads(2) schedule(static)
 	for(size_t i = 0; i < mCurvesCount; ++i) {
-		mCurveRootPositions[i] = curve_points[mCurveOffsets[i]];
+		mCurveRootPositions[i] = mRestCurvePoints[mCurveOffsets[i]];
 		
 		mCurveVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
 
 		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			mCurveVectors[mCurveOffsets[i] + j] = curve_points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
+			mCurveVectors[mCurveOffsets[i] + j] = mRestCurvePoints[mCurveOffsets[i] + j] - mCurveRootPositions[i];
 		}
 	}
 
@@ -84,10 +82,11 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) {
 	assert(prim_handle.isBasisCurvesGeoPrim());
 
+	mUpdated = false;
+
 	if(!force) {
 		if(mLastUpdateTimeCode == time_code) return true;
-
-		if (!pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr().ValueMightBeTimeVarying()) return true;
+		//if(!prim_handle.hasPositionsTimeSamples(mLastUpdateTimeCode, time_code)) return true;
 	}
 
 	// Curve live point positions
@@ -106,20 +105,21 @@ bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 
 	// Calc curves derivs
 	#pragma omp parallel for num_threads(2) schedule(static)
+	const auto& _points = points.AsConst();
 	for(size_t i = 0; i < mCurvesCount; ++i) {
-		mCurveRootPositions[i] = points[mCurveOffsets[i]];
+		mCurveRootPositions[i] = _points[mCurveOffsets[i]];
 		
 		mCurveVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
 
 		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			mCurveVectors[mCurveOffsets[i] + j] = points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
+			mCurveVectors[mCurveOffsets[i] + j] = _points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
 		}
 	}
 
 	mLastUpdateTimeCode = time_code;
+	mUpdated = true;
 
 	LOG_TRC << "PxrCurvesContainer updated at " << mLastUpdateTimeCode;
-
 	return true;
 }
 
