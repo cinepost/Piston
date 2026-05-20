@@ -31,16 +31,16 @@ bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
-bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_time_code, bool multi_threaded) {
+bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
 	bool adjacency_data_created;
 	if(!mpAdjacencyData) {
-		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mDeformerGeoPrimHandle, adjacency_data_created);
+		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mDeformerGeoPrimHandle, rest_time_code, adjacency_data_created);
 	}
 
 	// Get primitive adjacency json data if present
-	if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpAdjacencyData.get())) {
+	if(adjacency_data_created || !getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpAdjacencyData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
 			DLOG_ERR << "Error building mesh adjacency data!";
@@ -55,21 +55,16 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode reference_ti
 
 	bool trimesh_data_created;
 	if(!mpPhantomTrimeshData) {
-		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, trimesh_data_created);
+		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, trimesh_data_created);
 	}
 
 	// Get phantom mesh json data if present
-	if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
+	if(trimesh_data_created || !getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
 		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
 			DLOG_ERR << "Error building phantom mesh data!";
 			return false;
 		}
-	}
-
-	if(!mpPhantomTrimeshData || !mpPhantomTrimeshData->getTrimesh() || !mpPhantomTrimeshData->getTrimesh()->isValid()) {
-		DLOG_ERR << "No valid phantom trimesh data!";
-		return false;
 	}
 	
 	assert(mpAdjacencyData);

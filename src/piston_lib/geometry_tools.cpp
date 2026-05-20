@@ -201,7 +201,9 @@ bool rayTriangleIntersect(const pxr::GfVec3f &orig, const pxr::GfVec3f &dir, con
     return result;
 }
 
-void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const pxr::VtArray<pxr::GfVec3f>& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool) {
+template <typename T>
+void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const T& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool) {
+    static_assert(std::is_same_v<T, std::vector<pxr::GfVec3f>> || std::is_same_v<T, pxr::VtArray<pxr::GfVec3f>>, "Only std::vector<pxr::GfVec3f> and pxr::VtArray<pxr::GfVec3f> types are permitted!");    
     assert(pAdjacency);
     assert(pTrimesh);
 
@@ -340,5 +342,8 @@ template bool validatePrimIndices(const pxr::VtArray<int>& indices, size_t expec
 
 template bool validatePrimIndices(const std::vector<int>& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger);
 template bool validatePrimIndices(const pxr::VtArray<int>& indices, size_t expected_attrib_count, int max_prim_id, LoggerStream* pLogger);
+
+template void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const std::vector<pxr::GfVec3f>& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool);
+template void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const pxr::VtArray<pxr::GfVec3f>& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool);
 
 } // namespace Piston

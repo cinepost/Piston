@@ -58,6 +58,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
 	if(!pPhantomTrimesh) {
+		DLOG_ERR << "No phantom trimesh!";
 		return false;
 	}
 
@@ -66,6 +67,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(pAdjacency);
 
 	if(!pAdjacency) {
+		DLOG_ERR << "No adjacency data!";
 		return false;
 	}
 
@@ -73,11 +75,16 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 
 	const bool build_live = true; // build using live data
 	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
-	const auto& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
+	const MeshContainer::ContainerType& pt_positions = build_live ? mpDeformerMeshContainer->getLivePositions() : mpDeformerMeshContainer->getRestPositions();
 
 	buildVertexNormals(pAdjacency, pPhantomTrimesh, vertex_normals, pt_positions, (multi_threaded ? &mPool : nullptr));
 	calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
 	calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
+
+	if(mpCurvesContainer->isUpdated()) {
+		DLOG_TRC << "Curves updated. Transform to NTB.";
+		transformCurvesToNTB();
+	}
 
 	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
 
@@ -141,7 +148,7 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 	if(mpDebugGeo) {
 		mpDebugGeo->clear();
 
-		const pxr::VtArray<pxr::GfVec3f>& positions = pDeformerMeshContainer->getLivePositions();
+		const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
 
 		for(const auto face: pPhantomTrimesh->getFaces()) {
 			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]);
@@ -193,15 +200,15 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpFastCurvesDeformerData) {
-		mpFastCurvesDeformerData = dataCache.getOrCreateData<FastCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, deformer_data_created);
+		mpFastCurvesDeformerData = dataCache.getOrCreateData<FastCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, deformer_data_created);
 	}
 
 	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
 	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	
-	if(!mpFastCurvesDeformerData->isValid()) {
-		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
+	if(deformer_data_created || !mpFastCurvesDeformerData->isValid() || !mpPhantomTrimeshData->isValid()) {
+		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpFastCurvesDeformerData.get())) {
 			// Build deformer data in place if no json data present or not needed
 
 			if(!buildCurvesBindingData(rest_time_code, multi_threaded)) {
@@ -332,6 +339,7 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 	const auto& perBindRestNormals = mpFastCurvesDeformerData->getPerBindRestNormals();
 	const auto& perBindRestTBs = mpFastCurvesDeformerData->getPerBindRestTBs();
 
+	#pragma omp parallel for num_threads(2) schedule(static)
 	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
 		PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 		const auto& bind = curveBinds[curve_index];
@@ -442,7 +450,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
-	const pxr::VtArray<pxr::GfVec3f>& rest_positions = pDeformerMeshContainer->getRestPositions();
+	const MeshContainer::ContainerType& rest_positions = pDeformerMeshContainer->getRestPositions();
 
 	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_face_boundaries) {
 		bool isBound = false;
@@ -495,6 +503,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			isBound = bindCurveToTriface(curve_index, face_id, bind, ignore_face_boundaries);
 		}
 
+		mpPhantomTrimeshData->setValid(isBound);
 		return isBound;
 	};
 
@@ -625,6 +634,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	DLOG_DBG << "KDtree bound curves count: " << size_t(kdtree_bound_curves_count.load());
 	DLOG_DBG << "Brute force bound curves count: " << size_t(bforce_bound_curves_count.load());
 
+	mpPhantomTrimeshData->setValid(true);
 	return true;
 }
 

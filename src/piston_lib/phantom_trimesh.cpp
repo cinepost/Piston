@@ -22,7 +22,7 @@ PhantomTrimesh::UniquePtr PhantomTrimesh::create() {
 	return std::make_unique<PhantomTrimesh>();
 }
 
-PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mValid(false) {
+PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mIsValid(false) {
 	static const size_t reserve_size = 1024;
 
 	mFaceMap.reserve(reserve_size);
@@ -31,7 +31,7 @@ PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mValid(false) {
 }
 
 bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
-	mValid = false;
+	mIsValid = false;
 
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
@@ -61,14 +61,14 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	}
 
 	mPointsCount = points.size();
-
-	mValid = true;
-	return mValid;
+	return true;
 }
 
 #ifdef USE_CGAL
 
-bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions) {
+template <typename T>
+bool PhantomTrimesh::buildTetrahedrons(const T& positions) {
+	static_assert(std::is_same_v<T, std::vector<pxr::GfVec3f>> || std::is_same_v<T, pxr::VtArray<pxr::GfVec3f>>, "Only std::vector<pxr::GfVec3f> and pxr::VtArray<pxr::GfVec3f> types are permitted!"); 
 	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
 	using Vb =  CGAL::Triangulation_vertex_base_with_info_3<uint32_t, Kernel>;
 	using Tds = CGAL::Triangulation_data_structure_3<Vb>;
@@ -94,15 +94,15 @@ bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positio
   		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
   	}
 
-	Triangulation T(points.begin(), points.end());
+	Triangulation TR(points.begin(), points.end());
 
-	LOG_TRC << "T number of cells: " << (size_t)T.number_of_cells();
-	LOG_TRC << "T number of finite cells: " << (size_t)T.number_of_finite_cells();
+	LOG_TRC << "T number of cells: " << (size_t)TR.number_of_cells();
+	LOG_TRC << "T number of finite cells: " << (size_t)TR.number_of_finite_cells();
 
-	mTetrahedrons.resize(T.number_of_finite_cells());
+	mTetrahedrons.resize(TR.number_of_finite_cells());
 
 	size_t i = 0;
-	for(const CGAL_CellHandle& cell_handle: T.finite_cell_handles()) {
+	for(const CGAL_CellHandle& cell_handle: TR.finite_cell_handles()) {
 		mTetrahedrons[i].indices[0] = cell_handle->vertex(0)->info();
 		mTetrahedrons[i].indices[1] = cell_handle->vertex(1)->info();
 		mTetrahedrons[i].indices[2] = cell_handle->vertex(2)->info();
@@ -144,7 +144,8 @@ bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positio
 
 #else  // no USE_CGAL
 
-bool PhantomTrimesh::buildTetrahedrons() {
+template <typename T>
+bool PhantomTrimesh::buildTetrahedrons(const T& positions) {
 	LOG_ERR << "PhantomTrimesh::buildTetrahedrons() NOT IMPLEMENTED !!!";
 	return false;
 }
@@ -158,7 +159,7 @@ uint32_t PhantomTrimesh::getPointConnectedTetrahedronIndex(size_t pt_index, size
 }
 
 void PhantomTrimesh::invalidate() {
-	mValid = false;
+	mIsValid = false;
 
 	// Tetrahedrons
 	mTetrahedronCounts.clear();
@@ -175,19 +176,21 @@ void PhantomTrimesh::invalidate() {
 	mTmpVertices.clear();
 }
 
+bool PhantomTrimesh::isValid() const { 
+	return mIsValid && !mFaces.empty(); 
+}
+
 uint32_t PhantomTrimesh::getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const {
 	std::array<PhantomTrimesh::PxrIndexType, 3> indices{a, b, c};
 	std::sort(indices.begin(), indices.end());
 
 	{
-
 		std::scoped_lock lock(mFaceMapMutex);
 
 		auto it = mFaceMap.find(indices);
 		if(it != mFaceMap.end()) {
 			return static_cast<uint32_t>(it->second);
 		}
-
 	}
 
 	return kInvalidTriFaceID;
@@ -331,7 +334,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
 	mpTrimesh = std::make_unique<PhantomTrimesh>();
-	mpTrimesh->mValid = false;
+	mpTrimesh->mIsValid = false;
 
 	mpTrimesh->mFaces = j[kJFaces].template get<std::vector<PhantomTrimesh::TriFace>>();
 	mpTrimesh->mFaceMap = j[kJFaceMap].template get<std::unordered_map<std::array<PhantomTrimesh::PxrIndexType, 3>, size_t, IndicesArrayHasher<PhantomTrimesh::PxrIndexType, 3>>>();
@@ -355,7 +358,7 @@ bool SerializablePhantomTrimesh::readFromJSON(const json& j) {
 		mpTrimesh->mTmpVertices.insert(vtx);
 	}
 
-	mpTrimesh->mValid = true;
+	mpTrimesh->mIsValid = true;
 
 	LOG_DBG << "PhantomTrimesh data read from json payload.";
 
@@ -368,18 +371,18 @@ void SerializablePhantomTrimesh::setValid(bool state) {
 	const std::lock_guard<std::mutex> lock(mMutex); 
 	const std::lock_guard<std::mutex> trimesh_facemap_lock(mpTrimesh->mFaceMapMutex);
 
-	if(mpTrimesh->mValid != state) {
+	if(mpTrimesh->mIsValid != state) {
 		// TODO: check if we need to update other states... Anyways this is kinda ugly
-		mpTrimesh->mValid = state;
+		mpTrimesh->mIsValid = state;
 	}
 }
 
 PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {
-	return isValid() ? mpTrimesh.get() : nullptr;
+	return mpTrimesh ? mpTrimesh.get() : nullptr;
 }
 
 const PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() const {
-	return isValid() ? mpTrimesh.get() : nullptr;
+	return mpTrimesh ? mpTrimesh.get() : nullptr;
 }
 
 const std::string& SerializablePhantomTrimesh::typeName() const {
@@ -395,5 +398,8 @@ const std::string& SerializablePhantomTrimesh::jsonDataKey() const {
 const SerializableDeformerDataBase::DataVersion& SerializablePhantomTrimesh::jsonDataVersion() const {
 	return kTrimeshDataVersion;
 }
+
+template bool PhantomTrimesh::buildTetrahedrons(const std::vector<pxr::GfVec3f>& positions);
+template bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions);
 
 } // namespace Piston

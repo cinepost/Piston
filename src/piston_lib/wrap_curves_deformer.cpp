@@ -117,6 +117,69 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
     return true;
 }
 
+bool WrapCurvesDeformer::buildCurvesLocalAnimVectors(bool multi_threaded) {
+	if(!mCurvesGeoPrimHandle.positionsMightBeTimeVarying()) return false;
+
+	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
+	mTmpCurvesLocalAnimVectors.resize(mpCurvesContainer->getTotalVertexCount());
+	mTmpFaceNTBMatrices.resize(pPhantomTrimesh->getFaceCount());
+
+	const std::vector<PhantomTrimesh::TriFace>& faces = pPhantomTrimesh->getFaces();
+
+	auto face_matrix_func = [&](const std::size_t start, const std::size_t end) {
+		const auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
+		for(uint32_t face_id = static_cast<uint32_t>(start); face_id < static_cast<uint32_t>(end); ++face_id) {
+			assert(face_id < face_flags.size());
+			if(is_set(face_flags[face_id], PhantomTrimesh::TriFace::Flags::Bound)) {
+
+				const PhantomTrimesh::TriFace& face = faces[face_id];
+				const auto& p0 = pDeformerMeshContainer->getRestPointPosition(face.indices[0]);
+				const auto& p1 = pDeformerMeshContainer->getRestPointPosition(face.indices[1]);
+				const auto& p2 = pDeformerMeshContainer->getRestPointPosition(face.indices[2]);
+
+				const pxr::GfVec3f T = p1 - p0;
+				const pxr::GfVec3f B = p2 - p0;
+				const pxr::GfVec3f N = pxr::GfGetNormalized(pxr::GfCross(T, B));
+
+				mTmpFaceNTBMatrices[face_id] = pxr::GfMatrix3f(N[0], T[0], B[0], N[1], T[1], B[1], N[2], T[2], B[2]).GetInverse();
+			}
+		}
+	};
+
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
+		const auto& rest_curves_points = mpCurvesContainer->getRestCurvePoints();
+		assert(rest_curves_points.size() == mpCurvesContainer->getTotalVertexCount());
+		assert(rest_curves_points.size() == pointBinds.size());
+
+		for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
+			uint32_t vertex_offset = mpCurvesContainer->getCurveVertexOffset(curve_idx);
+			const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx); // curve_data_ptr.first is curve_points_count and curve_data_ptr.second is ptr to vertex 0
+			const pxr::GfVec3f& root_pt = mpCurvesContainer->getCurveRootPoint(curve_idx);
+
+			for(size_t i = 0; i < curve_data_ptr.first; ++i) {
+				const auto face_id = pointBinds[vertex_offset].face_id;
+				mTmpCurvesLocalAnimVectors[vertex_offset] = mTmpFaceNTBMatrices[face_id] * (rest_curves_points[vertex_offset] - (root_pt + *(curve_data_ptr.second + i)));
+				vertex_offset++;
+			}
+		}
+	};
+
+	if(multi_threaded) {
+		mPool.detach_blocks(0u, pPhantomTrimesh->getFaceCount(), face_matrix_func);
+		mPool.wait();
+		mPool.detach_blocks(0u, mpCurvesContainer->getCurvesCount(), func);
+		mPool.wait();
+	} else {
+		face_matrix_func(0u, pPhantomTrimesh->getFaceCount());
+		func(0u, mpCurvesContainer->getCurvesCount());
+	}
+
+	return true;
+}
+
 bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
@@ -124,38 +187,69 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 
 	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid()) return false;
 
+	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+	assert(pDeformerMeshContainer);
+
 	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
 
 	mLiveTriFaceNormals.resize(pPhantomTrimesh->getFaceCount());
+	const bool adjust_for_curve_local_anim = buildCurvesLocalAnimVectors(multi_threaded);
 
-	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
-
-	auto face_normal_func = [&](const std::size_t start, const std::size_t end) {
+	auto face_normal_and_matrix_func = [&](const std::size_t start, const std::size_t end) {
 		const auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
 		for(uint32_t face_id = static_cast<uint32_t>(start); face_id < static_cast<uint32_t>(end); ++face_id) {
+			assert(face_id < face_flags.size());
 			if(is_set(face_flags[face_id], PhantomTrimesh::TriFace::Flags::Bound)) {
+				assert(face_id < mLiveTriFaceNormals.size());
 				mLiveTriFaceNormals[face_id] = pDeformerMeshContainer->getFaceLiveNormal(pPhantomTrimesh->getFace(face_id));
+			}
+		}
+
+		if(adjust_for_curve_local_anim) {
+			const std::vector<PhantomTrimesh::TriFace>& faces = pPhantomTrimesh->getFaces();
+			for(uint32_t face_id = static_cast<uint32_t>(start); face_id < static_cast<uint32_t>(end); ++face_id) {
+				assert(face_id < face_flags.size());
+				if(is_set(face_flags[face_id], PhantomTrimesh::TriFace::Flags::Bound)) {
+
+					const PhantomTrimesh::TriFace& face = faces[face_id];
+					const auto& p0 = pDeformerMeshContainer->getLivePointPosition(face.indices[0]);
+					const auto& p1 = pDeformerMeshContainer->getLivePointPosition(face.indices[1]);
+					const auto& p2 = pDeformerMeshContainer->getLivePointPosition(face.indices[2]);
+
+					const pxr::GfVec3f T = p1 - p0;
+					const pxr::GfVec3f B = p2 - p0;
+					const pxr::GfVec3f N = pxr::GfGetNormalized(pxr::GfCross(T, B));
+
+					mTmpFaceNTBMatrices[face_id] = pxr::GfMatrix3f(N[0], T[0], B[0], N[1], T[1], B[1], N[2], T[2], B[2]);
+				}
 			}
 		}
 	};
 
-	auto func = [&](const std::size_t start, const std::size_t end) {	
+	auto func = [&](const std::size_t start, const std::size_t end) {
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
-			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
+			assert(bind.face_id != PointBindData::kInvalidFaceID);
+			assert(bind.face_id < mLiveTriFaceNormals.size());
 
-			const pxr::GfVec3f& face_normal = mLiveTriFaceNormals[bind.face_id];
-			points[i] = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v) + (face_normal * bind.dist);
+			points[i] = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v) + (mLiveTriFaceNormals[bind.face_id] * bind.dist);
+		}
+
+		if(adjust_for_curve_local_anim) {
+			for(size_t i = start; i < end; ++i) {
+				const auto& m = mTmpFaceNTBMatrices[pointBinds[i].face_id];
+				points[i] += m * mTmpCurvesLocalAnimVectors[i];
+			}
 		}
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pPhantomTrimesh->getFaceCount(), face_normal_func);
+		mPool.detach_blocks(0u, pPhantomTrimesh->getFaceCount(), face_normal_and_matrix_func);
 		mPool.wait();
 		mPool.detach_blocks(0u, pointBinds.size(), func);
 		mPool.wait();
 	} else {
-		face_normal_func(0u, pPhantomTrimesh->getFaceCount());
+		face_normal_and_matrix_func(0u, pPhantomTrimesh->getFaceCount());
 		func(0u, pointBinds.size());
 	}
 
@@ -186,12 +280,12 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpWrapCurvesDeformerData) {
-		mpWrapCurvesDeformerData = dataCache.getOrCreateData<WrapCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, deformer_data_created);
+		mpWrapCurvesDeformerData = dataCache.getOrCreateData<WrapCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, deformer_data_created);
 		mpWrapCurvesDeformerData->setBindMode(mBindMode);
 	}
 
-	if(!mpWrapCurvesDeformerData->isValid()) {
-		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get()) || pPhantomTrimesh->getFaces().empty()) {
+	if(deformer_data_created || !mpWrapCurvesDeformerData->isValid() || !mpPhantomTrimeshData->isValid()) {
+		if(!getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpWrapCurvesDeformerData.get())) {
 			// Build deformer data in place if no json data present or not needed
 
 			// First triangulate using simple "fan" triangulation
@@ -269,6 +363,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 
 			mpWrapCurvesDeformerData->setValid(true);
 		}
+		mpPhantomTrimeshData->setValid(mpWrapCurvesDeformerData->isValid());
 	}
 
 	return mpWrapCurvesDeformerData->isValid();

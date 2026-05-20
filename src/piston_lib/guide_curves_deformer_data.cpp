@@ -5,6 +5,9 @@
 
 namespace Piston {
 
+static_assert(sizeof(GuideCurvesDeformerData::PointBindData::EncodedID) == 4);
+static_assert(sizeof(GuideCurvesDeformerData::PointBindData) == 16);
+
 static const SerializableDeformerDataBase::DataVersion kGuidesBindingDataVersion( 0u, 0u, 0u);
 
 inline void to_json(json& j, const GuideCurvesDeformerData::PointBindData& bind) {

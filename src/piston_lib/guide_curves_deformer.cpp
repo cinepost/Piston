@@ -90,7 +90,7 @@ bool GuideCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time
 }
 
 bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
-	if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code)) {
+	if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
 		DLOG_ERR << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !";
 		return false;
 	}
@@ -135,7 +135,7 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 	assert(mpSkinMeshContainer);
 	const MeshContainer* pSkinMeshContainer = mpSkinMeshContainer.get();
 
-	pSkinMeshContainer->update(mGuidesSkinGeoPrimHandle, time_code);
+	pSkinMeshContainer->update(mGuidesSkinGeoPrimHandle, time_code, isDirty());
 
 	mTempSkinFaceLiveNormals.resize(pSkinPhantomTrimesh->getFaceCount());
 	TODO(precalculate skin live face normals first !!!)
@@ -220,7 +220,7 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 	assert(pSkinPhantomTrimesh);
 
 	assert(mpSkinMeshContainer);
-	mpSkinMeshContainer->update(mGuidesSkinGeoPrimHandle, time_code);
+	mpSkinMeshContainer->update(mGuidesSkinGeoPrimHandle, time_code, isDirty());
 
 	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
 
@@ -265,7 +265,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 
 
 	assert(mpDeformerMeshContainer);
-	if(!mpDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code)) {
+	if(!mpDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
 		return false;
 	}
 
@@ -316,7 +316,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	assert(mpGuideCurvesContainer);
 	assert(mpGuideCurvesDeformerData);
 	assert(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid());
-	assert(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid());
+	assert(mpSkinPhantomTrimeshData);
 
 	DLOG_INF << " Binding " << mCurvesGeoPrimHandle << " root points to skin surface.";
 
@@ -387,7 +387,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		if( prim_vertex_count > 3u){
 			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
 				
-			const pxr::VtArray<pxr::GfVec3f>& rest_positions = pSkinMeshContainer->getRestPositions();
+			const MeshContainer::ContainerType& rest_positions = pSkinMeshContainer->getRestPositions();
 
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
 				_tmp_sq_distances[j] = distanceSquared(pt, rest_positions[pSkinAdjacency->getFaceVertex(prim_vertex_offset + j)]);
@@ -507,7 +507,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpGuideCurvesDeformerData) {
-		mpGuideCurvesDeformerData = dataCache.getOrCreateData<GuideCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, deformer_data_created);
+		mpGuideCurvesDeformerData = dataCache.getOrCreateData<GuideCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, deformer_data_created);
 		mpGuideCurvesDeformerData->setBindMode(mBindMode);
 	}
 
@@ -543,7 +543,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 			}
 
 			if(getBindRootsToSkinSurface()) {
-				if(!buildSkinPrimData(multi_threaded)) {
+				if(!buildSkinPrimData(multi_threaded, rest_time_code)) {
 					DLOG_ERR << "Error building skin geometry data for " << mGuidesSkinGeoPrimHandle << "!";
 					return false;
 				}
@@ -577,7 +577,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool guides_trimesh_data_created;
 	if(!mpGuidesPhantomTrimeshData) {
-		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, guides_trimesh_data_created);
+		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, guides_trimesh_data_created);
 	}
 
 
@@ -820,7 +820,7 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 	const auto& guide_points = build_live ? mpGuideCurvesContainer->getLiveCurvePoints() : mpGuideCurvesContainer->getRestCurvePoints();
 
 	assert(mpSkinMeshContainer);
-	const pxr::VtArray<pxr::GfVec3f>& skin_points = build_live ? mpSkinMeshContainer->getLivePositions() : mpSkinMeshContainer->getRestPositions();
+	const MeshContainer::ContainerType& skin_points = build_live ? mpSkinMeshContainer->getLivePositions() : mpSkinMeshContainer->getRestPositions();
 
 	const auto& guide_origins = mpGuideCurvesDeformerData->getGuideOrigins();
 
@@ -866,7 +866,7 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 	assert(mpGuideCurvesContainer);
 	assert(mpGuideCurvesDeformerData);
 	assert(mpSkinAdjacencyData && mpSkinAdjacencyData->isValid());
-	assert(mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid());
+	assert(mpSkinPhantomTrimeshData);
 
 	const UsdGeomMeshFaceAdjacency* pSkinGeoAdjacency = mpSkinAdjacencyData->getAdjacency();
 	PhantomTrimesh* pSkinGeoPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
@@ -884,7 +884,7 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 	assert(mpSkinMeshContainer);
 	const auto* pSkinMeshContainer = mpSkinMeshContainer.get();
 
-	const pxr::VtArray<pxr::GfVec3f>& skin_geo_rest_points = pSkinMeshContainer->getRestPositions();
+	const MeshContainer::ContainerType& skin_geo_rest_points = pSkinMeshContainer->getRestPositions();
 
 	std::vector<std::mutex> kdtrees_mutexes(guide_curves_count);  // protects kdree initialisation
 	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guide_curves_count);
@@ -939,13 +939,15 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 		func(0u, guide_curves_count);
 	}
 
+	mpSkinPhantomTrimeshData->setValid(true);
+
 	return true;
 }
 
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	multi_threaded = false;
 
-	if(!buildSkinPrimData(multi_threaded)) {
+	if(!buildSkinPrimData(multi_threaded, rest_time_code)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
 		mpGuideCurvesDeformerData->setSkinPrimPath("");
 		DLOG_ERR << "Error building skin prim geometry data !";
@@ -1143,7 +1145,7 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
     return true;
 }
 
-bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
+bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCode rest_time_code) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
 	if(!mGuidesSkinGeoPrimHandle) {
@@ -1171,7 +1173,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	bool skin_adjacency_data_created;
 	if(!mpSkinAdjacencyData) {
-		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mGuidesSkinGeoPrimHandle, skin_adjacency_data_created);
+		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mGuidesSkinGeoPrimHandle, rest_time_code, skin_adjacency_data_created);
 		assert(mpSkinAdjacencyData);
 	}
 
@@ -1184,7 +1186,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded) {
 
 	bool skin_trimesh_data_created;
 	if(!mpSkinPhantomTrimeshData) {
-		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, skin_trimesh_data_created);
+		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, skin_trimesh_data_created);
 		assert(mpSkinPhantomTrimeshData);
 	}
 

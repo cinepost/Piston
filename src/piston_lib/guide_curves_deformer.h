@@ -74,7 +74,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		bool buildSkinPrimData(bool multi_threaded);
+		bool buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCode rest_time_code);
 		bool hasSkinPrimitiveData() const;
 
 		bool buildGuideOrigins(bool multi_threaded);

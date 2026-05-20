@@ -15,13 +15,42 @@
 #include <stdio.h>
 #include <stdint.h>
 
-/*
-static pxr::VtArray<uint8_t> bsonToPxrArray(const std::vector<uint8_t>& vec) {
-	pxr::Vt_ArrayForeignDataSource fd(nullptr, 1);
-	static const bool addRef = 1;
-	return {&fd, (uint8_t*)vec.data(), vec.size(), addRef};
+static auto compareVtArrays = [](const auto& a, const auto& b) {
+    if (a == b) return 0; // Optimization: COW check
+    return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end()) ? -1 : 1;
+};
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+bool operator<(const pxr::HdMeshTopology& lhs, const pxr::HdMeshTopology& rhs) {
+    if (lhs.GetScheme() != rhs.GetScheme()) return lhs.GetScheme() < rhs.GetScheme();
+    if (lhs.GetOrientation() != rhs.GetOrientation()) return lhs.GetOrientation() < rhs.GetOrientation();
+    if (lhs.GetRefineLevel() != rhs.GetRefineLevel()) return lhs.GetRefineLevel() < rhs.GetRefineLevel();
+
+    int res = ::compareVtArrays(lhs.GetFaceVertexCounts(), rhs.GetFaceVertexCounts());
+    if (res != 0) return res < 0;
+
+    res = ::compareVtArrays(lhs.GetFaceVertexIndices(), rhs.GetFaceVertexIndices());
+    if (res != 0) return res < 0;
+
+    return false;
 }
-*/	
+
+bool operator<(const HdBasisCurvesTopology& lhs, const HdBasisCurvesTopology& rhs) {
+    if (lhs.GetCurveType() != rhs.GetCurveType()) return lhs.GetCurveType() < rhs.GetCurveType();
+    if (lhs.GetCurveBasis() != rhs.GetCurveBasis())  return lhs.GetCurveBasis() < rhs.GetCurveBasis();
+    if (lhs.GetCurveWrap() != rhs.GetCurveWrap()) return lhs.GetCurveWrap() < rhs.GetCurveWrap();
+
+    int res = ::compareVtArrays(lhs.GetCurveVertexCounts(), rhs.GetCurveVertexCounts());
+    if (res != 0) return res < 0;
+
+    res = ::compareVtArrays(lhs.GetCurveIndices(), rhs.GetCurveIndices());
+    if (res != 0) return res < 0;
+
+    return false;
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE
 	
 namespace Piston {
 
@@ -162,8 +191,8 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 	return getStage()->GetTimeCodesPerSecond();
 }
 
-bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code) const {
-	if(mpDeformer && !mpDeformer->deform(time_code)) {
+bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {
+	if(mpDeformer && !mpDeformer->deform(time_code, multi_threaded, true /* ignore velocities */)) {
 		LOG_FTL << "Unable to execute " << mpDeformer->getName() << ".deform(...) for " << getPath() << " !!!";
 		return false;
 	}
@@ -189,9 +218,7 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr:
 		return false;
 	}
 
-	array.clear();
-
-	if(!prepareDataIfNeeded(time_code)) return false;
+	if(!prepareDataIfNeeded(time_code, true /* use threads */)) return false;
 
 	if(!primVar.GetAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting " << getPath() << " \"" << attribute_name << "\" values !";
@@ -223,15 +250,13 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, std:
 }
 
 bool UsdPrimHandle::getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code) const {
-	const auto& prim = getPrim();
-
-	auto geom = pxr::UsdGeomPointBased(prim);
+	auto geom = pxr::UsdGeomPointBased(getPrim());
 	if(!geom) {
 		LOG_ERR << "Error getting point based geometry from " << getPath() << " !";
 		return false;
 	}
 
-	if(!prepareDataIfNeeded(time_code)) return false;
+	if(!prepareDataIfNeeded(time_code, true /* use threads */)) return false;
 
 	if(!geom.GetPointsAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting points from " << getPath() << " !";
@@ -440,6 +465,27 @@ bool UsdPrimHandle::setBsonToPrim(const pxr::SdfPath& prim_path, const std::stri
 	return true;
 }
 
+bool UsdPrimHandle::positionsMightBeTimeVarying() const {
+	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
+	return attrQuery.ValueMightBeTimeVarying();
+}
+
+bool UsdPrimHandle::hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
+	if(mpDeformer) return mpDeformer->canProduceOutputTimeSamples(time_from, time_to);
+
+	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
+	if (!mightBeTimeVarying(attrQuery)) return false;
+
+	auto _hasTimeSample = [&attrQuery](double time) {
+		double lower, upper;
+		bool hasSamples;
+		attrQuery.GetBracketingTimeSamples(time, &lower, &upper, &hasSamples);
+		return hasSamples && lower == upper;
+	};
+
+	return _hasTimeSample(time_from.GetValue()) && _hasTimeSample(time_to.GetValue());
+};
+
 bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	const pxr::UsdPrim& _prim = getPrim();
 
@@ -456,33 +502,6 @@ bool UsdPrimHandle::operator==(const pxr::UsdPrim& prim) const {
 	}
 
 	return true;
-}
-
-// PointsList
-
-PointsList::PointsList(size_t size): mPoints(size), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), true) {
-	assert(size > 0);
-	calcSizeInBytes();
-}
-
-PointsList::PointsList(Piston::PointsList&& other): mPoints(std::move(other.mPoints)), mVtArray(&mForeignDataSource, (pxr::GfVec3f*)mPoints.data(), mPoints.size(), false), mSizeInBytes(other.mSizeInBytes) {
-}
-
-void PointsList::resize(size_t new_size) {
-	if(size() == new_size) return;
-
-	mPoints.resize(new_size);
-	mVtArray.resize(new_size);
-	calcSizeInBytes();
-}
-
-void PointsList::fillWithZero() {
-	static const pxr::GfVec3f zero = {0.0, 0.0, 0.0};
-	std::fill(mPoints.begin(), mPoints.end(), zero);
-}
-
-void PointsList::calcSizeInBytes() const {
-	mSizeInBytes = mPoints.size() * sizeof(pxr::GfVec3f);
 }
 
 std::string bson_to_hex_string(const BSON& bson) {

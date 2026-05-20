@@ -30,6 +30,7 @@ class PxrCurvesContainer {
 		static UniquePtr create(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
 		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode reference_time_code);
+		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force);
 
 		bool empty() const { return mCurvesCount == 0; }
 
@@ -44,6 +45,10 @@ class PxrCurvesContainer {
 
 		const pxr::GfVec3f& getCurveRootPoint(size_t curve_idx) const;
 
+		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints.AsConst(); }
+
+		bool      	isUpdated() const { return mUpdated; }
+
 	private:
 		PxrCurvesContainer();
 		PxrCurvesContainer(PxrCurvesContainer& other);
@@ -56,6 +61,10 @@ class PxrCurvesContainer {
 		pxr::VtArray<pxr::GfVec3f>              mCurveVectors;
 
 		pxr::VtArray<pxr::GfVec3f> 				mTempCurvePoints;
+		pxr::VtArray<pxr::GfVec3f>              mRestCurvePoints;
+
+		pxr::UsdTimeCode                        mLastUpdateTimeCode;
+		bool                                    mUpdated;
 };
 
 } // namespace Piston

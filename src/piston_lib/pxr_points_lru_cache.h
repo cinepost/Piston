@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "common.h"
+#include "points_list.h"
 
 #include <pxr/usd/usd/timeCode.h>
 #include <pxr/base/gf/matrix3f.h>
