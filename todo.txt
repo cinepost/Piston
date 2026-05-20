@@ -1,9 +1,15 @@
 TODOS:
 
-1. PhantomTrimesh. Fall back to rest_time_code point positions capture if no rest attribute name provided or it's wrong.
-2. Unify all attributes fetching (VtArray and std:vector) through PrimHandle interface functions.
-3. Make a proper logger for god sake! With console output color formatting if running in UI mode (check this upon loading Houdini) 
+1. DONE. PhantomTrimesh. Fall back to rest_time_code point positions capture if no rest attribute name provided or it's wrong.
+2. DONE. Unify all attributes fetching (VtArray and std:vector) through PrimHandle interface functions.
+3. DONE. Make a proper logger for god sake! With console output color formatting if running in UI mode (check this upon loading Houdini) 
 4. Double and triple check all serializable date to store and read ONLY necessary data only.
 5. KD-Tree structure for fast and efficient tetraheron search.
 6. FastDeformer needs a different binding strategy when prim_id is provided. We first have to search for any subdivided triface that have u+v+w=1 coords. If that fails we have to find one with shortest point projection to edge (not centroid) distance.
 7. Simple logger with python callback/interop so we can redirect messages to Houdini's UI.
+
+8. Remove single threaded code path.
+9. Use future for dependecies. Don't just wait for the whole pool.
+10. FastDefromer binding. Use only matrices when deforming. 
+11. Consider CurvesContainer refactorins. 
+12. Consider CurvesContainer, GuideCurvesContainter and MeshContainer to be of a same class.
