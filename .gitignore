@@ -49,6 +49,8 @@ env
 env/
 backup
 backup/
+.openai_cache
+.openai_cache/
 
 third_party/external
 third_party/external/
