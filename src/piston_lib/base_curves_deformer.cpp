@@ -130,11 +130,11 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 }
 
 const pxr::UsdPrim& BaseCurvesDeformer::getDeformerGeoPrim() const {
-	mDeformerGeoPrimHandle.getPrim();
+	return mDeformerGeoPrimHandle.getPrim();
 }
 
 const pxr::UsdPrim& BaseCurvesDeformer::getCurvesGeoPrim() const {
-	mCurvesGeoPrimHandle.getPrim();
+	return mCurvesGeoPrimHandle.getPrim();
 }
 
 void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
