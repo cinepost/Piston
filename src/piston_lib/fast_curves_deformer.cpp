@@ -339,7 +339,7 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 	const auto& perBindRestNormals = mpFastCurvesDeformerData->getPerBindRestNormals();
 	const auto& perBindRestTBs = mpFastCurvesDeformerData->getPerBindRestTBs();
 
-	#pragma omp parallel for num_threads(2) schedule(static)
+	DLOG_WRN << "FastCurvesDeformer::transformCurvesToNTB() make parallel !";
 	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
 		PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 		const auto& bind = curveBinds[curve_index];
