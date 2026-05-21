@@ -13,6 +13,7 @@ namespace boost = hboost;
 #endif // BOOST_PYTHON_MODULE
 
 #include "../../piston_lib/common.h"
+#include "../../piston_lib/global_config.h"
 #include "../../piston_lib/base_curves_deformer.h"
 #include "../../piston_lib/base_mesh_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
@@ -85,6 +86,15 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("__repr__", &CurvesDeformerFactory::Key::repr)
 	;
 
+	class_<GlobalConfig, boost::noncopyable>("GlobalConfig",  no_init)
+		.def("getInstance", &GlobalConfig::getInstance, return_value_policy<reference_existing_object>(), "@DocString(GlobalConfig::getInstance)")
+	
+		.def("setDataInstancingState", &GlobalConfig::setDataInstancingState)
+		.def("getDataInstancingState", &GlobalConfig::getDataInstancingState)
+		.def("setPointsCacheUsageState", &GlobalConfig::setPointsCacheUsageState)
+		.def("getPointsCacheUsageState", &GlobalConfig::getPointsCacheUsageState)
+	;
+
 	class_<CurvesDeformerFactory, boost::noncopyable>("DeformerFactory",  no_init)
 		.def("getInstance", &CurvesDeformerFactory::getInstance, return_value_policy<reference_existing_object>(), "@DocString(CurvesDeformerFactory::getInstance)")
 		.def("deleteDeformer", &CurvesDeformerFactory::deleteDeformer)
@@ -92,10 +102,6 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
 		.def("getGuidesDeformer", &CurvesDeformerFactory::getGuidesDeformer)
 
-		.def("setDataInstancingState", &CurvesDeformerFactory::setDataInstancingState)
-		.staticmethod("setDataInstancingState")
-		.def("getDataInstancingState", &CurvesDeformerFactory::getDataInstancingState)
-		.staticmethod("getDataInstancingState")
 
 		.def("setPointsCacheUsageState", &CurvesDeformerFactory::setPointsCacheUsageState)
 		.staticmethod("setPointsCacheUsageState")

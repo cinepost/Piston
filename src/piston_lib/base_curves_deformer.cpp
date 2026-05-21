@@ -1,3 +1,4 @@
+#include "global_config.h"
 #include "deformer_factory.h"
 #include "base_curves_deformer.h"
 #include "geometry_tools.h"
@@ -42,7 +43,7 @@ const pxr::SdfPath& BaseCurvesDeformer::getDataPrimPath() const {
 		return mDataPrimPath; 
 	}
 
-	return CurvesDeformerFactory::getInstance().getDefaultDataPrimPath();
+	return GlobalConfig::getInstance().getDefaultDataPrimPath();
 }
 
 void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
@@ -167,7 +168,8 @@ void BaseCurvesDeformer::setRestTimeCode(pxr::UsdTimeCode time_code) {
 
 pxr::UsdTimeCode BaseCurvesDeformer::getRestTimeCode() const {
 	if(mRestTimeCode.IsDefault()) {
-		return CurvesDeformerFactory::getDefaultRestTimeCode();
+		static const auto& conf = GlobalConfig::getInstance();
+		return conf.getDefaultRestTimeCode();
 	}
 
 	return mRestTimeCode;
@@ -262,7 +264,8 @@ void BaseCurvesDeformer::setInstancingState(bool state) {
 	if(mInstancingEnabled == state) return;
 	mInstancingEnabled = state;
 
-	if(mInstancingEnabled && !CurvesDeformerFactory::getDataInstancingState()) {
+	static auto const& conf = GlobalConfig::getInstance();
+	if(mInstancingEnabled && !conf.getDataInstancingState()) {
 		DLOG_INF << "Deformers data instancing is disabled!";
 		return;
 	}
@@ -271,11 +274,13 @@ void BaseCurvesDeformer::setInstancingState(bool state) {
 }
 
 bool BaseCurvesDeformer::getInstancingState() const { 
-	return CurvesDeformerFactory::getDataInstancingState() && mInstancingEnabled; 
+	static auto const& conf = GlobalConfig::getInstance();
+	return mInstancingEnabled && conf.getDataInstancingState(); 
 }
 
 bool BaseCurvesDeformer::getPointsCacheUsageState() const {
-	return mUsePointsCache && CurvesDeformerFactory::getInstance().getPointsCacheUsageState();
+	static auto const& conf = GlobalConfig::getInstance();
+	return mUsePointsCache && conf.getPointsCacheUsageState();
 }
 
 bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code, bool ignoreVelocities) {	
@@ -498,8 +503,6 @@ void BaseCurvesDeformer::makeDirty() {
 	mStats.clear();
 	mDirty = true;
 	mDeformerDataWritten = false;
-
-	static auto& cache = DeformerDataCache::getInstance();
 
 	clearLRUCaches();
 	invalidateData(DeformerDataCache::getInstance());

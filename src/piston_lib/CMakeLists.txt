@@ -43,6 +43,7 @@ endif(USE_CGAL)
 
 file( GLOB SOURCES
     ./os.cpp
+    ./global_config.cpp
     ./common.cpp
     ./pxr_json.cpp
     ./pxr_points_lru_cache.cpp

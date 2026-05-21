@@ -112,10 +112,8 @@ class PhantomTrimesh {
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(const uint32_t id) const { 
-			if(id >= mFaces.size() ) {
-				LOG_WRN << "PhantomTrimesh::getFace(" << id << ") while mFace.size() is " << mFaces.size();
-			} 
-			assert(id < mFaces.size()); return mFaces[id]; 
+			assert(id < mFaces.size()); 
+			return mFaces[id]; 
 		}
 		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 

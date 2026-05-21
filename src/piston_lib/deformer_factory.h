@@ -16,8 +16,6 @@
 
 namespace Piston {
 
-static const bool kDefaultCacheState = false;
-
 /*
  * Factory singleton class
  */
@@ -60,6 +58,10 @@ class CurvesDeformerFactory {
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 	    static GuideCurvesDeformer::SharedPtr getGuidesDeformer(const std::string& name);
 
+	    static void setPointsCacheUsageState(bool state);
+		static bool getPointsCacheUsageState();
+
+/*
 	    static void setDataInstancingState(bool state);
 	    static bool getDataInstancingState();
 
@@ -75,7 +77,7 @@ class CurvesDeformerFactory {
 		static bool isDefaultDataPrimPath(const pxr::SdfPath& path);
 
 		static DataToPrimStorageMethod getDataStorageMethod();
-
+*/
 	    static void clear();
 
 	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
@@ -99,11 +101,6 @@ class CurvesDeformerFactory {
     	static CurvesDeformerFactory* mInstancePtr;
 
     private:
-    	DataToPrimStorageMethod 	mDataToPrimStorageMethod;
-    	pxr::UsdTimeCode 			mDefaultRestTimeCode;
-    	pxr::SdfPath    		 	mDefaultDataPrimPath;
-    	bool                        mDataInstancingState;
-
     	CurvesDeformerFactory();
 };
 

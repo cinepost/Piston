@@ -73,6 +73,8 @@ void GuideCurvesDeformer::setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim) {
 		return;
 	}
 
+	mpSkinAdjacencyData = nullptr;
+	mpSkinPhantomTrimeshData = nullptr;
 	mGuidesSkinGeoPrimHandle = UsdPrimHandle(geoPrim);
 	makeDirty();
 
@@ -128,7 +130,7 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 		return true;
 	}
 
-	assert(mpSkinPhantomTrimeshData);
+	assert(mpSkinPhantomTrimeshData->isValid());
 	PhantomTrimesh* pSkinPhantomTrimesh = mpSkinPhantomTrimeshData->getTrimesh();
 	assert(pSkinPhantomTrimesh);
 
@@ -216,6 +218,7 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 	assert(mpGuideCurvesContainer);
 
 	assert(hasSkinPrimitiveData()); // for now we only work with skin geometry
+	assert(mpSkinPhantomTrimeshData->isValid());
 	PhantomTrimesh* pSkinPhantomTrimesh = hasSkinPrimitiveData() ? mpSkinPhantomTrimeshData->getTrimesh() : nullptr;
 	assert(pSkinPhantomTrimesh);
 
@@ -481,6 +484,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		func(0u, curves_count);
 	}
 
+	mpSkinPhantomTrimeshData->setValid(true);
 	DLOG_DBG << point_surface_binds.size() << " points are bound to skin surface.";
 
 	return true;

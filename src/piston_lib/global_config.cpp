@@ -1,0 +1,179 @@
+#include "global_config.h"
+#include "logging.h"
+
+#include <algorithm>
+#include <cctype>
+
+
+namespace Piston {
+
+static const bool sPointCacheDefaultState = false;
+static const bool sDataInstancingDefaultState = true;
+static const pxr::SdfPath sDefaultPrimPath("/__piston_data__");
+static const GlobalConfig::DataToPrimStorageMethod sDefaultDataToPrimStorage(GlobalConfig::DataToPrimStorageMethod::ATTRIBUTE);
+
+static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
+
+static std::string tolower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    return s;
+}
+
+GlobalConfig& GlobalConfig::getInstance() {
+    if (mInstancePtr == nullptr) {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mInstancePtr == nullptr) {
+            mInstancePtr = new GlobalConfig();
+        }
+    }
+
+    return *mInstancePtr;
+}
+
+void GlobalConfig::setPointsCacheUsageState(bool state) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
+	if(mPointCacheState == state) return;
+	mPointCacheState = state;
+}
+
+bool GlobalConfig::getPointsCacheUsageState() const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	return mPointCacheState;
+}
+
+void GlobalConfig::setDataInstancingState(bool state) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+
+	if(mDataInstancingState == state) return;
+	mDataInstancingState = state;
+}
+
+bool GlobalConfig::getDataInstancingState() const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	return mDataInstancingState;
+}
+
+void GlobalConfig::setDefaultRestTimeCode(pxr::UsdTimeCode time_code) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	if(mDefaultRestTimeCode == time_code) return;
+	mDefaultRestTimeCode = time_code;
+}
+
+pxr::UsdTimeCode GlobalConfig::getDefaultRestTimeCode() const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	return mDefaultRestTimeCode;
+}
+
+void GlobalConfig::setDefaultDataPrimPath(const std::string& path) {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	const pxr::SdfPath new_path(path);
+	if(mDefaultDataPrimPath == new_path) return;
+	mDefaultDataPrimPath = new_path;
+}
+
+pxr::SdfPath GlobalConfig::getDefaultDataPrimPath() const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	return mDefaultDataPrimPath;
+}
+
+bool GlobalConfig::isDefaultDataPrimPath(const std::string& path) const {
+	return isDefaultDataPrimPath(pxr::SdfPath(path));
+}
+
+bool GlobalConfig::isDefaultDataPrimPath(const pxr::SdfPath& path) const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	return mDefaultDataPrimPath == path;
+}
+
+GlobalConfig::DataToPrimStorageMethod GlobalConfig::getDataStorageMethod() const {
+	const std::lock_guard<std::mutex> lock(mMutex);
+	return mDataToPrimStorageMethod;
+}
+
+GlobalConfig::~GlobalConfig() {
+	//SimpleProfiler::printReport();
+}
+
+GlobalConfig::GlobalConfig(): 
+	mDataToPrimStorageMethod(sDefaultDataToPrimStorage), 
+	mDefaultRestTimeCode(pxr::UsdTimeCode::Default()), 
+	mDefaultDataPrimPath(sDefaultPrimPath), 
+	mPointCacheState(sPointCacheDefaultState), 
+	mDataInstancingState(sDataInstancingDefaultState) 
+	{
+	
+	std::cout << std::endl;
+	
+	std::string cache_var_value;
+	if(getEnvVar("PISTON_PTCACHE", cache_var_value)) {
+		cache_var_value = tolower(cache_var_value) ;
+		if(cache_var_value == "off" || cache_var_value == "false" || cache_var_value == "0") {
+			mPointCacheState = false;
+		} else {
+			mPointCacheState = true;
+		}
+	}
+
+	std::string data_instancing_var_value;
+	if(getEnvVar("PISTON_DATA_INSTANCING", data_instancing_var_value)) {
+		data_instancing_var_value = tolower(data_instancing_var_value) ;
+		if(data_instancing_var_value == "off" || data_instancing_var_value == "false" || data_instancing_var_value == "0") {
+			mDataInstancingState = false;
+		} else {
+			mDataInstancingState = true;
+		}
+	}
+	LOG_INF << "Deformers data instancing is " << (mDataInstancingState ? "ON" : "OFF");
+
+	std::string tpose_default_frame_string;
+	if(getEnvVar("PISTON_DEFAULT_TPOSE_FRAME", tpose_default_frame_string)) {
+		try {
+        	const double d = std::stod(tpose_default_frame_string	);
+        	mDefaultRestTimeCode = d;
+		} catch (const std::invalid_argument& e) {
+        	LOG_ERR << "Invalid \"PISTON_DEFAULT_TPOSE_FRAME\" environment variable: " << e.what();
+    	} catch (const std::out_of_range& e) {
+        	LOG_ERR << "\"PISTON_DEFAULT_TPOSE_FRAME\" environment variable out of range: " << e.what();
+    	}
+	}
+
+	if(!mDefaultRestTimeCode.IsDefault()) {
+		LOG_INF << "Default system T-Pose frame is " << mDefaultRestTimeCode;
+	}
+
+	std::string default_data_prim_path_override;
+	if(getEnvVar("PISTON_DEFAULT_DATA_PRIM_PATH", default_data_prim_path_override)) {
+		const pxr::SdfPath new_path(default_data_prim_path_override);
+		if(new_path.IsPrimPath()) {
+			mDefaultDataPrimPath = new_path;
+		} else {
+			LOG_ERR << "Unable to set default data prim path to \"" << default_data_prim_path_override << "\". Path is not a prim path !";
+		}
+	}
+
+	if(mDefaultDataPrimPath != sDefaultPrimPath) {
+		LOG_INF << "Default system data prim path is " << mDefaultDataPrimPath;
+	}
+
+	std::string data_to_prim_storage_method;
+	if(getEnvVar("PISTON_DATA_TO_PRIM_STORAGE", data_to_prim_storage_method)) {
+		auto default_storage_method = mDataToPrimStorageMethod;
+		if(tolower(data_to_prim_storage_method) == "metadata") {
+			mDataToPrimStorageMethod = DataToPrimStorageMethod::METADATA;
+		} else if (tolower(data_to_prim_storage_method) == "attribute") {
+			mDataToPrimStorageMethod = DataToPrimStorageMethod::ATTRIBUTE;
+		} else {
+			LOG_ERR << "Unknown data storage method \"" << data_to_prim_storage_method << "\" !!! Reverting to default method (" << to_string(default_storage_method) << ").";
+		}
+		if(mDataToPrimStorageMethod != sDefaultDataToPrimStorage) {
+			LOG_INF << "Data storage method is \"" << to_string(mDataToPrimStorageMethod) << "\"";
+		}
+	}
+}
+
+} // namespace Piston
+
+// Initialize static members
+Piston::GlobalConfig* Piston::GlobalConfig::mInstancePtr = nullptr;
+std::mutex Piston::GlobalConfig::mMutex;

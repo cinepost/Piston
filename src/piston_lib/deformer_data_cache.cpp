@@ -1,3 +1,4 @@
+#include "global_config.h"
 #include "base_curves_deformer.h"
 #include "deformer_data_cache.h"
 #include "adjacency.h"
@@ -170,7 +171,7 @@ void DeformerDataCache::cleanup() {
 DeformerDataCache::~DeformerDataCache() { }
 
 DeformerDataCache::DeformerDataCache() { 
-	mUseDataInstancing = CurvesDeformerFactory::getInstance().getDataInstancingState();
+	mUseDataInstancing = GlobalConfig::getInstance().getDataInstancingState();
 }
 
 // Specialization Macro

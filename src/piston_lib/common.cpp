@@ -1,4 +1,5 @@
 #include "common.h"
+#include "global_config.h"
 #include "deformer_factory.h"
 #include "topology.h"
 #include "serializable_data.h"
@@ -325,7 +326,8 @@ bool UsdPrimHandle::getBsonFromPrim(const pxr::SdfPath& prim_path, const std::st
 
 	const pxr::TfToken key_path(identifier);
 
-	const bool readAsMetadata = CurvesDeformerFactory::getDataStorageMethod() == CurvesDeformerFactory::DataToPrimStorageMethod::METADATA;
+	static const auto& conf = GlobalConfig::getInstance();
+	const bool readAsMetadata = conf.getDataStorageMethod() == CurvesDeformerFactory::DataToPrimStorageMethod::METADATA;
 
 	if(readAsMetadata) {
 		if(!data_prim.HasCustomDataKey(key_path)) {
@@ -442,7 +444,8 @@ bool UsdPrimHandle::setBsonToPrim(const pxr::SdfPath& prim_path, const std::stri
 
 	const pxr::TfToken key_path(identifier);
 
-	const bool storeAsMetadata = CurvesDeformerFactory::getDataStorageMethod() == CurvesDeformerFactory::DataToPrimStorageMethod::METADATA;
+	static auto const& conf = GlobalConfig::getInstance();
+	const bool storeAsMetadata = conf.getDataStorageMethod() == CurvesDeformerFactory::DataToPrimStorageMethod::METADATA;
 
 	if( storeAsMetadata) {
 		// store deformer data as metadata
