@@ -6,8 +6,6 @@ try:
 except:
 	QtCore = None
 
-from piston_houdini.shelf_tools import pistonUpdateCacheShelfButton
-
 def pistonCallbacks(event_type, **kwargs):
 	if event_type == hou.hipFileEventType.AfterClear:
 		# triggered immediately after the current .hip file is cleared
@@ -20,9 +18,8 @@ def pistonCallbacks(event_type, **kwargs):
 
 hou.hipFile.addEventCallback(pistonCallbacks)
 
-pistonUpdateCacheShelfButton()
-
 if not hasattr(hou.session, 'piston_shelf_global_cache_icon_timer'):
+	from piston_houdini.shelf_tools import pistonUpdateCacheShelfButton
 	if QtCore:
 		hou.session.icon_timer = QtCore.QTimer()
 		hou.session.icon_timer.timeout.connect(pistonUpdateCacheShelfButton)

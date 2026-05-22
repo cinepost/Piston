@@ -2,13 +2,15 @@
 #define PISTON_LIB_GLOBAL_CONFIG_H_
 
 #include "os.h"
-#include "deformer_factory.h"
 #include "simple_profiler.h"
+
+#include <pxr/usd/usd/prim.h>
 
 #include <string>
 #include <vector>
 #include <map>
 #include <mutex>
+
 
 namespace Piston {
 
@@ -17,7 +19,10 @@ namespace Piston {
  */
 class GlobalConfig {
 	public:
-		using DataToPrimStorageMethod = CurvesDeformerFactory::DataToPrimStorageMethod;
+		enum class DataToPrimStorageMethod {
+			METADATA = 0,
+			ATTRIBUTE = 1
+		};
 
 	public:
 
@@ -38,8 +43,7 @@ class GlobalConfig {
 		void setDefaultRestTimeCode(pxr::UsdTimeCode time_code);
 		pxr::UsdTimeCode getDefaultRestTimeCode()const ;
 
-		void setDefaultDataPrimPath(const std::string& path);
-		pxr::SdfPath getDefaultDataPrimPath() const;
+		const pxr::SdfPath& getDefaultDataPrimPath() const;
 		bool isDefaultDataPrimPath(const std::string& path) const;
 		bool isDefaultDataPrimPath(const pxr::SdfPath& path) const;
 
@@ -61,6 +65,16 @@ class GlobalConfig {
 
     	GlobalConfig();
 };
+
+inline std::string to_string(const GlobalConfig::DataToPrimStorageMethod& m) {
+	switch(m) {
+		case GlobalConfig::DataToPrimStorageMethod::METADATA:
+			return "METADATA";
+		case GlobalConfig::DataToPrimStorageMethod::ATTRIBUTE:
+		default:
+			return "ATTRIBUTE"; 
+	}
+} 
 
 } // namespace Piston
 

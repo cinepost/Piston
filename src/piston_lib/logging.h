@@ -24,6 +24,10 @@ namespace fs = std::filesystem;
 #undef ERROR
 #endif
 
+#ifdef DEBUG
+#undef DEBUG
+#endif
+
 #endif
 
 namespace Piston {

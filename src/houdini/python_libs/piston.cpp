@@ -110,7 +110,9 @@ BOOST_PYTHON_MODULE(_piston) {
 
 		.def("__iter__", range(&CurvesDeformerFactory::begin, &CurvesDeformerFactory::end))
 		.def("deformers", &CurvesDeformerFactory::deformers, return_value_policy<reference_existing_object>())
+		
 		.def("clear", &CurvesDeformerFactory::clear)
+		.staticmethod("clear")
 	;
 
 	class_<CurvesDeformerFactory::DeformersMap>("DeformersMap")

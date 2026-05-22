@@ -3,7 +3,7 @@ import piston
 
 def pistonUpdateCacheShelfButton():
 	tool = hou.shelves.tool("ptCacheToggle")
-	global_cache_state = piston.DeformerFactory.getPointsCacheUsageState()
+	global_cache_state = piston.GlobalConfig.getInstance().getPointsCacheUsageState()
 
 	if global_cache_state:
 		tool.setIcon("Piston_PtCache_On")

@@ -9,10 +9,6 @@
 
 namespace Piston {
 
-static const bool sDataInstancingDefaultState = true;
-static const pxr::SdfPath sDefaultPrimPath("/__piston_data__");
-static const CurvesDeformerFactory::DataToPrimStorageMethod sDefaultDataToPrimStorage(CurvesDeformerFactory::DataToPrimStorageMethod::ATTRIBUTE);
-
 static constexpr size_t kDefaultPxrPointsLRUCacheMaxSize = 1024 * 1024 * 256 * 4; 
 
 static std::string tolower(std::string s) {
@@ -95,18 +91,11 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 void CurvesDeformerFactory::setPointsCacheUsageState(bool state) {
 	auto& instance = CurvesDeformerFactory::getInstance();
 	static const auto& conf = GlobalConfig::getInstance();
-	const std::lock_guard<std::mutex> lock(instance.mMutex);
 
-	if(state && !conf.getPointsCacheUsageState()) {
-		LOG_WRN << "Point cache is disabled globally!";
-		instance.mpPxrPointsLRUCache = nullptr;
-		return;
-	} else if (state && conf.getPointsCacheUsageState()){
-		if(!instance.mpPxrPointsLRUCache) {
-			instance.mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
-		}
-	} else {
-		instance.mpPxrPointsLRUCache = nullptr;
+	{
+		const std::lock_guard<std::mutex> lock(instance.mMutex);
+		if(instance.mPointCacheState == state) return;
+		instance.mPointCacheState = conf.getPointsCacheUsageState() && state;
 	}
 
 	LOG_INF << "Point cache is " << (instance.mpPxrPointsLRUCache ? "ON" : "OFF");
@@ -117,12 +106,12 @@ bool CurvesDeformerFactory::getPointsCacheUsageState() {
 	static const auto& conf = GlobalConfig::getInstance();
 	const std::lock_guard<std::mutex> lock(instance.mMutex);
 
-	return instance.mpPxrPointsLRUCache && conf.getPointsCacheUsageState();
+	return instance.mPointCacheState && conf.getPointsCacheUsageState();
 }
 
 void CurvesDeformerFactory::clear() {
 	CurvesDeformerFactory& factory = getInstance();
-	std::lock_guard<std::mutex> lock(factory.mMutex);
+	const std::lock_guard<std::mutex> lock(factory.mMutex);
 	
 	factory.mDeformers.clear();
 	if(factory.mpPxrPointsLRUCache) {
@@ -130,14 +119,29 @@ void CurvesDeformerFactory::clear() {
 	}
 }
 
+PxrPointsLRUCache*  CurvesDeformerFactory::getPxrPointsLRUCachePtr() {
+	const bool cache_enabled = CurvesDeformerFactory::getPointsCacheUsageState();
+
+	PxrPointsLRUCache* p_cache = nullptr;
+	{
+		const std::lock_guard<std::mutex> lock(mMutex); 
+	
+		if(cache_enabled && !mpPxrPointsLRUCache) {
+			mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
+		} else if(!cache_enabled && mpPxrPointsLRUCache ) {
+			mpPxrPointsLRUCache = nullptr;
+		}
+		p_cache = mpPxrPointsLRUCache.get(); 
+	}
+	return p_cache;
+}
+
 CurvesDeformerFactory::~CurvesDeformerFactory() {
 	//SimpleProfiler::printReport();
 }
 
-CurvesDeformerFactory::CurvesDeformerFactory() {
-	const bool pt_cache_is_enabled = GlobalConfig::getInstance().getPointsCacheUsageState();
-	mpPxrPointsLRUCache = pt_cache_is_enabled ? PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize) : nullptr;
-	LOG_INF << "Point cache is " << (mpPxrPointsLRUCache ? "ON" : "OFF");
+CurvesDeformerFactory::CurvesDeformerFactory(): mpPxrPointsLRUCache(nullptr) {
+
 }
 
 } // namespace Piston

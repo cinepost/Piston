@@ -35,11 +35,6 @@ class CurvesDeformerFactory {
 			} 
 		};
 
-		enum class DataToPrimStorageMethod {
-			METADATA = 0,
-			ATTRIBUTE = 1
-		};
-
 	public:
 		using DeformersMap = std::map<Key, BaseCurvesDeformer::SharedPtr>;
 
@@ -61,26 +56,9 @@ class CurvesDeformerFactory {
 	    static void setPointsCacheUsageState(bool state);
 		static bool getPointsCacheUsageState();
 
-/*
-	    static void setDataInstancingState(bool state);
-	    static bool getDataInstancingState();
-
-		static void setPointsCacheUsageState(bool state);
-		static bool getPointsCacheUsageState();
-
-		static void setDefaultRestTimeCode(pxr::UsdTimeCode time_code);
-		static pxr::UsdTimeCode getDefaultRestTimeCode();
-
-		static void setDefaultDataPrimPath(const std::string& path);
-		static const pxr::SdfPath& getDefaultDataPrimPath();
-		static bool isDefaultDataPrimPath(const std::string& path);
-		static bool isDefaultDataPrimPath(const pxr::SdfPath& path);
-
-		static DataToPrimStorageMethod getDataStorageMethod();
-*/
 	    static void clear();
 
-	    PxrPointsLRUCache* getPxrPointsLRUCachePtr() { return mpPxrPointsLRUCache.get(); }
+	    PxrPointsLRUCache* getPxrPointsLRUCachePtr();
 
 	    const DeformersMap& getDeformers() const { return mDeformers; }
 
@@ -100,19 +78,12 @@ class CurvesDeformerFactory {
     	// Static pointer to the CurvesDeformerFactory instance
     	static CurvesDeformerFactory* mInstancePtr;
 
+    	// Local conf overrides
+    	bool mPointCacheState;
+
     private:
     	CurvesDeformerFactory();
 };
-
-inline std::string to_string(const CurvesDeformerFactory::DataToPrimStorageMethod& m) {
-	switch(m) {
-		case CurvesDeformerFactory::DataToPrimStorageMethod::METADATA:
-			return "METADATA";
-		case CurvesDeformerFactory::DataToPrimStorageMethod::ATTRIBUTE:
-		default:
-			return "ATTRIBUTE"; 
-	}
-} 
 
 } // namespace Piston
 

@@ -65,14 +65,7 @@ pxr::UsdTimeCode GlobalConfig::getDefaultRestTimeCode() const {
 	return mDefaultRestTimeCode;
 }
 
-void GlobalConfig::setDefaultDataPrimPath(const std::string& path) {
-	const std::lock_guard<std::mutex> lock(mMutex);
-	const pxr::SdfPath new_path(path);
-	if(mDefaultDataPrimPath == new_path) return;
-	mDefaultDataPrimPath = new_path;
-}
-
-pxr::SdfPath GlobalConfig::getDefaultDataPrimPath() const {
+const pxr::SdfPath& GlobalConfig::getDefaultDataPrimPath() const {
 	const std::lock_guard<std::mutex> lock(mMutex);
 	return mDefaultDataPrimPath;
 }
@@ -114,6 +107,8 @@ GlobalConfig::GlobalConfig():
 			mPointCacheState = true;
 		}
 	}
+
+	LOG_INF << "Point cache is " << (mPointCacheState ? "ENABLED" : "DISABLED");
 
 	std::string data_instancing_var_value;
 	if(getEnvVar("PISTON_DATA_INSTANCING", data_instancing_var_value)) {
