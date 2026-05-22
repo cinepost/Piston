@@ -61,7 +61,7 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 	mCurveRootPositions.resize(mCurvesCount);
 	mCurveVectors.resize(total_vertex_count);
 
-	#pragma omp parallel for num_threads(2) schedule(static)
+	//#pragma omp parallel for num_threads(2) schedule(static)
 	for(size_t i = 0; i < mCurvesCount; ++i) {
 		mCurveRootPositions[i] = mRestCurvePoints[mCurveOffsets[i]];
 		
@@ -104,7 +104,7 @@ bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	}
 
 	// Calc curves derivs
-	#pragma omp parallel for num_threads(2) schedule(static)
+	//#pragma omp parallel for num_threads(2) schedule(static)
 	const auto& _points = points.AsConst();
 	for(size_t i = 0; i < mCurvesCount; ++i) {
 		mCurveRootPositions[i] = _points[mCurveOffsets[i]];

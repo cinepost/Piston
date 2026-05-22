@@ -515,7 +515,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 		mpGuideCurvesDeformerData->setBindMode(mBindMode);
 	}
 
-	if(!mpGuideCurvesDeformerData->isValid()) {
+	if(deformer_data_created || !mpGuideCurvesDeformerData->isValid()) {
 		if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuideCurvesDeformerData.get())) {
 
 			bool result = false;
@@ -579,13 +579,14 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 
 bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+	
 	bool guides_trimesh_data_created;
 	if(!mpGuidesPhantomTrimeshData) {
 		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, guides_trimesh_data_created);
 	}
 
 
-	if(!mpGuidesPhantomTrimeshData->isValid()) {
+	if(guides_trimesh_data_created || !mpGuidesPhantomTrimeshData->isValid()) {
 
 		if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
 			// Build in place if no json data present or not needed
@@ -594,6 +595,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 				return false;
 			}
 		}
+
 		mpGuidesPhantomTrimeshData->setValid(false);
 
 		PhantomTrimesh* pPhantomTrimesh = mpGuidesPhantomTrimeshData->getTrimesh();
@@ -1181,7 +1183,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCod
 		assert(mpSkinAdjacencyData);
 	}
 
-	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinAdjacencyData.get())) {
+	if(skin_adjacency_data_created || !getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinAdjacencyData.get())) {
 		if(!mpSkinAdjacencyData->buildInPlace(mGuidesSkinGeoPrimHandle)) {
 			DLOG_ERR << "Error building guides skin adjacency data!";
 			return false;
@@ -1194,7 +1196,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCod
 		assert(mpSkinPhantomTrimeshData);
 	}
 
-	if(!getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinPhantomTrimeshData.get())) {
+	if(skin_trimesh_data_created || !getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinPhantomTrimeshData.get())) {
 		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName)) {
 			DLOG_ERR << "Error building guides skin trimesh data!";
 			return false;
