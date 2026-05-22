@@ -83,7 +83,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 
 	if(mpCurvesContainer->isUpdated()) {
 		DLOG_TRC << "Curves updated. Transform to NTB.";
-		transformCurvesToNTB();
+		transformCurvesToNTB(multi_threaded);
 	}
 
 	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
@@ -118,8 +118,8 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	DLOG_TRC << "FastCurvesDeformer::__deform__ " << (multi_threaded ? "multi_threaded" : "single thread");
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, curveBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, curveBinds.size(), func);
+		blocks.wait();
 	} else {
 		func(0u, curveBinds.size());
 	}
@@ -239,8 +239,8 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	mPerBindLiveTBs.resize(mpFastCurvesDeformerData->getPerBindRestTBs().size());
 
 	// transform curves to NTB spaces
-	transformCurvesToNTB();
-
+	transformCurvesToNTB(multi_threaded);
+	
 	return mpFastCurvesDeformerData->isValid(); 
 }
 
@@ -324,9 +324,10 @@ void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* p
     }
 }
 
-void FastCurvesDeformer::transformCurvesToNTB() {
+void FastCurvesDeformer::transformCurvesToNTB(bool multi_threaded) {
 	assert(mpCurvesContainer);
-
+	assert(mpCurvesContainer->getCurvesCount() > 0);
+	
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
 	assert(curveBinds.size() == mpCurvesContainer->getCurvesCount());
 
@@ -339,25 +340,33 @@ void FastCurvesDeformer::transformCurvesToNTB() {
 	const auto& perBindRestNormals = mpFastCurvesDeformerData->getPerBindRestNormals();
 	const auto& perBindRestTBs = mpFastCurvesDeformerData->getPerBindRestTBs();
 
-	DLOG_WRN << "FastCurvesDeformer::transformCurvesToNTB() make parallel !";
-	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
-		PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
-		const auto& bind = curveBinds[curve_index];
-		if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
+	auto func = [&](const size_t start, const size_t end) {
+		for(uint32_t curve_index = start; curve_index < end; ++curve_index) {
+			PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
+			const auto& bind = curveBinds[curve_index];
+			if(bind.face_id == CurveBindData::kInvalidFaceID) continue;
 
-		const auto root_pos_offset = mpCurvesContainer->getCurveRootPoint(curve_index) - pDeformerMeshContainer->getInterpolatedRestPosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
-		const pxr::GfVec3f& N = perBindRestNormals[curve_index];
-		const pxr::GfVec3f& T = perBindRestTBs[curve_index].first;
-		const pxr::GfVec3f& B = perBindRestTBs[curve_index].second;
-		const pxr::GfMatrix3f m = pxr::GfMatrix3f(
-			N[0], T[0], B[0],
-			N[1], T[1], B[1],
-			N[2], T[2], B[2]
-		).GetInverse();
+			const auto root_pos_offset = mpCurvesContainer->getCurveRootPoint(curve_index) - pDeformerMeshContainer->getInterpolatedRestPosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
+			const pxr::GfVec3f& N = perBindRestNormals[curve_index];
+			const pxr::GfVec3f& T = perBindRestTBs[curve_index].first;
+			const pxr::GfVec3f& B = perBindRestTBs[curve_index].second;
+			const pxr::GfMatrix3f m = pxr::GfMatrix3f(
+				N[0], T[0], B[0],
+				N[1], T[1], B[1],
+				N[2], T[2], B[2]
+			).GetInverse();
 
-		for(size_t j = 0; j < curve_data_ptr.first; ++j) {
-			*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j) + root_pos_offset);
+			for(size_t j = 0; j < curve_data_ptr.first; ++j) {
+				*(curve_data_ptr.second + j) = m * (*(curve_data_ptr.second + j) + root_pos_offset);
+			}
 		}
+	};
+
+	if(multi_threaded) {
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, mpCurvesContainer->getCurvesCount(), func);
+        blocks.wait();
+	} else {
+		func(0u, mpCurvesContainer->getCurvesCount());
 	}
 }
 
@@ -623,8 +632,8 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, total_curves_count, func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, total_curves_count, func);
+		blocks.wait();
 	} else {
 		func(0u, total_curves_count);
 	}

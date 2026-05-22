@@ -54,7 +54,7 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		void calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pPhantomTrimesh, const std::vector<pxr::GfVec3f>& vertex_normals, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 		void calcPerBindTangentsAndBiNormals(const PhantomTrimesh* pPhantomTrimesh, bool build_live, BS::thread_pool<BS::tp::none>* pThreadPool = nullptr);
 
-		void transformCurvesToNTB();
+		void transformCurvesToNTB(bool multi_threaded);
 
 		bool bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind, bool ignore_face_boundaries);
 

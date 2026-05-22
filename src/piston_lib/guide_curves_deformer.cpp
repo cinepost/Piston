@@ -157,8 +157,8 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pointBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
 	} else {
 		func(0u, pointBinds.size());
 	}
@@ -199,8 +199,8 @@ bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& 
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pointBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
 	} else {
 		func(0u, pointBinds.size());
 	}
@@ -252,8 +252,8 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pointBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
 	} else {
 		func(0u, pointBinds.size());
 	}
@@ -305,8 +305,8 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pointBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
 	} else {
 		func(0u, pointBinds.size());
 	}
@@ -478,8 +478,8 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, curves_count, func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, curves_count, func);
+		blocks.wait();
 	} else {
 		func(0u, curves_count);
 	}
@@ -795,8 +795,8 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 		DLOG_INF << "Binding curves to guides using SPACE mode.";
 
 		if(multi_threaded) {
-			mPool.detach_blocks(0u, curves_count, bind_func);
-			mPool.wait();
+			BS::multi_future<void> blocks = mPool.submit_blocks(0u, curves_count, bind_func);
+			blocks.wait();
 		} else {
 			bind_func(0u, curves_count);
 		}
@@ -859,8 +859,8 @@ bool GuideCurvesDeformer::buildNTBFrames(std::vector<NTBFrame>& guide_frames, bo
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, total_guides_count, frame_func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, total_guides_count, frame_func);
+		blocks.wait();
 	} else {
 		frame_func(0u, total_guides_count);
 	}
@@ -939,8 +939,8 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, guide_curves_count, func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, guide_curves_count, func);
+		blocks.wait();
 	} else {
 		func(0u, guide_curves_count);
 	}
@@ -1071,8 +1071,8 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	DLOG_INF << "Binding curves to guides using NTB mode.";
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, curves_count, func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, curves_count, func);
+		blocks.wait();
 	} else {
 		func(0u, curves_count);
 	}

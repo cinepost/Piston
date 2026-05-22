@@ -108,8 +108,8 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pointBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
 	} else {
 		func(0u, pointBinds.size());
 	}
@@ -168,10 +168,11 @@ bool WrapCurvesDeformer::buildCurvesLocalAnimVectors(bool multi_threaded) {
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pPhantomTrimesh->getFaceCount(), face_matrix_func);
-		mPool.wait();
-		mPool.detach_blocks(0u, mpCurvesContainer->getCurvesCount(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks_mf = mPool.submit_blocks(0u, pPhantomTrimesh->getFaceCount(), face_matrix_func);
+		blocks_mf.wait();
+
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, mpCurvesContainer->getCurvesCount(), func);
+		blocks.wait();
 	} else {
 		face_matrix_func(0u, pPhantomTrimesh->getFaceCount());
 		func(0u, mpCurvesContainer->getCurvesCount());
@@ -244,10 +245,10 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 	};
 
 	if(multi_threaded) {
-		mPool.detach_blocks(0u, pPhantomTrimesh->getFaceCount(), face_normal_and_matrix_func);
-		mPool.wait();
-		mPool.detach_blocks(0u, pointBinds.size(), func);
-		mPool.wait();
+		BS::multi_future<void> blocks_nm = mPool.submit_blocks(0u, pPhantomTrimesh->getFaceCount(), face_normal_and_matrix_func);
+		blocks_nm.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
 	} else {
 		face_normal_and_matrix_func(0u, pPhantomTrimesh->getFaceCount());
 		func(0u, pointBinds.size());
@@ -521,8 +522,8 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
     };
 
     if(multi_threaded) {
-		mPool.detach_blocks(0, curves_count, func);
-		mPool.wait();
+		BS::multi_future<void> blocks = mPool.submit_blocks(0, curves_count, func);
+		blocks.wait();
 	} else {
 		func(0, curves_count);
 	}
@@ -763,8 +764,8 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
     DLOG_INF << "Binding curves using SPACE method.";
     
     if(multi_threaded) {
-    	mPool.detach_blocks(0, curves_count, func);
-		mPool.wait();
+    	BS::multi_future<void> blocks = mPool.submit_blocks(0, curves_count, func);
+		blocks.wait();
 	} else {
 		func(0, curves_count);
 	}
