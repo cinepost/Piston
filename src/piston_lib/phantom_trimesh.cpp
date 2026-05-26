@@ -371,10 +371,10 @@ void SerializablePhantomTrimesh::setValid(bool state) {
 	const std::lock_guard<std::mutex> lock(mMutex); 
 	const std::lock_guard<std::mutex> trimesh_facemap_lock(mpTrimesh->mFaceMapMutex);
 
-	if(mpTrimesh->mIsValid != state) {
-		// TODO: check if we need to update other states... Anyways this is kinda ugly
-		mpTrimesh->mIsValid = state;
-	}
+	if(mpTrimesh->mIsValid == state) return;
+
+	// TODO: check if we need to update other states... Anyways this is kinda ugly
+	mpTrimesh->mIsValid = state;
 }
 
 PhantomTrimesh* SerializablePhantomTrimesh::getTrimesh() {

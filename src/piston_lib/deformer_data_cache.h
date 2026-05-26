@@ -40,12 +40,15 @@ class DeformerDataCache {
 		};
 
 		struct KeyStrict: KeyBase {
-			KeyStrict(): KeyBase() {};
-			KeyStrict(const std::type_index& _type_idx, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handle, time_code) {};
-			KeyStrict(const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handles, time_code) {};
+
+			uint32_t id;
+
+			KeyStrict(uint32_t _id): KeyBase(), id(_id) {};
+			KeyStrict(uint32_t _id, const std::type_index& _type_idx, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handle, time_code), id(_id) {};
+			KeyStrict(uint32_t _id, const std::type_index& _type_idx, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code): KeyBase(_type_idx, handles, time_code), id(_id) {};
 
 			bool operator==(const KeyStrict& other) const {
-				if(type_idx != other.type_idx || paths.size() != other.paths.size() || topologies_hash_sum != other.topologies_hash_sum) return false;
+				if(id != other.id || type_idx != other.type_idx || paths.size() != other.paths.size() || topologies_hash_sum != other.topologies_hash_sum) return false;
 				static const auto& cache = DeformerDataCache::getInstance();
 				if(!cache.topologiesAreEqualStrict(topology_indices, other.topology_indices)) return false;
 				return paths == other.paths;
@@ -122,7 +125,8 @@ class DeformerDataCache {
 			}
 
 			std::size_t operator()(const Piston::DeformerDataCache::KeyStrict& k) const {
-				return 0;
+				assert(1 == 2);
+				return k.id;
 			}
 
 			std::size_t operator()(const Piston::DeformerDataCache::Key& k) const {
@@ -190,10 +194,10 @@ class DeformerDataCache {
 		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created);
 
 		template< class T>
-		void invalidate(const UsdPrimHandle& handle, pxr::UsdTimeCode time_code);
+		void invalidate(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code);
 
 		template< class T>
-		void invalidate(const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code);
+		void invalidate(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code);
 
 		// Remove data from cache completely
 		template< class T>

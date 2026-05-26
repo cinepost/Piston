@@ -509,7 +509,7 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 	}
 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
-	bool deformer_data_created;
+	bool deformer_data_created = true;
 	if(!mpGuideCurvesDeformerData) {
 		mpGuideCurvesDeformerData = dataCache.getOrCreateData<GuideCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, deformer_data_created);
 		mpGuideCurvesDeformerData->setBindMode(mBindMode);
@@ -580,14 +580,12 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	
-	bool guides_trimesh_data_created;
+	bool guides_trimesh_data_created = true;
 	if(!mpGuidesPhantomTrimeshData) {
 		mpGuidesPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, guides_trimesh_data_created);
 	}
 
-
 	if(guides_trimesh_data_created || !mpGuidesPhantomTrimeshData->isValid()) {
-
 		if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
 			// Build in place if no json data present or not needed
 			if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
@@ -1177,7 +1175,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCod
 		return true;
 	}
 
-	bool skin_adjacency_data_created;
+	bool skin_adjacency_data_created = true;
 	if(!mpSkinAdjacencyData) {
 		mpSkinAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mGuidesSkinGeoPrimHandle, rest_time_code, skin_adjacency_data_created);
 		assert(mpSkinAdjacencyData);
@@ -1190,7 +1188,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCod
 		}
 	}
 
-	bool skin_trimesh_data_created;
+	bool skin_trimesh_data_created = true;
 	if(!mpSkinPhantomTrimeshData) {
 		mpSkinPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle, &mGuidesSkinGeoPrimHandle}, rest_time_code, skin_trimesh_data_created);
 		assert(mpSkinPhantomTrimeshData);

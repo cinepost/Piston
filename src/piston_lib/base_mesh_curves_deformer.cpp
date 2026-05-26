@@ -34,7 +34,7 @@ bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
-	bool adjacency_data_created;
+	bool adjacency_data_created = true;
 	if(!mpAdjacencyData) {
 		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mDeformerGeoPrimHandle, rest_time_code, adjacency_data_created);
 	}
@@ -53,7 +53,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 		return false;
 	}
 
-	bool trimesh_data_created;
+	bool trimesh_data_created = true;
 	if(!mpPhantomTrimeshData) {
 		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, trimesh_data_created);
 	}

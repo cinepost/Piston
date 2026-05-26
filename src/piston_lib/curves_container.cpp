@@ -7,11 +7,12 @@
 
 namespace Piston {
 
-PxrCurvesContainer::PxrCurvesContainer(): mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()), mUpdated(false) {
+PxrCurvesContainer::PxrCurvesContainer():mSpace(PxrCurvesContainer::Space::UNKNOWN), mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()), mUpdated(false) {
 
 }
 
 PxrCurvesContainer::PxrCurvesContainer(PxrCurvesContainer& other) {
+	mSpace = other.mSpace;
 	mCurvesCount = other.mCurvesCount;
 	mCurveOffsets = other.mCurveOffsets;
 	mCurveRootPositions = other.mCurveRootPositions;
@@ -20,6 +21,8 @@ PxrCurvesContainer::PxrCurvesContainer(PxrCurvesContainer& other) {
 }
 
 bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code) {
+	mSpace = Space::UNKNOWN;
+
 	auto geom_curves = pxr::UsdGeomCurves(prim_handle.getPrim());
 	if(!geom_curves) {
 		LOG_ERR << "Error getting curves geometry from " << prim_handle.getName() << " !";
@@ -75,7 +78,7 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 	assert(mCurveVertexCounts.size() == mCurveOffsets.size());
 
 	mLastUpdateTimeCode = rest_time_code;
-
+	mSpace = Space::LOCAL;
 	return true;
 }
 
@@ -117,6 +120,7 @@ bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	}
 
 	mLastUpdateTimeCode = time_code;
+	mSpace = Space::LOCAL;
 	mUpdated = true;
 
 	LOG_TRC << "PxrCurvesContainer updated at " << mLastUpdateTimeCode;

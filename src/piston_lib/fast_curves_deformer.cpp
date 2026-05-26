@@ -81,7 +81,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	calcPerBindNormals(pAdjacency, pPhantomTrimesh, vertex_normals, build_live, (multi_threaded ? &mPool : nullptr));
 	calcPerBindTangentsAndBiNormals(pPhantomTrimesh, build_live, (multi_threaded ? &mPool : nullptr));
 
-	if(mpCurvesContainer->isUpdated()) {
+	if(mpCurvesContainer->getSpace() == PxrCurvesContainer::Space::LOCAL) {
 		DLOG_TRC << "Curves updated. Transform to NTB.";
 		transformCurvesToNTB(multi_threaded);
 	}
@@ -198,7 +198,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	}
 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
-	bool deformer_data_created;
+	bool deformer_data_created = true;
 	if(!mpFastCurvesDeformerData) {
 		mpFastCurvesDeformerData = dataCache.getOrCreateData<FastCurvesDeformerData>(this, {&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle}, rest_time_code, deformer_data_created);
 	}
@@ -239,7 +239,9 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	mPerBindLiveTBs.resize(mpFastCurvesDeformerData->getPerBindRestTBs().size());
 
 	// transform curves to NTB spaces
-	transformCurvesToNTB(multi_threaded);
+	if(mpCurvesContainer->getSpace() == PxrCurvesContainer::Space::LOCAL) {
+		transformCurvesToNTB(multi_threaded);
+	}
 	
 	return mpFastCurvesDeformerData->isValid(); 
 }
@@ -327,7 +329,13 @@ void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* p
 void FastCurvesDeformer::transformCurvesToNTB(bool multi_threaded) {
 	assert(mpCurvesContainer);
 	assert(mpCurvesContainer->getCurvesCount() > 0);
-	
+
+	if(mpCurvesContainer->getSpace() != PxrCurvesContainer::Space::LOCAL) {
+		// curves already in NTB space
+		LOG_WRN << "Trying to transformCurvesToNTB while curves in " << to_string(mpCurvesContainer->getSpace()) << " space!";
+		return;
+	}
+
 	const auto& curveBinds = mpFastCurvesDeformerData->getCurveBinds();
 	assert(curveBinds.size() == mpCurvesContainer->getCurvesCount());
 
@@ -368,6 +376,8 @@ void FastCurvesDeformer::transformCurvesToNTB(bool multi_threaded) {
 	} else {
 		func(0u, mpCurvesContainer->getCurvesCount());
 	}
+
+	mpCurvesContainer->setSpace(PxrCurvesContainer::Space::DEFORMER);
 }
 
 bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_id, CurveBindData& bind, bool ignore_face_boundaries) {

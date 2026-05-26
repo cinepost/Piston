@@ -123,6 +123,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		void setDebugGeometryMultiplier(float m) { mDebugGeometryMult = m; }
 
+		uint32_t getUniqueID() const { return mID; }
+
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 

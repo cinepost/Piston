@@ -22,6 +22,13 @@ namespace Piston {
 
 class PxrCurvesContainer {
 	public:
+
+		enum class Space {
+			UNKNOWN = 0,	// 
+			LOCAL, 			// usd space
+			DEFORMER   		// some space that is used by deformer
+		};
+
 		using UniquePtr = std::unique_ptr<PxrCurvesContainer>;
 		using CurveDataPtr = std::pair<int, pxr::GfVec3f*>;  // curve <count, ptr> pair
 		using CurveDataConstPtr = std::pair<int, const pxr::GfVec3f*>;  // curve <count, ptr> pair
@@ -47,13 +54,18 @@ class PxrCurvesContainer {
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints.AsConst(); }
 
-		bool      	isUpdated() const { return mUpdated; }
+		bool  sUpdated() const { return mUpdated; }
+
+		Space getSpace() const { return mSpace;}
+
+		void  setSpace(const Space space) { mSpace = space; }
 
 	private:
 		PxrCurvesContainer();
 		PxrCurvesContainer(PxrCurvesContainer& other);
 	
 	private:
+		Space 									mSpace = Space::UNKNOWN;
 		size_t                                  mCurvesCount;
 		pxr::VtArray<int> 						mCurveVertexCounts;
 		std::vector<uint32_t> 					mCurveOffsets;
@@ -66,6 +78,18 @@ class PxrCurvesContainer {
 		pxr::UsdTimeCode                        mLastUpdateTimeCode;
 		bool                                    mUpdated;
 };
+
+inline std::string to_string(PxrCurvesContainer::Space space) {
+	switch(space) {
+		case PxrCurvesContainer::Space::LOCAL:
+			return "LOCAL";
+		case PxrCurvesContainer::Space::DEFORMER:
+			return "DEFORMER";
+		case PxrCurvesContainer::Space::UNKNOWN:
+		default:
+			return "UNKNOWN";
+	}
+}
 
 } // namespace Piston
 

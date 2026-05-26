@@ -101,6 +101,7 @@ class TemplatedMeshContainer: public TemplatedMeshContainerBase {
 };
 
 using MeshContainer = TemplatedMeshContainer<pxr::VtArray<TemplatedMeshContainerBase::PointType>>;
+//using MeshContainer = TemplatedMeshContainer<std::vector<TemplatedMeshContainerBase::PointType>>;
 
 } // namespace Piston
 
