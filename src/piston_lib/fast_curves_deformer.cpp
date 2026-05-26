@@ -151,13 +151,13 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 		const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
 
 		for(const auto face: pPhantomTrimesh->getFaces()) {
-			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]);
+			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]*mDebugGeometryMult);
 			lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
 			lA.setWidth(0.05);
-			DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]);
+			DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]*mDebugGeometryMult);
 			lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
 			lB.setWidth(0.05);
-			DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]);
+			DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]*mDebugGeometryMult);
 			lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
 			lC.setWidth(0.05);
 
@@ -176,11 +176,11 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 			const auto& bind = curveBinds[i];
 			auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
 
-			DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f);
+			DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f*mDebugGeometryMult);
 			lN.setColor({0.0, 1.0, 0.0});
-			DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f);
+			DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f*mDebugGeometryMult);
 			lT.setColor({1.0, 0.0, 0.0});
-			DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f);
+			DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f*mDebugGeometryMult);
 			lB.setColor({0.0, 0.0, 1.0});
 			
 			mpDebugGeo->addLine(lN);

@@ -330,7 +330,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	};
 
 
-	auto getDeformedPoints = [this, &deformPoints](std::unique_ptr<PointsList>& points, bool multi_threaded, PxrCurvesContainer* pCurves, pxr::UsdTimeCode time_code) {
+	auto getDeformedPoints = [this, &deformPoints](std::unique_ptr<PointsList>& points, bool multi_threaded, PxrCurvesContainer* pCurves, const PxrPointsLRUCache::CompositeKey& key) {
 		assert(pCurves);
 		
 		const size_t points_count = pCurves->getTotalVertexCount();
@@ -343,7 +343,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 
 		PointsList* points_list = points.get(); 
 
-		if (deformPoints(multi_threaded, *points_list, time_code)) {
+		if (deformPoints(multi_threaded, *points_list, key.time)) {
 			return (const PointsList*)points_list;
 		}
 
@@ -379,8 +379,30 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	PxrPointsLRUCacheShrinkLock cache_shrink_lock(pPointsLRUCache); // avoid cache shrinking during deformation stage
 	if(cache_shrink_lock.isValid()) DLOG_TRC << "pPointsLRUCache locked";
 
+	LOG_TRC << "Velocities calculation is possible " << (mDeformerGeoPrimHandle.hasPositionsTimeSamples(key_from.time, key_to.time) ? "YES" : "NO");
+	LOG_TRC << "Velocities calculation is ignored " << (ignoreVelocities ? "YES" : "NO");
+
+	const PointsList* pPointsVBlurFrom = nullptr;
+	const PointsList* pPointsVBlurTo = nullptr;
+
+	const PxrPointsLRUCache::CompositeKey velocity_key = {velocityKeyName(), time_code};
+	const PointsList* veolcities_list_ptr = pPointsLRUCache ? pPointsLRUCache->get(velocity_key) : nullptr;
+	bool output_motion_vectors = false;
+
+	if(!ignoreVelocities && mCalcMotionVectors && mDeformerGeoPrimHandle.hasPositionsTimeSamples(key_from.time, key_to.time)) {
+		if(!veolcities_list_ptr) {
+			pPointsVBlurFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? nullptr :
+				(pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from) : getDeformedPoints(mpDeformedPointsListStep, multi_threaded, mpCurvesContainer.get(), key_from));
+			
+			pPointsVBlurTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? nullptr : 
+				(pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to) : getDeformedPoints(mpDeformedPointsListStep, multi_threaded, mpCurvesContainer.get(), key_to));
+		}
+
+		output_motion_vectors = true;
+	}
+
 	DLOG_TRC << "Deform points at " << time_code;
-	const PointsList* deformed_points_list_ptr = pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key) : getDeformedPoints(mpDeformedPointsList, multi_threaded, mpCurvesContainer.get(), time_code);
+	const PointsList* deformed_points_list_ptr = pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, curr_key) : getDeformedPoints(mpDeformedPointsList, multi_threaded, mpCurvesContainer.get(), curr_key);
 	assert(deformed_points_list_ptr);
 	if(!deformed_points_list_ptr) {
 		DLOG_ERR << "Error getting deformed points list!";
@@ -388,34 +410,23 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	}
 
 	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
+	pxr::UsdAttribute attr_v = curves.GetVelocitiesAttr();
 
-	LOG_TRC << "Velocities calculation is possible " << (mDeformerGeoPrimHandle.hasPositionsTimeSamples(key_from.time, key_to.time) ? "YES" : "NO");
-	LOG_TRC << "Velocities calculation is ignored " << (ignoreVelocities ? "YES" : "NO");
-
-	if(!ignoreVelocities && mCalcMotionVectors && mDeformerGeoPrimHandle.hasPositionsTimeSamples(key_from.time, key_to.time)) {
-
-		const PxrPointsLRUCache::CompositeKey key_vel = {velocityKeyName(), time_code};
-		const PointsList* veolcities_list_ptr = pPointsLRUCache ? pPointsLRUCache->get(key_vel) : nullptr;
+	if(output_motion_vectors && attr_v) {
 
 		if(!veolcities_list_ptr) {
-			PointsList* tmp_velicities_list_ptr = pPointsLRUCache ? pPointsLRUCache->put(key_vel, mpCurvesContainer->getTotalVertexCount()) : getTempVelocitiesList(mpCurvesContainer->getTotalVertexCount());
-
 			LOG_TRC << "Calc velocities from " <<  std::to_string(key_from.time.GetValue()) << " to " <<  std::to_string(key_to.time.GetValue());
-
-			const PointsList* pPointsFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? deformed_points_list_ptr :
-				(pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from) : getDeformedPoints(mpDeformedPointsListStep, multi_threaded, mpCurvesContainer.get(), key_from.time));
 			
-			const PointsList* pPointsTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? deformed_points_list_ptr : 
-				(pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to) : getDeformedPoints(mpDeformedPointsListStep, multi_threaded, mpCurvesContainer.get(), key_to.time));
-
-			assert(pPointsFrom && pPointsTo);
-
-			const pxr::GfVec3f* p_pts_from_ptr = pPointsFrom->data();
-			const pxr::GfVec3f* p_pts_to_ptr = pPointsTo->data();
+			assert(pPointsVBlurFrom || pPointsVBlurTo);
+			const pxr::GfVec3f* p_pts_from_ptr = pPointsVBlurFrom ?  pPointsVBlurFrom->data() : deformed_points_list_ptr->data();
+			const pxr::GfVec3f* p_pts_to_ptr = pPointsVBlurTo ? pPointsVBlurTo->data() : deformed_points_list_ptr->data();
 
 			assert(p_pts_from_ptr != p_pts_to_ptr);
 
 			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mDeformerGeoPrimHandle.getStageTimeCodesPerSecond());
+
+			PointsList* tmp_velicities_list_ptr = pPointsLRUCache ? pPointsLRUCache->put(velocity_key, mpCurvesContainer->getTotalVertexCount()) : getTempVelocitiesList(mpCurvesContainer->getTotalVertexCount());
+			assert(tmp_velicities_list_ptr);
 
 			auto calcVectorsFunc = [&](const std::size_t start, const std::size_t end) {
 				if(p_pts_from_ptr == p_pts_to_ptr) {
@@ -430,24 +441,20 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 			};
 
 			if(multi_threaded) {
-				mPool.detach_blocks(0u, tmp_velicities_list_ptr->size(), calcVectorsFunc);
-				mPool.wait();
+				BS::multi_future<void> blocks = mPool.submit_blocks(0u, tmp_velicities_list_ptr->size(), calcVectorsFunc);
+				blocks.wait();
 			} else {
 				calcVectorsFunc(0u, tmp_velicities_list_ptr->size());
 			}
 
 			veolcities_list_ptr = (const PointsList*)tmp_velicities_list_ptr;
+			
+			assert(veolcities_list_ptr);
 		}
 
-		assert(veolcities_list_ptr);
-
-		if(pxr::UsdAttribute attr_v = curves.GetVelocitiesAttr()) {
-			if(!attr_v.Set(veolcities_list_ptr->getVtArray(), time_code)) {
-				DLOG_ERR << "Error setting velocities attribute !";
-				return false;
-			}
-		} else {
-			DLOG_ERR << mCurvesGeoPrimHandle << " has no velocities attribute !";
+		if(!attr_v.Set(veolcities_list_ptr->getVtArray(), time_code)) {
+			DLOG_ERR << "Error setting velocities attribute !";
+			return false;
 		}
 	}
 

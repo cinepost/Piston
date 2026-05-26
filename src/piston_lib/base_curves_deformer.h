@@ -121,6 +121,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		void showDebugGeometry(bool state);
 
+		void setDebugGeometryMultiplier(float m) { mDebugGeometryMult = m; }
+
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
@@ -142,6 +144,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 	protected:
 		bool mUsePointsCache = true;
 		bool mShowDebugGeometry = false;
+		float mDebugGeometryMult = 1.0f;
 		bool mDirty = true;
 		bool mDeformerDataWritten = false;
 		bool mInstancingEnabled = true;

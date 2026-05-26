@@ -159,6 +159,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("writeJsonDataToPrim", &BaseCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
 
 		.def("showDebugGeometry", &BaseCurvesDeformer::showDebugGeometry)
+		.def("setDebugGeometryMultiplier", &BaseCurvesDeformer::setDebugGeometryMultiplier)
 
 		.def("__repr__", &BaseCurvesDeformer::repr)
 		.def("toString", &BaseCurvesDeformer::toString, return_value_policy<copy_const_reference>())
