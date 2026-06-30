@@ -274,7 +274,7 @@ const TemplatedMeshContainerBase::PointType TemplatedMeshContainer<T>::getFaceRe
 
 	return pxr::GfGetNormalized(
 		pxr::GfCross(rest_positions[face.indices[1]] - rest_positions[face.indices[0]], rest_positions[face.indices[2]] - rest_positions[face.indices[0]])
-	);
+	, MIN_VECTOR_LENGTH_F);
 }
 
 template <typename T>
@@ -283,7 +283,7 @@ TemplatedMeshContainerBase::PointType TemplatedMeshContainer<T>::getFaceLiveNorm
 
 	return pxr::GfGetNormalized(
 		pxr::GfCross(live_positions[face.indices[1]] - live_positions[face.indices[0]], live_positions[face.indices[2]] - live_positions[face.indices[0]])
-	);
+	, MIN_VECTOR_LENGTH_F);
 }
 
 template class Piston::TemplatedMeshContainer<pxr::VtArray<Piston::TemplatedMeshContainerBase::PointType>>;

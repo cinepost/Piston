@@ -41,7 +41,7 @@ class TemplatedPointsList : public TemplatedPointsListBase {
 		//std::vector<pxr::GfVec3f>& getVector() { return mPoints; }
 		//const std::vector<pxr::GfVec3f>& getVector() const { return mPoints; }
 
-		const pxr::VtArray<PointType>& getVtArray() const { return mVtArray; }
+		const pxr::VtArray<PointType>& getVtArray() const { return mVtArray.AsConst(); }
 
 		void resize(size_t new_size);
 
@@ -61,7 +61,7 @@ class TemplatedPointsList : public TemplatedPointsListBase {
 
 
 		std::vector<PointType> 	mPoints;
-		pxr::VtArray<PointType> 	mVtArray;
+		pxr::VtArray<PointType> mVtArray;
 		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
 
 		mutable size_t mSizeInBytes;

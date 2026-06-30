@@ -2,6 +2,7 @@
 #define PISTON_LIB_GEOMETRY_TOOLS_H_
 
 #include "framework.h"
+#include "float16.h"
 #include "logging.h"
 
 #include <memory>
@@ -12,9 +13,6 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 
-#include <glm/vec3.hpp>
-#include <glm/glm.hpp>  
-
 #include <pxr/base/gf/matrix3f.h>
 
 
@@ -24,21 +22,43 @@ class UsdGeomMeshFaceAdjacency;
 class PhantomTrimesh;
 
 struct Plane {
-	Plane(const glm::vec3& p, const glm::vec3& n): point{p[0], p[1], p[2]}, normal{n[0], n[1], n[2]} {};
 	Plane(const pxr::GfVec3f& p, const pxr::GfVec3f& n): point{p[0], p[1], p[2]}, normal{n[0], n[1], n[2]} {};
 	std::array<float, 3> point;
 	std::array<float, 3> normal;
 };
 
+// Axis-Aligned Bounding Box
+struct AABB {
+    pxr::GfVec3f min{std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+    pxr::GfVec3f max{-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max()};
+
+    inline void fit(const pxr::GfVec3f& p) {
+        min[0] = std::min(min[0], p[0]); min[1] = std::min(min[1], p[1]); min[2] = std::min(min[2], p[2]);
+        max[0] = std::max(max[0], p[0]); max[1] = std::max(max[1], p[1]); max[2] = std::max(max[2], p[2]);
+    }
+
+    inline float squareDist(const pxr::GfVec3f& p) const {
+        float sq = 0.0;
+        if (p[0] < min[0]) sq += (min[0] - p[0]) * (min[0] - p[0]);
+        else if (p[0] > max[0]) sq += (p[0] - max[0]) * (p[0] - max[0]);
+        if (p[1] < min[1]) sq += (min[1] - p[1]) * (min[1] - p[1]);
+        else if (p[1] > max[1]) sq += (p[1] - max[1]) * (p[1] - max[1]);
+        if (p[2] < min[2]) sq += (min[2] - p[2]) * (min[2] - p[2]);
+        else if (p[2] > max[2]) sq += (p[2] - max[2]) * (p[2] - max[2]);
+        return sq;
+    }
+};
+
 struct NTBFrame {
 	NTBFrame(): n(1.0, 0.0, 0.0), t(0.0, 0.0, 1.0), b(0.0, 1.0, 0.0) {};
 	NTBFrame(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t, const pxr::GfVec3f& _b): n(_n), t(_t), b(_b) {};
-	NTBFrame(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t): n(_n), t(_t), b(pxr::GfCross(pxr::GfGetNormalized(_t), _n)) {};
+	NTBFrame(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t): n(_n), t(_t), b(pxr::GfCross(pxr::GfGetNormalized(_t, MIN_VECTOR_LENGTH_F), _n)) {};
 
 	void set(const pxr::GfVec3f& _n, const pxr::GfVec3f& _t, const pxr::GfVec3f& _b) { n = _n; t = _t; b = _b; }
 
 	pxr::GfVec3f operator*(const pxr::GfVec3f& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * v; }
 	pxr::GfVec3f operator*(const std::array<float, 3>& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * pxr::GfVec3f(v[0], v[1], v[2]); }
+    pxr::GfVec3f operator*(const std::array<float16_t, 3>& v) const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]) * pxr::GfVec3f(v[0], v[1], v[2]); }
 
 	inline pxr::GfMatrix3f getMatrix3f() const { return pxr::GfMatrix3f(n[0], t[0], b[0], n[1], t[1], b[1], n[2], t[2], b[2]); }
 
@@ -83,12 +103,6 @@ inline float barycentricDistanceSquaredToCenter(float u, float v, float w) {
     float dw = w - k;
     return du*du + dv*dv + dw*dw;
 }
-
-inline float distance(const glm::vec3& point, const Plane& plane) {
-	return dot(glm::vec3{plane.normal[0], plane.normal[1], plane.normal[2]}, glm::vec3{point[0] - plane.point[0], point[1] - plane.point[1], point[2] - plane.point[2]});
-}
-
-inline float distance(const Plane& plane, const glm::vec3& point) { return distance(point, plane); } 
 
 inline float distance(const pxr::GfVec3f& point, const Plane& plane) {
 	return pxr::GfDot(pxr::GfVec3f{plane.normal[0], plane.normal[1], plane.normal[2]}, pxr::GfVec3f{point[0] - plane.point[0], point[1] - plane.point[1], point[2] - plane.point[2]});
@@ -181,8 +195,6 @@ inline float pointTriangleDistSquared(const pxr::GfVec3f& p, const pxr::GfVec3f&
     float w = vc * denom;
     return lengthSquared(p - (a + ab * v + ac * w));
 };
-
-glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2);
 
 pxr::GfMatrix3f rotateAlign2(const pxr::GfVec3f& n1, const pxr::GfVec3f& n2);
 pxr::GfMatrix3f rotateAlign(const pxr::GfVec3f& n1, const pxr::GfVec3f& n2);

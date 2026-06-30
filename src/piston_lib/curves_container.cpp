@@ -7,7 +7,7 @@
 
 namespace Piston {
 
-PxrCurvesContainer::PxrCurvesContainer():mSpace(PxrCurvesContainer::Space::UNKNOWN), mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()), mUpdated(false) {
+PxrCurvesContainer::PxrCurvesContainer():mSpace(PxrCurvesContainer::Space::UNKNOWN), mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()) {
 
 }
 
@@ -85,8 +85,6 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) {
 	assert(prim_handle.isBasisCurvesGeoPrim());
 
-	mUpdated = false;
-
 	if(!force) {
 		if(mLastUpdateTimeCode == time_code) return true;
 		//if(!prim_handle.hasPositionsTimeSamples(mLastUpdateTimeCode, time_code)) return true;
@@ -121,7 +119,6 @@ bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 
 	mLastUpdateTimeCode = time_code;
 	mSpace = Space::LOCAL;
-	mUpdated = true;
 
 	LOG_TRC << "PxrCurvesContainer updated at " << mLastUpdateTimeCode;
 	return true;

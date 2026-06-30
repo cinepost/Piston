@@ -1,7 +1,6 @@
 #include "simple_profiler.h"
 #include "guide_curves_deformer.h"
 #include "deformer_data_cache.h"
-#include "curves_container_utils.h"
 
 #include "common.h"
 #include "logging.h"
@@ -9,7 +8,6 @@
 #include "geometry_tools.h"
 #include "tetrahedron.h"
 
-#include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/matrix4f.h>
 
 #include <random>
@@ -114,12 +112,6 @@ bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, px
 			break;
 		case BindMode::NTB:
 			result = deformImpl_NTBMode(multi_threaded, points, time_code);
-			break;
-		case BindMode::BLEND:
-			result = deformImpl_BlendNTBMode(multi_threaded, points, time_code);
-			break;
-		case BindMode::LHS:
-			result = deformImpl_LHSMode(multi_threaded, points, time_code);
 			break;
 		default:
 			assert(false && "Unimplemented GuideCurvesDeformer::BindMode");
@@ -233,30 +225,6 @@ bool GuideCurvesDeformer::hasSkinPrimitiveData() const {
 	return mpSkinPhantomTrimeshData && mpSkinPhantomTrimeshData->isValid();
 }
 
-bool GuideCurvesDeformer::deformImpl_LHSMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
-
-	const auto& positions = mpGuideCurvesContainer->getLiveCurvePoints();
-
-	for(size_t i = 0; i < points.size(); ++i) {
-		assert(i < mTestLHSData6P.size());
-
-		const auto& bind = mTestLHSData6P[i];
-		points[i] = {0.0f, 0.0f, 0.0f};
-
-		if(bind.isValid()) {
-			points[i] += positions[bind.v[0]] * bind.w[0];
-			points[i] += positions[bind.v[1]] * bind.w[1];
-			points[i] += positions[bind.v[2]] * bind.w[2];
-			points[i] += positions[bind.v[3]] * bind.w[3];
-			points[i] += positions[bind.v[4]] * bind.w[4];
-			points[i] += positions[bind.v[5]] * bind.w[5];
-
-		}
-	}
-
-	return true;
-}
-
 bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
@@ -290,60 +258,6 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 			const std::array<float, 3>& ntbCoord = bind.getData();
 
 			points[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * ntbCoord;
-		}
-	};
-
-	if(multi_threaded) {
-		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
-		blocks.wait();
-	} else {
-		func(0u, pointBinds.size());
-	}
-
-	return true;
-}
-
-bool GuideCurvesDeformer::deformImpl_BlendNTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
-	const auto* pGuideCurvesContainer = mpGuideCurvesContainer.get();
-	assert(pGuideCurvesContainer);
-
-	assert(hasSkinPrimitiveData()); // for now we only work with skin geometry
-
-	assert(mpSkinMeshContainer);
-	mpSkinMeshContainer->update(mGuidesSkinGeoPrimHandle, time_code, isDirty());
-
-	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
-	const auto& pointBinds = mTestBlendNTBData;
-	assert(pointBinds.size() == points.size());
-
-	std::vector<NTBFrame> live_guide_frames(mpGuideCurvesContainer->getLiveCurvePoints().size());
-	if(!buildNTBFrames(live_guide_frames, multi_threaded, true /* build live */)) {
-		return false;
-	}
-
-	auto func = [&](const std::size_t start, const std::size_t end) {
-		for(size_t i = start; i < end; ++i) {
-			const auto& bind = pointBinds[i];
-			if(!bind.isValid()) continue;
-
-			points[i] = {0.0f, 0.0f, 0.f};
-
-			// first guide
-			uint32_t frame_id_0 = pGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[0]) + bind.v[0];
-			
-			points[i] += (guides_live_points[frame_id_0] + live_guide_frames[frame_id_0] * bind.coords[0]) * bind.w[0];
-
-			// second guide
-			if(bind.guide_id[1] == GuideCurvesDeformerData::BlendedNTBData::kInvalidCurveID) continue;
-			uint32_t frame_id_1 = pGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[1]) + bind.v[1];
-
-			points[i] += (guides_live_points[frame_id_1] + live_guide_frames[frame_id_1] * bind.coords[1]) * bind.w[1];
-
-			// third guide
-			if(bind.guide_id[2] == GuideCurvesDeformerData::BlendedNTBData::kInvalidCurveID) continue;
-			uint32_t frame_id_2 = pGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[2]) + bind.v[2];
-
-			points[i] += (guides_live_points[frame_id_2] + live_guide_frames[frame_id_2] * bind.coords[2]) * bind.w[2];
 		}
 	};
 
@@ -596,9 +510,7 @@ buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_thr
 bool GuideCurvesDeformer::guideIndicesNeeded() const {
 	if(getBindRootsToSkinSurface()) return true;
 	if(getBindMode() == BindMode::NTB) return true;
-	if(getBindMode() == BindMode::BLEND) return true;
 	if(getBindMode() == BindMode::ANGLE) return true;
-	if(getBindMode() == BindMode::LHS) return true;
 
 	return false;
 }
@@ -687,12 +599,6 @@ bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code,
 			case BindMode::NTB:
 				result = buildDeformerDataNTBMode(rest_time_code, multi_threaded);
 				break;
-			case BindMode::LHS:
-				result = buildDeformerDataLHSMode(rest_time_code, multi_threaded);
-				break;
-			case BindMode::BLEND:
-				result = buildDeformerDataBlendNTBMode(rest_time_code, multi_threaded);
-				break;
 			default:
 				result = buildDeformerDataAngleMode(rest_time_code, multi_threaded);
 				break;
@@ -731,15 +637,13 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
 		if(!pPhantomTrimesh->hasTetrahedrons()) {
 			assert(mpDeformerMeshContainer);
-			if(!pPhantomTrimesh->buildTetrahedrons(mpDeformerMeshContainer->getRestPositions(), mpGuideCurvesContainer.get())) {
+			if(!pPhantomTrimesh->buildTetrahedrons(mpDeformerMeshContainer->getRestPositions())) {
 				DLOG_ERR << "Error building tetrahedrons!";
 				return false;
 			}
 		}
 
 		const std::vector<PhantomTrimesh::Tetrahedron>& tetrahedrons = pPhantomTrimesh->getTetrahedrons();
-
-		DLOG_DBG << "Tetrahedrons count " << tetrahedrons.size();
 
 		// Build kdtree
 		auto buildTetrahedronsRestCentroidsKDTree = [&](bool multi_threaded) {
@@ -755,7 +659,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 			return neighbour_search::KDTree<float, 3>(pDeformerMeshContainer->getRestPositions(), multi_threaded);
 		};
 
-		//neighbour_search::KDTree<float, 3> centroids_kdtree = buildTetrahedronsRestCentroidsKDTree(multi_threaded);
+		neighbour_search::KDTree<float, 3> centroids_kdtree = buildTetrahedronsRestCentroidsKDTree(multi_threaded);
 		neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = buildRestPositionsKDTree(multi_threaded);
 
 		const size_t curves_count = mpCurvesContainer->getCurvesCount();
@@ -768,8 +672,6 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 		std::atomic<size_t> bound_points = 0;
 		std::atomic<size_t> unboud_points = 0;
 		
-		TetrahedronKDTree<PhantomTrimesh::PxrIndexType> tetraKDTree(pPhantomTrimesh->getTetrahedrons(), pDeformerMeshContainer->getRestPositions());
-
 		auto bind_func = [&](const std::size_t start, const std::size_t end) {
 	    	if(multi_threaded) {
 	    		const std::optional<std::size_t> thread_index = BS::this_thread::get_index();
@@ -782,8 +684,6 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 	    	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
 
 	    	const auto& faces = pPhantomTrimesh->getFaces();
-
-	    	TetrahedronKDTree<PhantomTrimesh>::TetraIndexType cachedTetraIndex = TetrahedronKDTree<PhantomTrimesh>::kInvalidTetraID;
 
 			for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
 	    		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_idx);
@@ -804,56 +704,121 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 
 	        		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
 
-	        		bool is_inside = false;
-	        		
-	        		//auto tetra_index = tetraKDTree.queryPoint(curr_pt, is_inside);
-	        		auto tetra_index = tetraKDTree.queryPointWithCache(curr_pt, cachedTetraIndex, is_inside);
+	        		//findKNearestNeighboursWithinRadiusSquared(const PointType &target, std::size_t k, CoordinateType radius_squared, std::vector<ReturnType> &result)
 
-	        		if(is_inside) {
-	        			PROFILE("inside");
+	        		// First try to find tetrahedron is connected to cleset point in point cloud
+	        		const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = deformer_restpoints_kdtree.findNearestNeighbour(curr_pt);
+	        		const size_t point_connected_tetras_count = pPhantomTrimesh->getPointConnectedTetrahedronsCount(nearest_pt.first);
+
+	        		for(size_t lti = 0; lti < point_connected_tetras_count; ++lti) {
+	        			uint32_t tetra_index = pPhantomTrimesh->getPointConnectedTetrahedronIndex(nearest_pt.first, lti);
+
 	        			pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(tetra_index), curr_pt, u, v, w, x);
 
-	        			// bound inside tetra;
+	        			if(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+	        			   u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f ) {
+	        				// neighbour test failed;
+	        				continue;
+	        			}
+
+	        			// bound by nerest point cloud vertex;
 	        			bind.encodeID_modeSPACE(tetra_index, true /* is tetra id */, false /* data is 3x32bit floats */);
 	        			bind.setData(u, v, w);
 	        			bound_points++;
-	        		} else {
-	        			PROFILE("outside");
-	        			// Bind to triface
-						deformer_restpoints_kdtree.findKNearestNeighbours(curr_pt, 3, closest_deformer_points);
-
-        				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(closest_deformer_points[0].first, closest_deformer_points[1].first, closest_deformer_points[2].first);
-        				const auto& face = faces[face_id];
-
-						const pxr::GfVec3f& p0 = pDeformerMeshContainer->getRestPointPosition(face.indices[0]);
-						const pxr::GfVec3f& p1 = pDeformerMeshContainer->getRestPointPosition(face.indices[1]);
-						const pxr::GfVec3f& p2 = pDeformerMeshContainer->getRestPointPosition(face.indices[2]);
-
-						const auto& face_normal = pDeformerMeshContainer->getFaceRestNormal(face);
-						const Plane face_plane(p0, face_normal);
-						const float face_distance = distance(face_plane, curr_pt);
-
-						const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
-
-						const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
-						float d00 = pxr::GfDot(v0, v0);
-						float d01 = pxr::GfDot(v0, v1);
-						float d11 = pxr::GfDot(v1, v1);
-						float d20 = pxr::GfDot(v2, v0);
-						float d21 = pxr::GfDot(v2, v1);
-						float denom = d00 * d11 - d01 * d01;
-
-						u = (d11 * d20 - d01 * d21) / denom;
-						v = (d00 * d21 - d01 * d20) / denom;
-						w = face_distance;
-						bind.encodeID_modeSPACE(face_id, false /* not a tetra id */, false /* data is 3x32bit floats */);
-						bind.setData(u, v, w);
-        				bound_points++;
+	        			break;
 	        		}
 
-	        		break;
+	        		neighbour_search::KDTree<float, 3>::ReturnType closest_tetra_centroid;
+	        		closest_tetra_centroid.first = neighbour_search::KDTree<float, 3>::kInvalidIndex;
 
-	        		assert(bind.encoded_id != PointBindData::kInvalid && "SPACE mode encoded_id should not be PointBindData::kInvalid !");
+	        		// If point is not bound by previous method we test it against closest tetraheron centroid
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			closest_tetra_centroid = centroids_kdtree.findNearestNeighbour(curr_pt);
+						
+						pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(closest_tetra_centroid.first), curr_pt, u, v, w, x);
+	        			if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+	        			   	 u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f )) {
+	        				// bound by nearest tetra centroid
+	        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
+	        				bind.setData(u, v, w);
+	        				bound_points++;
+	        			}
+	        		}
+
+	        		// Brute force search for contaning centroid
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			const bool sort = false;
+	        			centroids_kdtree.findAllNearestNeighboursWithinRadiusSquared(curr_pt, sorted_tetra_centroids, sort);
+						
+						float x;
+	        			for(const auto& centroid: sorted_tetra_centroids) {
+							pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(centroid.first), curr_pt, u, v, w, x);
+	        				if(!(u < 0.0f || v < 0.0f || w < 0.0f || x < 0.0f ||
+	        			   	     u > 1.0f || v > 1.0f || w > 1.0f || x > 1.0f)) {
+	        				   	// bound by brute force search
+	        				   	bind.encodeID_modeSPACE(centroid.first, true /* is tetra id */, false /* data is 3x32bit floats */);
+	        				   	bind.setData(u, v, w);
+	        					bound_points++;
+	        					break;
+	        				}
+	        			}
+	        		}
+
+	        		// Now for any unbound point we bind it to closest triface or tetra (depends on user choice)
+
+	        		const bool bindMissingToTriface = true;
+	        		
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			if(bindMissingToTriface) {
+
+	        				// TODO: make separate point clouds (root and tip guide points) to avoid binding to same guide points
+
+	        				deformer_restpoints_kdtree.findKNearestNeighbours(curr_pt, 3, closest_deformer_points);
+
+	        				const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(closest_deformer_points[0].first, closest_deformer_points[1].first, closest_deformer_points[2].first);
+	        				const auto& face = faces[face_id];
+
+							const pxr::GfVec3f& p0 = pDeformerMeshContainer->getRestPointPosition(face.indices[0]);
+							const pxr::GfVec3f& p1 = pDeformerMeshContainer->getRestPointPosition(face.indices[1]);
+							const pxr::GfVec3f& p2 = pDeformerMeshContainer->getRestPointPosition(face.indices[2]);
+
+							const auto& face_normal = pDeformerMeshContainer->getFaceRestNormal(face);
+							const Plane face_plane(p0, face_normal);
+							const float face_distance = distance(face_plane, curr_pt);
+
+							const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
+
+							const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = projected_pt - p0;
+							float d00 = pxr::GfDot(v0, v0);
+							float d01 = pxr::GfDot(v0, v1);
+							float d11 = pxr::GfDot(v1, v1);
+							float d20 = pxr::GfDot(v2, v0);
+							float d21 = pxr::GfDot(v2, v1);
+							float denom = d00 * d11 - d01 * d01;
+
+							u = (d11 * d20 - d01 * d21) / denom;
+							v = (d00 * d21 - d01 * d20) / denom;
+							w = face_distance;
+							bind.encodeID_modeSPACE(face_id, false /* not a tetra id */, false /* data is 3x32bit floats */);
+							bind.setData(u, v, w);
+	        				bound_points++;
+	        			} else {
+	        				
+	        				// TODO: this needs to be checked. (weird shit happens)
+
+	        				pDeformerMeshContainer->barycentricTetrahedronRestCoords(pPhantomTrimesh->getTetrahedron(closest_tetra_centroid.first), curr_pt, u, v, w, x);
+	        				bind.encodeID_modeSPACE(closest_tetra_centroid.first, true /* is tetra id */, true /* data is 4x24bit floats */);
+	        				bind.setData(u, v, w, x);
+	        				bound_points++;
+	        			}
+	        			
+	        		}
+
+	        		if(bind.encoded_id == PointBindData::kInvalid) {
+	        			// We should not be here
+	        			assert((1 == 2) && "What the f..ck !?");
+	        			unboud_points++;
+	        		}
 	        	}
 	    	}
 		};
@@ -867,11 +832,9 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 			bind_func(0u, curves_count);
 		}
 
-		DLOG_DBG << "Total points: " << total_points.load();
-		DLOG_DBG << "Bound points: " << bound_points.load();
-		DLOG_DBG << "Unbound points: " << unboud_points.load();
-
-		SimpleProfiler::printReport();
+		DLOG_TRC << "Total points: " << total_points.load();
+		DLOG_TRC << "Bound points: " << bound_points.load();
+		DLOG_TRC << "Unbound points: " << unboud_points.load();
 
 		mpGuidesPhantomTrimeshData->setValid(true);
 	}
@@ -985,7 +948,7 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
         	}
         	pKDTree = kdtrees[guide_id].get();
 
-			const pxr::GfVec3f& root_pt = mpGuideCurvesContainer->getCurveRestPoint(guide_id, 0 /* root vtx */);
+			const pxr::GfVec3f& root_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, 0 /* root vtx */);
         	pKDTree->findKNearestNeighbours(root_pt, 3, closest_deformer_points);
 
         	assert( closest_deformer_points[0].first != closest_deformer_points[1].first &&
@@ -1015,740 +978,6 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 
 	return true;
 }
-
-
-// Computes the determinant of a 3x3 matrix (helper for 4x4 inversion)
-template<typename T>
-static inline T det3x3(T m00, T m01, T m02,
-              T m10, T m11, T m12,
-              T m20, T m21, T m22) {
-    return m00 * (m11 * m22 - m12 * m21) -
-           m01 * (m10 * m22 - m12 * m20) +
-           m02 * (m10 * m21 - m11 * m20);
-}
-
-// Fixed, highly accurate 4x4 matrix inverter using standard minor determinants
-template<typename T>
-static inline bool invert4x4_fixed(const T m[16], T invOut[16]) {
-    T inv[16];
-
-    inv[0] = m[5]  * m[10] * m[15] - 
-             m[5]  * m[11] * m[14] - 
-             m[9]  * m[6]  * m[15] + 
-             m[9]  * m[7]  * m[14] +
-             m[13] * m[6]  * m[11] - 
-             m[13] * m[7]  * m[10];
-
-    inv[4] = -m[4]  * m[10] * m[15] + 
-              m[4]  * m[11] * m[14] + 
-              m[8]  * m[6]  * m[15] - 
-              m[8]  * m[7]  * m[14] - 
-              m[12] * m[6]  * m[11] + 
-              m[12] * m[7]  * m[10];
-
-    inv[8] = m[4]  * m[9]  * m[15] - 
-             m[4]  * m[11] * m[13] - 
-             m[8]  * m[5]  * m[15] + 
-             m[8]  * m[7]  * m[13] + 
-             m[12] * m[5]  * m[11] - 
-             m[12] * m[7]  * m[9];
-
-    inv[12] = -m[4]  * m[9]  * m[14] + 
-               m[4]  * m[10] * m[13] + 
-               m[8]  * m[5]  * m[14] - 
-               m[8]  * m[6]  * m[13] - 
-               m[12] * m[5]  * m[10] + 
-               m[12] * m[6]  * m[9];
-
-    inv[1] = -m[1]  * m[10] * m[15] + 
-              m[1]  * m[11] * m[14] + 
-              m[9]  * m[2]  * m[15] - 
-              m[9]  * m[3]  * m[14] - 
-              m[13] * m[2]  * m[11] + 
-              m[13] * m[3]  * m[10];
-
-    inv[5] = m[0]  * m[10] * m[15] - 
-             m[0]  * m[11] * m[14] - 
-             m[8]  * m[2]  * m[15] + 
-             m[8]  * m[3]  * m[14] + 
-             m[12] * m[2]  * m[11] - 
-             m[12] * m[3]  * m[10];
-
-    inv[9] = -m[0]  * m[9]  * m[15] + 
-              m[0]  * m[11] * m[13] + 
-              m[8]  * m[1]  * m[15] - 
-              m[8]  * m[3]  * m[13] - 
-              m[12] * m[1]  * m[11] + 
-              m[12] * m[3]  * m[9];
-
-    inv[13] = m[0]  * m[9]  * m[14] - 
-              m[0]  * m[10] * m[13] - 
-              m[8]  * m[1]  * m[14] + 
-              m[8]  * m[2]  * m[13] + 
-              m[12] * m[1]  * m[10] - 
-              m[12] * m[2]  * m[9];
-
-    inv[2] = m[1]  * m[6]  * m[15] - 
-             m[1]  * m[7]  * m[14] - 
-             m[5]  * m[2]  * m[15] + 
-             m[5]  * m[3]  * m[14] + 
-             m[13] * m[2]  * m[7] - 
-             m[13] * m[3]  * m[6];
-
-    inv[6] = -m[0]  * m[6]  * m[15] + 
-              m[0]  * m[7]  * m[14] + 
-              m[4]  * m[2]  * m[15] - 
-              m[4]  * m[3]  * m[14] - 
-              m[12] * m[2]  * m[7] + 
-              m[12] * m[3]  * m[6];
-
-    inv[10] = m[0]  * m[5]  * m[15] - 
-              m[0]  * m[7]  * m[13] - 
-              m[4]  * m[1]  * m[15] + 
-              m[4]  * m[3]  * m[13] + 
-              m[12] * m[1]  * m[7] - 
-              m[12] * m[3]  * m[5];
-
-    inv[14] = -m[0]  * m[5]  * m[14] + 
-               m[0]  * m[6]  * m[13] + 
-               m[4]  * m[1]  * m[14] - 
-               m[4]  * m[2]  * m[13] - 
-               m[12] * m[1]  * m[6] + 
-               m[12] * m[2]  * m[5];
-
-    inv[3] = -m[1] * m[6] * m[11] + 
-              m[1] * m[7] * m[10] + 
-              m[5] * m[2] * m[11] - 
-              m[5] * m[3] * m[10] - 
-              m[9] * m[2] * m[7] + 
-              m[9] * m[3] * m[6];
-
-    inv[7] = m[0] * m[6] * m[11] - 
-             m[0] * m[7] * m[10] - 
-             m[4] * m[2] * m[11] + 
-             m[4] * m[3] * m[10] + 
-             m[8] * m[2] * m[7] - 
-             m[8] * m[3] * m[6];
-
-    inv[11] = -m[0] * m[5] * m[11] + 
-               m[0] * m[7] * m[9] + 
-               m[4] * m[1] * m[11] - 
-               m[4] * m[3] * m[9] - 
-               m[8] * m[1] * m[7] + 
-               m[8] * m[3] * m[5];
-
-    inv[15] = m[0] * m[5] * m[10] - 
-              m[0] * m[6] * m[9] - 
-              m[4] * m[1] * m[10] + 
-              m[4] * m[2] * m[9] + 
-              m[8] * m[1] * m[6] - 
-              m[8] * m[2] * m[5];
-
-    T det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
-
-    if (std::abs(det) < 1e-9) return false;
-
-    T invDet = 1.0 / det;
-    for (int i = 0; i < 16; i++) {
-        invOut[i] = inv[i] * invDet;
-    }
-    return true;
-}
-
-// Inverts a 4x4 matrix using Cramer's Rule (fast and efficient for fixed sizes)
-template<typename T>
-static inline bool invert4x4(const T src[16], T dst[16]) {
-    T sub[12];
-    
-    sub[0]  = src[10] * src[15] - src[11] * src[14];
-    sub[1]  = src[9]  * src[15] - src[11] * src[13];
-    sub[2]  = src[9]  * src[14] - src[10] * src[13];
-    sub[3]  = src[8]  * src[15] - src[11] * src[12];
-    sub[4]  = src[8]  * src[14] - src[10] * src[12];
-    sub[5]  = src[8]  * src[13] - src[9]  * src[12];
-    sub[6]  = src[6]  * src[15] - src[7]  * src[14];
-    sub[7]  = src[5]  * src[15] - src[7]  * src[13];
-    sub[8]  = src[5]  * src[14] - src[6]  * src[13];
-    sub[9]  = src[4]  * src[15] - src[7]  * src[12];
-    sub[10] = src[4]  * src[14] - src[6]  * src[12];
-    sub[11] = src[4]  * src[13] - src[5]  * src[12];
-
-    dst[0] =  (src[5] * sub[0] - src[6] * sub[1] + src[7] * sub[2]);
-    dst[1] = -(src[1] * sub[0] - src[2] * sub[1] + src[3] * sub[2]);
-    dst[2] =  (src[13] * det3x3<T>(src[1], src[2], src[3], src[5], src[6], src[7], src[9], src[10], src[11]));
-    dst[3] = -(src[9]  * det3x3<T>(src[1], src[2], src[3], src[5], src[6], src[7], src[13], src[14], src[15]));
-    
-    dst[4] = -(src[4] * sub[0] - src[6] * sub[3] + src[7] * sub[4]);
-    dst[5] =  (src[0] * sub[0] - src[2] * sub[3] + src[3] * sub[4]);
-    dst[6] = -(src[12] * det3x3<T>(src[0], src[2], src[3], src[4], src[6], src[7], src[8], src[10], src[11]));
-    dst[7] =  (src[8]  * det3x3<T>(src[0], src[2], src[3], src[4], src[6], src[7], src[12], src[14], src[15]));
-    
-    dst[8] =  (src[4] * sub[1] - src[5] * sub[3] + src[7] * sub[5]);
-    dst[9] = -(src[0] * sub[1] - src[1] * sub[3] + src[3] * sub[5]);
-    dst[10] = (src[12] * det3x3<T>(src[0], src[1], src[3], src[4], src[5], src[7], src[8], src[9], src[11]));
-    dst[11] =-(src[8]  * det3x3<T>(src[0], src[1], src[3], src[4], src[5], src[7], src[12], src[13], src[15]));
-    
-    dst[12] = -(src[4] * sub[2] - src[5] * sub[4] + src[6] * sub[5]);
-    dst[13] =  (src[0] * sub[2] - src[1] * sub[4] + src[2] * sub[5]);
-    dst[14] = -(src[12] * det3x3<T>(src[0], src[1], src[2], src[4], src[5], src[6], src[8], src[9], src[10]));
-    dst[15] =  (src[8]  * det3x3<T>(src[0], src[1], src[2], src[4], src[5], src[6], src[12], src[13], src[14]));
-
-    T det = src[0] * dst[0] + src[1] * dst[4] + src[2] * dst[8] + src[3] * dst[12];
-    
-    if (std::abs(det) < 1e-9) return false; // Matrix is singular (points are co-planar/degenerate)
-
-    T invDet = 1.0 / det;
-    for (int i = 0; i < 16; ++i) dst[i] *= invDet;
-    return true;
-}
-
-// Calculates 6 weights using A^T * (A * A^T)^-1
-template<typename T>
-static inline bool calculateWeights(const pxr::GfVec3f& P, const pxr::VtArray<pxr::GfVec3f>& points, const std::array<uint32_t, 6>& vertices,  T outWeights[6]) {
-    // 1. Explicitly construct A (4x6 matrix)
-    T A[4][6];
-    for (int i = 0; i < 6; ++i) {
-        A[0][i] = points[vertices[i]][0];
-        A[1][i] = points[vertices[i]][1];
-        A[2][i] = points[vertices[i]][2];
-        A[3][i] = 1.0; // Partition of unity constraint
-    }
-
-    // 2. Compute M = A * A^T (Result is a 4x4 symmetric matrix)
-    T M[16] = {0};
-    for (int r = 0; r < 4; ++r) {
-        for (int c = 0; c < 4; ++c) {
-            T sum = 0.0;
-            for (int k = 0; k < 6; ++k) {
-                sum += A[r][k] * A[c][k]; // A[c][k] serves as A^T[k][c]
-            }
-            M[r * 4 + c] = sum;
-        }
-    }
-
-    // 3. Compute M_inv = (A * A^T)^-1
-    T M_inv[16];
-    if (!invert4x4_fixed<T>(M, M_inv)) {
-        return false; // Error: control points are degenerate (e.g., all flattened on a single plane)
-    }
-
-    // 4. Compute Vector B (4x1)
-    T B[4] = { P[0], P[1], P[2], 1.0 };
-
-    // 5. Compute intermediate vector: Y = M_inv * B (4x1)
-    T Y[4] = {0};
-    for (int r = 0; r < 4; ++r) {
-        Y[r] = M_inv[r * 4 + 0] * B[0] +
-               M_inv[r * 4 + 1] * B[1] +
-               M_inv[r * 4 + 2] * B[2] +
-               M_inv[r * 4 + 3] * B[3];
-    }
-
-    // 6. Compute final weights: weights = A^T * Y (6x1)
-    for (int i = 0; i < 6; ++i) {
-        outWeights[i] = A[0][i] * Y[0] +
-                        A[1][i] * Y[1] +
-                        A[2][i] * Y[2] +
-                        A[3][i] * Y[3];
-    }
-
-    return true;
-}
-
-// Computes the optimal reconstruction weights for point P using 6 3D points
-static std::array<float, 6> calculate3DWeights(const pxr::GfVec3f& P, const std::array<pxr::GfVec3f, 6>& points) {
-    size_t N = points.size(); // Designed for N=6
-    
-    // We set up a system of linear equations using Lagrange Multipliers
-    // To minimize sum(w_i^2 * dist_i) subject to sum(w_i) = 1 and sum(w_i * v_i) = P
-    // For simplicity and high precision, we solve the local coordinate matrix.
-    
-    // Rows 0,1,2: Coordinate reconstruction constraints (X, Y, Z)
-    // Row 3: Sum of weights equals 1 constraint
-    // Rows 4,5: Regularization/minimization parameters for the remaining degrees of freedom
-    
-    int matrixSize = N + 4; // 6 points + 4 constraints (X, Y, Z, and Sum=1)
-    std::vector<std::vector<float>> A(matrixSize, std::vector<float>(matrixSize, 0.0));
-    std::vector<float> B(matrixSize, 0.0);
-
-    // Populate the objective function (minimize distance-based energy)
-    for (size_t i = 0; i < N; ++i) {
-        float distSq = std::pow(points[i][0] - P[0], 2) + 
-                        std::pow(points[i][1]- P[1], 2) + 
-                        std::pow(points[i][2]- P[2], 2);
-        
-        // Prevent division by zero if P is exactly on a point
-        if (distSq < 1e-9) {
-            std::array<float, 6> exactWeights;
-            std::fill(exactWeights.begin(), exactWeights.end(), 0.0f);
-            exactWeights[i] = 1.0;
-            return exactWeights;
-        }
-        
-        A[i][i] = 2.0 * distSq; // Weight penalization matrix
-    }
-
-    // Add Constraints to the linear system
-    for (size_t i = 0; i < N; ++i) {
-        A[i][N]     = points[i][0]; // X constraint row
-        A[N][i]     = points[i][0];
-        
-        A[i][N + 1] = points[i][1]; // Y constraint row
-        A[N + 1][i] = points[i][1];
-        
-        A[i][N + 2] = points[i][2]; // Z constraint row
-        A[N + 2][i] = points[i][2];
-        
-        A[i][N + 3] = 1.0;         // Sum = 1 constraint row
-        A[N + 3][i] = 1.0;
-    }
-
-    // Set target vector B
-    B[N]     = P[0];
-    B[N + 1] = P[1];
-    B[N + 2] = P[2];
-    B[N + 3] = 1.0;
-
-    // Solve Ax = B using Gaussian Elimination with partial pivoting
-    for (int i = 0; i < matrixSize; ++i) {
-        int maxRow = i;
-        for (int k = i + 1; k < matrixSize; ++k) {
-            if (std::abs(A[k][i]) > std::abs(A[maxRow][i])) {
-                maxRow = k;
-            }
-        }
-        std::swap(A[i], A[maxRow]);
-        std::swap(B[i], B[maxRow]);
-
-        for (int k = i + 1; k < matrixSize; ++k) {
-            float factor = A[k][i] / A[i][i];
-            for (int j = i; j < matrixSize; ++j) {
-                A[k][j] -= factor * A[i][j];
-            }
-            B[k] -= factor * B[i];
-        }
-    }
-
-    // Back substitution
-    std::vector<float> X(matrixSize, 0.0);
-    for (int i = matrixSize - 1; i >= 0; --i) {
-        X[i] = B[i];
-        for (int j = i + 1; j < matrixSize; ++j) {
-            X[i] -= A[i][j] * X[j];
-        }
-        X[i] /= A[i][i];
-    }
-
-    // Extract the first N elements as our weights
-    std::array<float, 6> weights;
-    for (size_t i = 0; i < N; ++i) {
-        weights[i] = X[i];
-    }
-
-    return weights;
-}
-
-bool GuideCurvesDeformer::buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	mTestLHSData6P.clear();
-
-	// Check we have guide indices (clump ids) and curves count matches.
-	const size_t curves_count = mpCurvesContainer->getCurvesCount();
-	assert(curves_count <= mGuideIndices.AsConst().size());
-
-
-	const GuideCurvesContainer* pGuideCurvesContainer = mpGuideCurvesContainer.get();
-	if(!pGuideCurvesContainer) return false;
-
-
-	const size_t guide_vertex_count = pGuideCurvesContainer->getTotalVertexCount();
-
-	// Hair curves binding part -----
-	const auto& guides_rest_points = mpGuideCurvesContainer->getRestCurvePoints();
-	const auto& guides_curve_vertex_counts = mpGuideCurvesContainer->getCurveVertexCounts();
-	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
-	const USDCurveKDTree guides_kdtree(pGuideCurvesContainer);
-
-	size_t bound_curves = 0;
-	size_t bound_points = 0;
-
-	// preallocate 
-	mTestLHSData6P.resize(pCurvesContainer->getTotalVertexCount()); 
-
-
-	// pre compute per vertex distances
-	std::vector<float> dist_from_root(mpCurvesContainer->getTotalVertexCount());
-	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
-		uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_index);
-		dist_from_root[curve_vertex_offset] = 0.f;
-		for(uint32_t i = 1; i < mpCurvesContainer->getCurveVertexCount(curve_index); ++i) {
-			dist_from_root[curve_vertex_offset + i] = dist_from_root[curve_vertex_offset + i - 1] + 
-				(pCurvesContainer->getCurveVector(curve_index, i - 1) - pCurvesContainer->getCurveVector(curve_index, i)).GetLength();
-		}
-	}
-
-	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
-
-		PxrCurvesContainer::CurveDataConstPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_index);
-		const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
-
-		const pxr::GfVec3f& curve_root_pt = pCurvesContainer->getCurveRootPoint(curve_index);
-		const uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_index);
-
-		assert(curve_index < mGuideIndices.AsConst().size());
-		const auto guide_id = mGuideIndices.AsConst()[curve_index];
-
-		//DLOG_DBG << "Guide 0 ID " << guide_id;
-		//DLOG_DBG << "Guide 0 length " << mpGuideCurvesContainer->getRestCurveLength(guide_id);
-
-		const auto root_points = guides_kdtree.findKNearestCurveRoots(curve_root_pt, 2, guide_id /* ignore guide_id itself */);
-
-		bool has_doubled_guide_id = false;
-		for(const auto& root_point: root_points) {
-			assert(root_point.first.positionType == USDCurveKDTree::CurvePositionType::Root);
-			if(root_point.first.curveIndex == guide_id) has_doubled_guide_id = true;
-		}
-
-		if(has_doubled_guide_id || root_points.size() != 2) {
-			DLOG_DBG << "!!!";
-			continue;
-		}
-
-		//DLOG_DBG << "Guide 1 ID " << root_points[0].first.curveIndex;
-		//DLOG_DBG << "Guide 2 ID " << root_points[1].first.curveIndex;
-
-		// Bind rest of curves points
-		for(uint32_t i = 0; i < curve_vertices_count; ++i) {
-			float curr_dist_from_root = dist_from_root[curve_vertex_offset + i];
-
-			//DLOG_DBG << "Curr dist " << curr_dist_from_root;
-
-			const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
-
-
-			std::array<uint32_t, 6> gv; // 6 neightbour guides vertices
-
-			pGuideCurvesContainer->getVeticesAtLength(guide_id, curr_dist_from_root, gv[0], gv[1]);
-			pGuideCurvesContainer->getVeticesAtLength(root_points[0].first.curveIndex, curr_dist_from_root, gv[2], gv[3]);
-			pGuideCurvesContainer->getVeticesAtLength(root_points[1].first.curveIndex, curr_dist_from_root, gv[4], gv[5]);
-
-			auto& bind = mTestLHSData6P[curve_vertex_offset + i];
-
-			// another test
-
-			bind.curveIndices[0] = guide_id;
-			bind.curveIndices[1] = root_points[0].first.curveIndex;
-			bind.curveIndices[2] = root_points[1].first.curveIndex;
-
-			bind.v[0] = gv[0]; bind.v[1] = gv[1]; 
-			bind.v[2] = gv[2]; bind.v[3] = gv[3]; 
-			bind.v[4] = gv[4]; bind.v[5] = gv[5];
-
-			std::array<pxr::GfVec3f, 6> pts;
-			pts[0] = guides_rest_points[gv[0]];
-			pts[1] = guides_rest_points[gv[1]];
-			pts[2] = guides_rest_points[gv[2]];
-			pts[3] = guides_rest_points[gv[3]];
-			pts[4] = guides_rest_points[gv[4]];
-			pts[5] = guides_rest_points[gv[5]];
-			std::array<float, 6> weights = calculate3DWeights(curr_pt, pts);
-
-			bind.w[0] = weights[0];
-			bind.w[1] = weights[1];
-			bind.w[2] = weights[2];
-			bind.w[3] = weights[3];
-			bind.w[4] = weights[4];
-			bind.w[5] = weights[5];
-
-/*
-			if (calculateWeights<float>(curr_pt, guides_rest_points, gv, bind.w)) {
-				bind.curveIndices[0] = guide_id;
-				bind.curveIndices[1] = root_points[0].first.curveIndex;
-				bind.curveIndices[2] = root_points[1].first.curveIndex;
-
-				bind.v[0] = gv[0]; bind.v[1] = gv[1]; 
-				bind.v[2] = gv[2]; bind.v[3] = gv[3]; 
-				bind.v[4] = gv[4]; bind.v[5] = gv[5];
-
-				float weightSum = 0.0;
-				for (int i = 0; i < 6; ++i) weightSum += bind.w[i];
-
-				if (std::abs(weightSum) > 1e-9) {
-				    for (int j = 0; j < 6; ++j) {
-				        //bind.w[j] /= weightSum; // Forces sum to be exactly 1.0
-				    }
-				}
-
-
-				// another test
-				std::array<pxr::GfVec3f, 6> pts;
-				pts[0] = guides_rest_points[gv[0]];
-				pts[1] = guides_rest_points[gv[1]];
-				pts[2] = guides_rest_points[gv[2]];
-				pts[3] = guides_rest_points[gv[3]];
-				pts[4] = guides_rest_points[gv[4]];
-				pts[5] = guides_rest_points[gv[5]];
-				std::array<float, 6> weights = calculate3DWeights(curr_pt, pts);
-
-				bind.w[0] = weights[0];
-				bind.w[1] = weights[1];
-				bind.w[2] = weights[2];
-				bind.w[3] = weights[3];
-				bind.w[4] = weights[4];
-				bind.w[5] = weights[5];
-
-				DLOG_DBG << "Wsum " << (bind.w[0] + bind.w[1] + bind.w[2] + bind.w[3] + bind.w[4] + bind.w[5]);
-			} else {
-				DLOG_ERR << "Err binding point ";
-			}
-*/
-       	}
-
-       	bound_curves++;
-	}
-
-
-	DLOG_DBG << "LHS stats";
-	DLOG_DBG << "Total curves count: " << mpCurvesContainer->getCurvesCount();
-	DLOG_DBG << "Curves bound: " << bound_curves;
-	DLOG_DBG << "Total curves points: " << mpCurvesContainer->getTotalVertexCount();
-	DLOG_DBG << "Points bound: " << bound_points;
-
-	return true;
-}
-
-static inline pxr::GfVec2f calculateInverseDistanceWeights(
-    const pxr::GfVec3f& P,
-    const pxr::GfVec3f& L1_A, const pxr::GfVec3f& L1_B,
-    const pxr::GfVec3f& L2_A, const pxr::GfVec3f& L2_B) {
-
-	// Lambda to compute squared perpendicular distance from P to an infinite line (A-B)
-    auto distanceSqToLine = [&P](const pxr::GfVec3f& A, const pxr::GfVec3f& B) -> float {
-        pxr::GfVec3f lineDir = B - A;
-        float lineLenSq = pxr::GfDot(lineDir, lineDir);
-        
-        // Handle degenerate line (A and B are the same point)
-        if (lineLenSq < 1e-7f) {
-            return pxr::GfDot(P - A, P - A);
-        }
-
-        pxr::GfVec3f ap = P - A;
-        pxr::GfVec3f crossProd = pxr::GfCross(ap, lineDir);
-        return pxr::GfDot(crossProd, crossProd) / lineLenSq;
-    };
-
-    // 1. Calculate squared distances using the lambda
-    float d2_1 = distanceSqToLine(L1_A, L1_B);
-    float d2_2 = distanceSqToLine(L2_A, L2_B);
-
-    // Epsilon to safeguard against division by zero if P sits directly on a line
-    const float eps = 1e-6f; 
-
-    // 2. Compute inverse squared distances (closer line = stronger weight)
-    float w1 = 1.0f / (d2_1 + eps);
-    float w2 = 1.0f / (d2_2 + eps);
-
-    // 3. Normalize the weights so they sum to 1.0
-    float sum = w1 + w2;
-    return pxr::GfVec2f(w1 / sum, w2 / sum);
-}
-
-static inline pxr::GfVec3f calculateInverseDistanceWeights(
-    const pxr::GfVec3f& P,
-    const pxr::GfVec3f& L1_A, const pxr::GfVec3f& L1_B,
-    const pxr::GfVec3f& L2_A, const pxr::GfVec3f& L2_B,
-    const pxr::GfVec3f& L3_A, const pxr::GfVec3f& L3_B) {
-
-	// Lambda to compute squared perpendicular distance from P to an infinite line (A-B)
-    auto distanceSqToLine = [&P](const pxr::GfVec3f& A, const pxr::GfVec3f& B) -> float {
-        pxr::GfVec3f lineDir = B - A;
-        float lineLenSq = pxr::GfDot(lineDir, lineDir);
-        
-        // Handle degenerate line (A and B are the same point)
-        if (lineLenSq < 1e-7f) {
-            return pxr::GfDot(P - A, P - A);
-        }
-
-        pxr::GfVec3f ap = P - A;
-        pxr::GfVec3f crossProd = pxr::GfCross(ap, lineDir);
-        return pxr::GfDot(crossProd, crossProd) / lineLenSq;
-    };
-
-    // 1. Calculate squared distances using the lambda
-    float d2_1 = distanceSqToLine(L1_A, L1_B);
-    float d2_2 = distanceSqToLine(L2_A, L2_B);
-    float d2_3 = distanceSqToLine(L3_A, L3_B);
-
-    // Epsilon to safeguard against division by zero if P sits directly on a line
-    const float eps = 1e-6f; 
-
-    // 2. Compute inverse squared distances (closer line = stronger weight)
-    float w1 = 1.0f / (d2_1 + eps);
-    float w2 = 1.0f / (d2_2 + eps);
-    float w3 = 1.0f / (d2_3 + eps);
-
-    // 3. Normalize the weights so they sum to 1.0
-    float sum = w1 + w2 + w3;
-    return pxr::GfVec3f(w1 / sum, w2 / sum, w3 / sum);
-}
-
-bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	multi_threaded = false;
-
-	bool skin_prim_data_created = true;
-	if(!buildSkinPrimData(multi_threaded, rest_time_code, skin_prim_data_created)) {
-		mpGuideCurvesDeformerData->skinPrimIndices().clear();
-		mpGuideCurvesDeformerData->setSkinPrimPath("");
-		DLOG_ERR << "Error building skin prim geometry data !";
-		return false;
-	}	
-
-	if(!mDeformerGeoPrimHandle.fetchAttributeValues<int>(mGuidesSkinPrimAttrName, mpGuideCurvesDeformerData->skinPrimIndices(), rest_time_code)) {
-		DLOG_ERR << "Error getting skin prim indices !";
-		return false;
-	}
-
-	if(!buildGuideOrigins(multi_threaded)) {
-		DLOG_ERR << "NTB frames calulation without skin geometry primitive indices is NOT supported yet !";
-		return false;
-	}
-
-	const GuideCurvesContainer* pGuideCurvesContainer = mpGuideCurvesContainer.get();
-	if(!pGuideCurvesContainer) return false;
-
-	const size_t curves_count = mpCurvesContainer->getCurvesCount();
-	assert(curves_count == mGuideIndices.size());
-
-	std::vector<NTBFrame> rest_guide_frames(pGuideCurvesContainer->getRestCurvePoints().size());
-
-	static const bool build_live = false;
-	if(!buildNTBFrames(rest_guide_frames, multi_threaded, build_live)) {
-		return false;
-	}
-
-	// inverse frames
-	std::vector<pxr::GfMatrix3f> matrices(rest_guide_frames.size());
-	for(size_t i = 0; i < rest_guide_frames.size(); ++i) {
-		matrices[i] = rest_guide_frames[i].getMatrix3f().GetInverse();
-	}
-
-	auto& pointBinds = mpGuideCurvesDeformerData->pointBinds();
-	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
-	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
-
-	const size_t guide_curves_count = pGuideCurvesContainer->getCurvesCount();
-
-	std::vector<std::mutex> kdtrees_mutexes(guide_curves_count);  // protects kdree initialisation
-	std::vector<std::unique_ptr<neighbour_search::KDTree<float, 3>>> kdtrees(guide_curves_count);
-	const auto& guides_rest_points = pGuideCurvesContainer->getRestCurvePoints();
-
-	const USDCurveKDTree guides_kdtree(pGuideCurvesContainer);
-
-	// pre compute per vertex distances
-	std::vector<float> dist_from_root(mpCurvesContainer->getTotalVertexCount());
-
-	for(uint32_t curve_index = 0; curve_index < mpCurvesContainer->getCurvesCount(); ++curve_index) {
-		uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_index);
-		dist_from_root[curve_vertex_offset] = 0.f;
-	
-		for(uint32_t i = 1; i < mpCurvesContainer->getCurveVertexCount(curve_index); ++i) {
-			dist_from_root[curve_vertex_offset + i] = dist_from_root[curve_vertex_offset + i - 1] + 
-				(pCurvesContainer->getCurveVector(curve_index, i - 1) - pCurvesContainer->getCurveVector(curve_index, i)).GetLength();
-		}
-	}
-
-	// pre allocate
-	mTestBlendNTBData.resize(pCurvesContainer->getTotalVertexCount());
-
-	auto func = [&](const std::size_t start, const std::size_t end) {
-
-		for(size_t curve_index = start; curve_index < end; ++curve_index) {
-			const auto guide_id = mGuideIndices.AsConst()[curve_index];
-
-			PxrCurvesContainer::CurveDataConstPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_index);
-			const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
-
-			const pxr::GfVec3f& curve_root_pt = pCurvesContainer->getCurveRootPoint(curve_index);
-			const uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_index);
-
-			const auto root_points = guides_kdtree.findKNearestCurveRoots(curve_root_pt, 2, guide_id /* ignore guide_id itself */);
-
-			for(uint32_t i = 0; i < curve_vertices_count; ++i) {
-				float curr_dist_from_root = dist_from_root[curve_vertex_offset + i];
-
-				const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
-				auto& bind = mTestBlendNTBData[curve_vertex_offset + i];
-
-				std::array<uint32_t, 6> gv; // 6 neightbour guides vertices
-
-				pGuideCurvesContainer->getVeticesAtLength(guide_id, curr_dist_from_root, gv[0], gv[1]);
-				bind.guide_id[0] = guide_id;
-				bind.v[0] = gv[0] - pGuideCurvesContainer->getCurveVertexOffset(guide_id);
-
-				const uint8_t neighbour_guides_count = static_cast<uint8_t>(root_points.size());
-
-				switch (neighbour_guides_count) {
-					case 0:
-						{
-						bind.w[0] = 1.f; bind.w[1] = 0.f; bind.w[2] = 0.f;
-						bind.coords[0] = matrices[gv[0]] * (curr_pt - guides_rest_points[gv[0]]);
-						}
-						break;
-					case 1:
-						{
-						pGuideCurvesContainer->getVeticesAtLength(root_points[0].first.curveIndex, curr_dist_from_root, gv[2], gv[3]);
-						bind.guide_id[1] = root_points[0].first.curveIndex;
-						bind.v[1] = gv[2] - pGuideCurvesContainer->getCurveVertexOffset(root_points[0].first.curveIndex);
-
-						pxr::GfVec2f weights = calculateInverseDistanceWeights(curr_pt, guides_rest_points[gv[0]], guides_rest_points[gv[1]], guides_rest_points[gv[2]], guides_rest_points[gv[3]]);
-
-						bind.w[0] = weights[0];
-						bind.w[1] = weights[1];
-						bind.w[2] = 0.f;
-
-						bind.coords[0] = matrices[gv[0]] * (curr_pt - guides_rest_points[gv[0]]);
-						bind.coords[1] = matrices[gv[2]] * (curr_pt - guides_rest_points[gv[2]]);
-						}
-						break;
-					case 2:
-						{
-						pGuideCurvesContainer->getVeticesAtLength(root_points[0].first.curveIndex, curr_dist_from_root, gv[2], gv[3]);
-						bind.guide_id[1] = root_points[0].first.curveIndex;
-						bind.v[1] = gv[2] - pGuideCurvesContainer->getCurveVertexOffset(root_points[0].first.curveIndex);
-						pGuideCurvesContainer->getVeticesAtLength(root_points[1].first.curveIndex, curr_dist_from_root, gv[4], gv[5]);
-						bind.guide_id[2] = root_points[1].first.curveIndex;
-						bind.v[2] = gv[4] - pGuideCurvesContainer->getCurveVertexOffset(root_points[1].first.curveIndex);
-
-						pxr::GfVec3f weights = calculateInverseDistanceWeights(curr_pt, guides_rest_points[gv[0]], guides_rest_points[gv[1]], guides_rest_points[gv[2]], guides_rest_points[gv[3]], guides_rest_points[gv[4]], guides_rest_points[gv[5]]);
-
-						bind.w[0] = weights[0];
-						bind.w[1] = weights[1];
-						bind.w[2] = weights[2];
-
-						bind.coords[0] = matrices[gv[0]] * (curr_pt - guides_rest_points[gv[0]]);
-						bind.coords[1] = matrices[gv[2]] * (curr_pt - guides_rest_points[gv[2]]);
-						bind.coords[2] = matrices[gv[4]] * (curr_pt - guides_rest_points[gv[4]]);
-						}
-						break;
-					default:
-						break;
-				}
-			}
-		}
-	};
-
-	DLOG_INF << "Binding curves to guides using Blended NTB mode.";
-
-	if(multi_threaded) {
-		BS::multi_future<void> blocks = mPool.submit_blocks(0u, curves_count, func);
-		blocks.wait();
-	} else {
-		func(0u, curves_count);
-	}
-
-	return true;
-
-}
-
 
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	multi_threaded = false;
@@ -1930,7 +1159,7 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 			const uint32_t guide_vertex_id = nearest_pt.first - guide_vertex_offset; // we have global point indices in kdtree. by substracting we a re making them local to the specific guide curve
 			const uint32_t segment_id = std::min(guide_vertex_id, (uint32_t)guide_vertex_count - 2u); // exclude last vertex index
 
-			const pxr::GfVec3f& guide_pt = mpGuideCurvesContainer->getCurveRestPoint(guide_id, segment_id);
+			const pxr::GfVec3f& guide_pt = mpGuideCurvesContainer->getGuideRestPoint(guide_id, segment_id);
 			
 			bind.encodeID_modeANGLE(guide_id, segment_id);
         	bind.setData(curr_pt - guide_pt);
@@ -2052,7 +1281,7 @@ bool GuideCurvesDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
-void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
+void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
 	assert(mpGuideCurvesDeformerData);
 	assert(mpGuideCurvesContainer);
 	assert(mpCurvesContainer);
@@ -2066,50 +1295,6 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
 
 	switch(mpGuideCurvesDeformerData->getBindMode()) {
-		case GuideCurvesDeformerData::BindMode::BLEND:
-		{
-			std::vector<NTBFrame> live_guide_frames(guides_live_points.size());
-			
-			if(!buildNTBFrames(live_guide_frames, true /* multi threaded */, true /* live */)) {
-				DLOG_ERR << "drawDebugGeometry(time_code) NTB frames building failed.";
-				return;
-			}
-
-			// vector from curve point to frame
-			if(1==1){
-				const auto& pointBinds = mTestBlendNTBData;
-				
-				const auto& deformed_points = pDeformedPoints->getVtArray();
-
-				for(size_t i = 0; i < pointBinds.size(); ++i) {
-					const auto& bind = pointBinds[i];
-					if(!bind.isValid()) continue;
-
-					uint32_t frame_id_0 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[0]) + bind.v[0];
-					uint32_t frame_id_1 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[1]) + bind.v[1];
-					uint32_t frame_id_2 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[2]) + bind.v[2];
-
-					const pxr::GfVec3f& pt = deformed_points[i];
-
-					DebugGeo::Line l0(guides_live_points[frame_id_0], pt);
-					l0.setColor({1.0f, 1.0f, 1.0f});
-					l0.setWidth(0.0025f);
-					mpDebugGeo->addLine(l0);
-
-					DebugGeo::Line l1(guides_live_points[frame_id_1], pt);
-					l1.setColor({1.0f, 1.0f, 1.0f});
-					l1.setWidth(0.0025f);
-					mpDebugGeo->addLine(l1);
-
-					DebugGeo::Line l2(guides_live_points[frame_id_2], pt);
-					l2.setColor({1.0f, 1.0f, 1.0f});
-					l2.setWidth(0.0025f);
-					mpDebugGeo->addLine(l2);
-				}
-			}
-			mpDebugGeo->build("/debugBlebdedNTBFrames", mCurvesGeoPrimHandle.getStage());
-		}
-			break;
 		case GuideCurvesDeformerData::BindMode::NTB:
 		{
 			std::vector<NTBFrame> live_guide_frames(guides_live_points.size());
@@ -2128,14 +1313,14 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 					const auto& p = guides_live_points[vtx];
 
 					DebugGeo::Line lN(p, p + frame.n * mDebugGeometryMult);
-					lN.setColor({1.0f, 0.0f, 0.0f});
-					lN.setWidth(0.05f);
+					lN.setColor({1.0, 0.0, 0.0});
+					lN.setWidth(0.05);
 					DebugGeo::Line lT(p, p + frame.t);
-					lT.setColor({0.0f, 1.0f, 0.0f});
-					lT.setWidth(0.05f);
+					lT.setColor({0.0, 1.0, 0.0});
+					lT.setWidth(0.05);
 					DebugGeo::Line lB(p, p + frame.b * mDebugGeometryMult);
-					lB.setColor({0.0f, 0.0f, 1.0f});
-					lB.setWidth(0.05f);
+					lB.setColor({0.0, 0.0, 1.0});
+					lB.setWidth(0.05);
 
 					mpDebugGeo->addLine(lN);
 					mpDebugGeo->addLine(lT);
@@ -2159,66 +1344,14 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 
 					//points[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * ntbCoord;
 					DebugGeo::Line lV(guides_live_points[frame_id], guides_live_points[frame_id] + live_guide_frames[frame_id] * ntbCoord);
-					lV.setColor({1.0f, 1.0f, 1.0f});
-					lV.setWidth(0.05f);
+					lV.setColor({1.0, 1.0, 1.0});
+					lV.setWidth(0.05);
 					mpDebugGeo->addLine(lV);
 				}
 			}
 
 			mpDebugGeo->build("/debugNTBFrames", mCurvesGeoPrimHandle.getStage());
 		}
-			break;
-		case GuideCurvesDeformerData::BindMode::SPACE:
-		{
-			PhantomTrimesh* pPhantomTrimesh = mpGuidesPhantomTrimeshData->getTrimesh();
-			assert(pPhantomTrimesh);
-
-			const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
-			assert(pDeformerMeshContainer);
-
-			DLOG_DBG << "DebugGeo tetrahedrons count " << pPhantomTrimesh->getTetrahedrons().size();
-
-			if(!pPhantomTrimesh->hasTetrahedrons()) {
-				DLOG_ERR << "No tetrahedrons!";
-				return;
-			}
-
-			const std::vector<PhantomTrimesh::Tetrahedron>& tetrahedrons = pPhantomTrimesh->getTetrahedrons();
-			TetrahedronKDTree<PhantomTrimesh::PxrIndexType> tetraKDTree(tetrahedrons, pDeformerMeshContainer->getRestPositions());
-
-			const auto* pRootNode = tetraKDTree.getRootNode();
-			if(!pRootNode) {
-				DLOG_ERR << "No tetrahedrons KDTree root node!";
-				return;
-			}
-
-			std::function<void(const TetrahedronKDTree<PhantomTrimesh::PxrIndexType>::KDNode*, float)> drawNodeBound = 
-			[&](const TetrahedronKDTree<PhantomTrimesh::PxrIndexType>::KDNode* pNode, float k_c) {
-				if (!pNode) return;
-
-				DebugGeo::WireframeBox box(pNode->nodeBounds);
-				box.setColor({1.0 * k_c, 0.0, 0.0});
-				box.setWidth(0.05);
-				mpDebugGeo->addWireBox(box);
-
-				if (pNode->left)  drawNodeBound(pNode->left, k_c * 0.85);
-				if (pNode->right) drawNodeBound(pNode->right, k_c * 0.85);
-			};
-
-			drawNodeBound(pRootNode, 1.0 /* color k */);
-
-			// Tetras
-			const auto& points = pDeformerMeshContainer->getRestPositions();
-			for(const auto& tetra: tetrahedrons) {
-
-				DebugGeo::WireTetra tet(points[tetra.indices[0]], points[tetra.indices[1]], points[tetra.indices[2]], points[tetra.indices[3]]);
-				tet.setColor({0.0, 1.0, 0.0});
-				tet.setWidth(0.05);
-				mpDebugGeo->addWireTetra(tet);
-			}
-
-			mpDebugGeo->build("/debugKDtree", mCurvesGeoPrimHandle.getStage());
-		}	
 			break;
 		default:
 			break;

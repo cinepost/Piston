@@ -8,6 +8,7 @@
 #include "guide_curves_container.h"
 #include "guide_curves_deformer_data.h"
 #include "geometry_tools.h"
+#include "debug_drawing.h"
 
 #include <memory>
 #include <limits>
@@ -71,10 +72,12 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		virtual void invalidateData(DeformerDataCache& cache) override;
 
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override;
+
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		bool buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCode rest_time_code);
+		bool buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCode rest_time_code, bool& created);
 		bool hasSkinPrimitiveData() const;
 
 		bool buildGuideOrigins(bool multi_threaded);
@@ -85,9 +88,18 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 		bool buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
 
+		bool buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
+		bool buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded);
+
 		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_AngleMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_NTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+
+		bool deformImpl_LHSMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+		bool deformImpl_BlendNTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
+
+
+
 		bool moveSkinBoundPoints(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
 		bool guideIndicesNeeded() const;
@@ -114,10 +126,16 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		std::string                                     		mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
 		pxr::VtArray<int> 										mGuideIndices;
 
+		std::vector<GuideCurvesDeformerData::PointBindDataLHS>  mTestLHSData;
+		std::vector<GuideCurvesDeformerData::PointBindDataLHS_6P>  mTestLHSData6P;
+		std::vector<GuideCurvesDeformerData::BlendedNTBData>    mTestBlendNTBData;
+
 		float                                       			mFalloff = .0f;
 		BindMode                                                mBindMode;
 
 		std::vector<pxr::GfVec3f>               				mTempSkinFaceLiveNormals; // temporary to save on per-frame reallocations
+
+		DebugGeo::UniquePtr                                 	mpDebugGeo;
 };
 
 } // namespace Piston

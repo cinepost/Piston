@@ -5,6 +5,7 @@
 #include "common.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
+#include "geometry_tools.h"
 
 
 #include <memory>
@@ -34,7 +35,33 @@ class DebugGeo {
 			void setWidth(const float _w0, const float _w1) { w0 = _w0; w1 = _w1; }
 		};
 
+		struct WireframeBox {
+			pxr::GfVec3f min, max;
+			pxr::GfVec3f color;
+			float width;
+
+			WireframeBox(): min(0.0f), max(0.0f), color(1.0f), width(0.01f) {}
+			WireframeBox(const AABB& aabb): min(aabb.min), max(aabb.max), color(1.0f), width(0.01f) {}
+
+			void setColor(const pxr::GfVec3f& c) { color = c; }
+			void setWidth(const float w) { width = w; }
+		};
+
+		struct WireTetra {
+			pxr::GfVec3f p0, p1, p2, p3;
+			pxr::GfVec3f color;
+			float width;
+
+			WireTetra(): p0(0.0f), p1(0.0f), p2(0.0f), p3(0.0f) {}
+			WireTetra(const pxr::GfVec3f& _p0, const pxr::GfVec3f& _p1, const pxr::GfVec3f& _p2, const pxr::GfVec3f& _p3): p0(_p0), p1(_p1), p2(_p2), p3(_p3) {}
+
+			void setColor(const pxr::GfVec3f& c) { color = c; }
+			void setWidth(const float w) { width = w; }
+		};
+
 		void addLine(const Line& l) { mLines.push_back(l); }
+		void addWireBox(const WireframeBox& b) { mWireBoxes.push_back(b); }
+		void addWireTetra(const WireTetra& t) { mWireTetras.push_back(t); }
 		void clear();
 
 		static UniquePtr create(const std::string& name);
@@ -45,6 +72,8 @@ class DebugGeo {
 	private:
 		std::string mName;
 		std::vector<Line> mLines;
+		std::vector<WireframeBox> mWireBoxes;
+		std::vector<WireTetra> mWireTetras;
 
 		std::mutex  mMutex;
 

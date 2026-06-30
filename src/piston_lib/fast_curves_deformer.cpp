@@ -24,7 +24,7 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 namespace Piston {
 
 FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
-	mpDebugGeo = DebugGeo::create(name);
+
 }
 
 FastCurvesDeformer::SharedPtr FastCurvesDeformer::create(const std::string& name) {
@@ -138,58 +138,60 @@ bool FastCurvesDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
-void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code) {
+void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
 	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 
-	if(mpDebugGeo) {
+	if(!mpDebugGeo) {
+		mpDebugGeo = DebugGeo::create(getName());
+	} else {
 		mpDebugGeo->clear();
-
-		const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
-
-		for(const auto face: pPhantomTrimesh->getFaces()) {
-			DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]*mDebugGeometryMult);
-			lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-			lA.setWidth(0.05);
-			DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]*mDebugGeometryMult);
-			lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-			lB.setWidth(0.05);
-			DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]*mDebugGeometryMult);
-			lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-			lC.setWidth(0.05);
-
-			mpDebugGeo->addLine(lA);
-			mpDebugGeo->addLine(lB);
-			mpDebugGeo->addLine(lC);
-		}
-
-		const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
-		for(size_t i = 0; i < curveBinds.size(); ++i) {
-			
-			const pxr::GfVec3f& N = mPerBindLiveNormals[i];
-			const pxr::GfVec3f& T = mPerBindLiveTBs[i].first;
-			const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
-
-			const auto& bind = curveBinds[i];
-			auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
-
-			DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f*mDebugGeometryMult);
-			lN.setColor({0.0, 1.0, 0.0});
-			DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f*mDebugGeometryMult);
-			lT.setColor({1.0, 0.0, 0.0});
-			DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f*mDebugGeometryMult);
-			lB.setColor({0.0, 0.0, 1.0});
-			
-			mpDebugGeo->addLine(lN);
-			mpDebugGeo->addLine(lT);
-			mpDebugGeo->addLine(lB);
-		}
-
-		mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
 	}
+
+	const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
+
+	for(const auto face: pPhantomTrimesh->getFaces()) {
+		DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]*mDebugGeometryMult);
+		lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lA.setWidth(0.05);
+		DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]*mDebugGeometryMult);
+		lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lB.setWidth(0.05);
+		DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]*mDebugGeometryMult);
+		lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lC.setWidth(0.05);
+
+		mpDebugGeo->addLine(lA);
+		mpDebugGeo->addLine(lB);
+		mpDebugGeo->addLine(lC);
+	}
+
+	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
+	for(size_t i = 0; i < curveBinds.size(); ++i) {
+		
+		const pxr::GfVec3f& N = mPerBindLiveNormals[i];
+		const pxr::GfVec3f& T = mPerBindLiveTBs[i].first;
+		const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
+
+		const auto& bind = curveBinds[i];
+		auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
+
+		DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f*mDebugGeometryMult);
+		lN.setColor({0.0, 1.0, 0.0});
+		DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f*mDebugGeometryMult);
+		lT.setColor({1.0, 0.0, 0.0});
+		DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f*mDebugGeometryMult);
+		lB.setColor({0.0, 0.0, 1.0});
+		
+		mpDebugGeo->addLine(lN);
+		mpDebugGeo->addLine(lT);
+		mpDebugGeo->addLine(lB);
+	}
+
+	mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
 }
 
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
@@ -265,7 +267,10 @@ void FastCurvesDeformer::calcPerBindNormals(const UsdGeomMeshFaceAdjacency* pAdj
 			float v = bind.v;
 			float w = 1.f - u - v;
 			barycentrics_clamp_to_triangle(u, v, w);
-			perBindNormals[i] = pxr::GfGetNormalized(u * vertex_normals[face.indices[1]] + v * vertex_normals[face.indices[2]] + w * vertex_normals[face.indices[0]]);
+			perBindNormals[i] = pxr::GfGetNormalized(
+				u * vertex_normals[face.indices[1]] + v * vertex_normals[face.indices[2]] + w * vertex_normals[face.indices[0]]
+				, MIN_VECTOR_LENGTH_F
+			);
     	}
     };
 
@@ -311,8 +316,8 @@ void FastCurvesDeformer::calcPerBindTangentsAndBiNormals(const PhantomTrimesh* p
 			const pxr::GfVec3f root_proj_pos = bind.u * pt_positions[face.indices[0]] + bind.v * pt_positions[face.indices[2]] + (1.f - bind.u - bind.v) * pt_positions[face.indices[1]];			
 			const pxr::GfVec3f tmp_binormal = face_center_points[bind.face_id] - root_proj_pos;
 
-			mPerBindTBs[i].first = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], tmp_binormal)); // tangent
-			mPerBindTBs[i].second = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], mPerBindTBs[i].first)); //binormal
+			mPerBindTBs[i].first = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], tmp_binormal), MIN_VECTOR_LENGTH_F); // tangent
+			mPerBindTBs[i].second = pxr::GfGetNormalized(pxr::GfCross(perBindNormals[i], mPerBindTBs[i].first), MIN_VECTOR_LENGTH_F); //binormal
     	}
     };
 

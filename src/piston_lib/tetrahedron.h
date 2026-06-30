@@ -1,0 +1,148 @@
+#ifndef PISTON_LIB_TETRAHEDRON_H_
+#define PISTON_LIB_TETRAHEDRON_H_
+
+#include "framework.h"
+#include "common.h"
+#include "geometry_tools.h"
+#include "logging.h"
+
+#include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/base/gf/matrix3f.h>
+
+#include <limits>
+#include <string>
+#include <array>
+#include <unordered_map>
+#include <memory>
+#include <mutex>
+
+
+namespace Piston {
+
+static inline float sqDistPointToTriangle(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b, const pxr::GfVec3f& c) {
+    pxr::GfVec3f ab = b - a;
+    pxr::GfVec3f ac = c - a;
+    pxr::GfVec3f ap = p - a;
+    float d1 = pxr::GfDot(ab, ap);
+    float d2 = pxr::GfDot(ac, ap);
+    if (d1 <= 0.0 && d2 <= 0.0) return ap.GetLengthSq();
+
+    pxr::GfVec3f bp = p - b;
+    float d3 = pxr::GfDot(ab, bp);
+    float d4 = pxr::GfDot(ac, bp);
+    if (d3 >= 0.0 && d4 <= d3) return bp.GetLengthSq();
+
+    float vc = d1 * d4 - d3 * d2;
+    if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) {
+        float v = d1 / (d1 - d3);
+        return (ap - ab * v).GetLengthSq();
+    }
+
+    pxr::GfVec3f cp = p - c;
+    float d5 = pxr::GfDot(ab, cp);
+    float d6 = pxr::GfDot(ac, cp);
+    if (d6 >= 0.0 && d5 <= d6) return cp.GetLengthSq();
+
+    float vb = d5 * d2 - d1 * d6;
+    if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) {
+        float w = d2 / (d2 - d6);
+        return (ap - ac * w).GetLengthSq();
+    }
+
+    float va = d3 * d6 - d5 * d4;
+    if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0) {
+        float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        return (bp - (c - b) * w).GetLengthSq();
+    }
+
+    float denom = 1.0f / (va + vb + vc);
+    float v = vb * denom;
+    float w = vc * denom;
+    return (ap - ab * v - ac * w).GetLengthSq();
+}
+
+template<typename VtxIndexType>
+struct Tetrahedron {
+	using IndicesList = std::array<VtxIndexType, 4>;
+	static constexpr VtxIndexType   kInvalidVertexID = std::numeric_limits<VtxIndexType>::max();
+
+	Tetrahedron(): indices{kInvalidVertexID} { }
+	Tetrahedron(VtxIndexType a, VtxIndexType b, VtxIndexType c, VtxIndexType d): indices{a, b, c, d} { }
+
+	bool isValid() const { return !(
+		indices[0] == indices[1] || indices[0] == indices[2] || indices[0] == indices[3] ||
+		indices[0] == kInvalidVertexID || indices[1] == kInvalidVertexID || indices[2] == kInvalidVertexID || indices[3] == kInvalidVertexID); 
+	}
+
+	IndicesList 	indices;
+};
+
+template<typename VtxIndexType>
+inline bool isPointInTetrahedron(const pxr::GfVec3f& p, const Tetrahedron<VtxIndexType>& tet, const pxr::VtArray<pxr::GfVec3f>& points) {
+    auto signDir = [](const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3, const pxr::GfVec3f& p4) {
+        return pxr::GfDot(p1 - p4, pxr::GfCross(p2 - p4, p3 - p4));
+    };
+
+    float d1 = signDir(p, points[tet.indices[1]], points[tet.indices[2]], points[tet.indices[3]]);
+    float d2 = signDir(points[tet.indices[0]], p, points[tet.indices[2]], points[tet.indices[3]]);
+    float d3 = signDir(points[tet.indices[0]], points[tet.indices[1]], p, points[tet.indices[3]]);
+    float d4 = signDir(points[tet.indices[0]], points[tet.indices[1]], points[tet.indices[2]], p);
+
+    bool has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0) || (d4 < 0);
+    bool has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0) || (d4 > 0);
+
+    return !(has_neg && has_pos);
+}
+
+template<typename VtxIndexType>
+class TetrahedronKDTree {
+public:
+    using TetraIndexType = uint32_t;
+    static constexpr TetraIndexType kInvalidTetraID = std::numeric_limits<TetraIndexType>::max();
+
+	struct KDNode {
+	    AABB nodeBounds;
+	    KDNode* left = nullptr;
+	    KDNode* right = nullptr;
+	    std::vector<TetraIndexType> tet_indices; 
+	    bool isLeaf() const { return left == nullptr && right == nullptr; }
+	};
+
+public:
+	TetrahedronKDTree(const std::vector<Tetrahedron<VtxIndexType>>& tets, const pxr::VtArray<pxr::GfVec3f>& points);
+
+    TetraIndexType queryPoint(const pxr::GfVec3f& p, bool& is_inside) const;
+    TetraIndexType queryPointWithCache(const pxr::GfVec3f& p, TetraIndexType& cachedTetraIndex, bool& is_inside) const;
+
+    const KDNode* getRootNode() const { return mpRoot; }
+ 
+private:
+    KDNode* build(std::vector<TetraIndexType>&& tet_indices, int depth);
+
+    TetraIndexType searchInside(const KDNode* node, const pxr::GfVec3f& p) const;
+    void searchClosest(const KDNode* node, const pxr::GfVec3f& p, TetraIndexType& bestTetIndex, float& bestSqDist) const;
+
+private:
+    const int MAX_LEAF_SIZE = 4;
+
+	const std::vector<Tetrahedron<VtxIndexType>>& mTetrahedrons;
+    const pxr::VtArray<pxr::GfVec3f>& mPoints;
+
+    std::vector<AABB> mTetrahedronAABBs;
+    std::vector<pxr::GfVec3f> mTetrahedronCentroids;
+   
+    KDNode* mpRoot = nullptr;
+};
+
+template<typename VtxIndexType>
+static inline float minSqDistToTetrahedron(const pxr::GfVec3f& p, const Tetrahedron<VtxIndexType>& tet, const pxr::VtArray<pxr::GfVec3f>& points) {
+    float d0 = sqDistPointToTriangle(p, points[tet.indices[0]], points[tet.indices[1]], points[tet.indices[2]]);
+    float d1 = sqDistPointToTriangle(p, points[tet.indices[0]], points[tet.indices[1]], points[tet.indices[3]]);
+    float d2 = sqDistPointToTriangle(p, points[tet.indices[0]], points[tet.indices[2]], points[tet.indices[3]]);
+    float d3 = sqDistPointToTriangle(p, points[tet.indices[1]], points[tet.indices[2]], points[tet.indices[3]]);
+    return std::min({d0, d1, d2, d3});
+}
+
+} // namespace Piston
+
+#endif // PISTON_LIB_TETRAHEDRON_H_

@@ -24,7 +24,33 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		enum class BindMode: uint8_t {  
 			NTB,
 			ANGLE,
-			SPACE
+			SPACE,
+			LHS,
+			BLEND
+		};
+
+		struct PointBindDataLHS {
+			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
+
+			uint32_t curveIndices[3];
+			float uCoords[3];
+			float weights[3];
+		
+			bool isValid() const { return curveIndices[0] != kInvalidCurveID; }
+
+			PointBindDataLHS(): curveIndices{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID} {}
+		};
+
+		struct PointBindDataLHS_6P {
+			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
+
+			uint32_t curveIndices[3]; // TODO: use three 24 or 30 bit indices and rest bits are for flags
+			uint32_t v[6]; 
+			float w[6];
+		
+			bool isValid() const { return curveIndices[0] != kInvalidCurveID; }
+
+			PointBindDataLHS_6P(): curveIndices{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID} {}
 		};
 
 		struct PointSurfaceBindData {
@@ -46,6 +72,22 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 				return 	(static_cast<size_t>(face_id) | (static_cast<size_t>(point_id) << 32)) + 
 						(static_cast<size_t>(u.toBits()) | (static_cast<size_t>(v.toBits()) << 16) | 
 						(static_cast<size_t>(dist.toBits()) << 32) | (static_cast<size_t>(weight.toBits()) << 48)); 
+			}
+		};
+
+		struct BlendedNTBData {
+			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
+			static constexpr uint8_t kInvalidVertexID = std::numeric_limits<uint8_t>::max();
+
+			uint32_t 	guide_id[3];
+			uint8_t  	v[3]; // vertices. 2 vertices per guide
+			float16_t   w[3]; // weights. 2 weights per guide
+			pxr::GfVec3f coords[3]; // ntb coords
+
+			bool isValid() const { return guide_id[0] != kInvalidCurveID && v[0] != kInvalidVertexID; }
+
+			BlendedNTBData(): guide_id{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID} {
+				std::memset(v, kInvalidVertexID, sizeof(v));
 			}
 		};
 
@@ -129,7 +171,7 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			}
 
 			void encodeID_modeANGLE(uint32_t guide_id, uint8_t segment_id) {
-				encoded_id.mode_angle.guide_id = guide_id;
+				encoded_id.mode_angle.guide_id = guide_id & 0xFFFFFF;
 				encoded_id.mode_angle.segment_id = (uint32_t)segment_id;
 			}
 			
@@ -223,6 +265,10 @@ inline std::string to_string(const GuideCurvesDeformerData::BindMode& mode) {
 			return "ANGLE";
 		case GuideCurvesDeformerData::BindMode::SPACE:
 			return "SPACE";
+		case GuideCurvesDeformerData::BindMode::LHS:
+			return "LHS";
+		case GuideCurvesDeformerData::BindMode::BLEND:
+			return "BLEND";
 		default:
 			return "Unknown";
 	}

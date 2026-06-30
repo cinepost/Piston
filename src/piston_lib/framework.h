@@ -34,6 +34,9 @@ namespace Piston {
     using BSON = std::vector<std::uint8_t>;
 #endif
 
+#ifndef MIN_VECTOR_LENGTH_F
+#define MIN_VECTOR_LENGTH_F 1e-6f
+#endif
 
 #define enum_class_operators(e_) \
     inline e_ operator& (e_ a, e_ b) { return static_cast<e_>(static_cast<int>(a)& static_cast<int>(b)); } \

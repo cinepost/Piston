@@ -1,7 +1,8 @@
 include(${PROJECT_SOURCE_DIR}/third_party/external_versions.cmake)
 
-include_directories( 
+include_directories(
     ${EXTERNALS_INSTALL_DIR}
+    ${PISTON_VERSION_DIR}
 #    ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/boost/src
     ${CMAKE_THIRD_PARTY_SOURCE_DIR}/bs_thread_pool
     ${CMAKE_THIRD_PARTY_SOURCE_DIR}/json/single_include
@@ -34,8 +35,18 @@ if(USE_CGAL)
         ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Filtered_kernel/include
         ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Modular_arithmetic/include
         ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Algebraic_foundations/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/TDS_2/include
         ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/TDS_3/include
         ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Triangulation_3/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Alpha_shapes_3/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Surface_mesh/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/BGL/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Polygon_mesh_processing/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Principal_component_analysis_LGPL/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Triangulation_2/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Polygon/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Union_find/include
+        ${CMAKE_THIRD_PARTY_SOURCE_DIR}/external/cgal/Weights/include
     )
 
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DBOOST_MP_STANDALONE")
@@ -51,9 +62,12 @@ file( GLOB SOURCES
     ./topology.cpp
     ./points_list.cpp
     ./curves_container.cpp
+    ./curves_container_utils.cpp
     ./mesh_container.cpp
     ./phantom_trimesh.cpp
+    ./tetrahedron.cpp
     ./geometry_tools.cpp
+    ./cgal_tools.cpp
     ./serializable_data.cpp
     ./deformer_data_cache.cpp
     ./base_curves_deformer.cpp

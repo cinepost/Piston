@@ -1,0 +1,151 @@
+#include "tetrahedron.h"
+#include "phantom_trimesh.h"
+
+namespace Piston {
+
+template<typename VtxIndexType>
+typename TetrahedronKDTree<VtxIndexType>::KDNode* TetrahedronKDTree<VtxIndexType>::build(std::vector<const Tetrahedron<VtxIndexType>*>& tets, int depth) {
+    if (tets.empty()) return nullptr;
+
+    KDNode* node = new KDNode();
+    for (auto tet : tets) {
+        node->nodeBounds.fit(tet->bounds.min);
+        node->nodeBounds.fit(tet->bounds.max);
+    }
+
+    if (tets.size() <= MAX_LEAF_SIZE) {
+        node->tets = tets;
+        return node;
+    }
+
+    int axis = depth % 3;
+    std::sort(tets.begin(), tets.end(), [axis](const Tetrahedron<VtxIndexType>* a, const Tetrahedron<VtxIndexType>* b) {
+        pxr::GfVec3f ca = a->centroid();
+        pxr::GfVec3f cb = b->centroid();
+        return (axis == 0) ? (ca[0] < cb[0]) : ((axis == 1) ? (ca[1] < cb[1]) : (ca[2] < cb[2]));
+    });
+
+    size_t medianIdx = tets.size() / 2;
+    double splitVal = (axis == 0) ? tets[medianIdx]->centroid().x : 
+                      ((axis == 1) ? tets[medianIdx]->centroid().y : tets[medianIdx]->centroid().z);
+
+    std::vector<const Tetrahedron<VtxIndexType>*> leftTets, rightTets;
+    for (auto tet : tets) {
+        double tMin = (axis == 0) ? tet->bounds.min.x : ((axis == 1) ? tet->bounds.min.y : tet->bounds.min.z);
+        double tMax = (axis == 0) ? tet->bounds.max.x : ((axis == 1) ? tet->bounds.max.y : tet->bounds.max.z);
+        
+        if (tMin <= splitVal) leftTets.push_back(tet);
+        if (tMax >= splitVal) rightTets.push_back(tet);
+    }
+
+    // Avoid infinite recursion if items cannot be split cleanly
+    if (leftTets.size() == tets.size() || rightTets.size() == tets.size()) {
+        node->tets = tets;
+        return node;
+    }
+
+    node->left = build(leftTets, depth + 1);
+    node->right = build(rightTets, depth + 1);
+    return node;
+}
+
+template<typename VtxIndexType>
+void TetrahedronKDTree<VtxIndexType>::searchClosest(const KDNode* node, const pxr::GfVec3f& p, const Tetrahedron<VtxIndexType>*& bestTet, float& bestSqDist) const {
+    if (!node) return;
+
+    // Prune path if it cannot beat current best distance
+    if (node->nodeBounds.squareDist(p) >= bestSqDist) return;
+
+    if (node->isLeaf()) {
+        for (auto tet : node->tets) {
+            float d = minSqDistToTetrahedron<VtxIndexType>(p, *tet, mPoints);
+            if (d < bestSqDist) {
+                bestSqDist = d;
+                bestTet = tet;
+            }
+        }
+        return;
+    }
+
+    float dLeft = node->left ? node->left->nodeBounds.squareDist(p) : std::numeric_limits<float>::max();
+    float dRight = node->right ? node->right->nodeBounds.squareDist(p) : std::numeric_limits<float>::max();
+
+    if (dLeft < dRight) {
+        searchClosest(node->left, p, bestTet, bestSqDist);
+        searchClosest(node->right, p, bestTet, bestSqDist);
+    } else {
+        searchClosest(node->right, p, bestTet, bestSqDist);
+        searchClosest(node->left, p, bestTet, bestSqDist);
+    }
+}
+
+template<typename VtxIndexType>
+const Tetrahedron<VtxIndexType>* TetrahedronKDTree<VtxIndexType>::searchInside(const KDNode* node, const pxr::GfVec3f& p) const {
+    if (!node || node->nodeBounds.squareDist(p) > 1e-9) return nullptr;
+
+    if (node->isLeaf()) {
+        for (auto tet : node->tets) {
+            
+            if (isPointInTetrahedron<VtxIndexType>(p, *tet)) {
+                return tet;
+            }
+        }
+        return nullptr;
+    }
+
+    // Test closest bounding space child node first
+    float dLeft = node->left ? node->left->nodeBounds.squareDist(p) : std::numeric_limits<float>::max();
+    float dRight = node->right ? node->right->nodeBounds.squareDist(p) : std::numeric_limits<float>::max();
+
+    if (dLeft < dRight) {
+        if (auto found = searchInside(node->left, p)) return found;
+        return searchInside(node->right, p);
+    } else {
+        if (auto found = searchInside(node->right, p)) return found;
+        return searchInside(node->left, p);
+    }
+}
+
+template<typename VtxIndexType>
+const Tetrahedron<VtxIndexType>* TetrahedronKDTree<VtxIndexType>::queryPoint(const pxr::GfVec3f& p) const {
+    // Pass 1: Try to look for strict volumetric containment
+    const Tetrahedron<VtxIndexType>* containingTet = searchInside(root, p);
+    if (containingTet) return containingTet;
+
+    // Pass 2: Fallback to finding the element with closest geometric feature
+    const Tetrahedron<VtxIndexType>* closestTet = nullptr;
+    float bestSqDist = std::numeric_limits<float>::max();
+    searchClosest(root, p, closestTet, bestSqDist);
+    return closestTet;
+}
+
+template<typename VtxIndexType>
+const Tetrahedron<VtxIndexType>* TetrahedronKDTree<VtxIndexType>::queryPointWithCache(const pxr::GfVec3f& p, const Tetrahedron<VtxIndexType>*& cachedTet) const {
+    // Step 1: O(1) Check - Is the point still inside the previous tetrahedron?
+    if (cachedTet && isPointInTetrahedron(p, *cachedTet)) {
+        return cachedTet; // Massively faster for coherent points
+    }
+
+    // Step 2: O(1) Check - Is it inside the faces/neighbors of the cache?
+    // (Optional: If you store neighbor pointers in your Tetrahedron struct, 
+    // you can check the 4 neighboring tets here before traversing the tree).
+
+    // Step 3: Fallback - Search the tree for strict containment
+    const Tetrahedron* containingTet = searchInside(root, p);
+    if (containingTet) {
+        cachedTet = containingTet; // Update the cache for the next frame/step
+        return containingTet;
+    }
+
+    // Step 4: Fallback - Find the closest face if completely outside the mesh
+    const Tetrahedron* closestTet = nullptr;
+    float bestSqDist = std::numeric_limits<float>::max();
+    searchClosest(root, p, closestTet, bestSqDist);
+    
+    cachedTet = closestTet; // Update the cache with the closest element
+    return closestTet;
+}
+
+} // namespace Piston
+
+template class Piston::Tetrahedron<Piston::PhantomTrimesh::PxrIndexType>;

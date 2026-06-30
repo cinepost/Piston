@@ -5,7 +5,7 @@
 
 namespace Piston {
 
-static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 1u);
+static const SerializableDeformerDataBase::DataVersion kWrapBindingDataVersion( 0u, 0u, 2u);
 
 WrapCurvesDeformerData::WrapCurvesDeformerData(): mIsValid(false), mBindMode(WrapCurvesDeformerData::BindMode::DIST) {
 
@@ -22,7 +22,11 @@ size_t WrapCurvesDeformerData::calcHash() const {
 	size_t hash = 0;
 
 	for(const auto& bind: mPointBinds) {
-		hash += static_cast<size_t>(bind.face_id * (bind.u + bind.v + bind.dist));
+		std::size_t raw_bits;
+		double _tmp = bind.u + bind.v + bind.dist;
+
+    	std::memcpy(&raw_bits, &_tmp, sizeof(double));
+		hash += static_cast<size_t>(bind.face_id) + raw_bits;
 	}
 
 	hash += mPointBinds.size();

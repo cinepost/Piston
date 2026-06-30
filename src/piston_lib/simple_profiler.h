@@ -13,13 +13,13 @@
 #include "framework.h"
 
 
-#ifdef PISTON_DEBUG
+//#ifdef PISTON_DEBUG
 #define PROFILE(NAME) auto __profiler__ = Piston::SimpleProfiler(NAME)
 #define PROFILE_PRINT() Piston::SimpleProfiler::printReport()
-#else
-#define PROFILE(NAME) {}
-#define PROFILE_PRINT() {}
-#endif
+//#else
+//#define PROFILE(NAME) {}
+//#define PROFILE_PRINT() {}
+//#endif
 
 namespace Piston {
 

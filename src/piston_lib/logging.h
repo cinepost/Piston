@@ -44,7 +44,8 @@ enum class LogLevel {
 #ifdef PISTON_DEBUG
 #define LOG_TRC Logger::getInstance().getStream(LogLevel::TRACE)
 #else
-#define LOG_TRC if (false) Logger::getInstance().getStream(LogLevel::TRACE)
+//#define LOG_TRC if (false) Logger::getInstance().getStream(LogLevel::TRACE)
+#define LOG_TRC Logger::getInstance().getStream(LogLevel::TRACE)
 #endif
 
 #define LOG_DBG Logger::getInstance().getStream(LogLevel::DEBUG)

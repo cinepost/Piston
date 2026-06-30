@@ -4,7 +4,6 @@
 #include "geometry_tools.h"
 #include "simple_profiler.h"
 #include "piston_math.h"
-#include "kdtree.hpp"
 #include "logging.h"
 
 #ifdef USE_CGAL
@@ -15,9 +14,6 @@
 #include <CGAL/Triangulation_3.h>
 #include <CGAL/Regular_triangulation_3.h>
 #include <CGAL/Delaunay_triangulation_3.h>
-#include <CGAL/Regular_triangulation_cell_base_3.h>
-#include <CGAL/Alpha_shape_vertex_base_3.h>
-#include <CGAL/Alpha_shape_cell_base_3.h>
 #include <CGAL/Alpha_shape_3.h>
 
 #endif // USE_CGAL
@@ -78,26 +74,26 @@ template <typename T>
 bool PhantomTrimesh::buildTetrahedrons(const T& positions, const GuideCurvesContainer* pCurvesContainer) {
 	PROFILE("PhantomTrimesh::buildTetrahedrons");
 	static_assert(std::is_same_v<T, std::vector<pxr::GfVec3f>> || std::is_same_v<T, pxr::VtArray<pxr::GfVec3f>>, "Only std::vector<pxr::GfVec3f> and pxr::VtArray<pxr::GfVec3f> types are permitted!"); 
-
 	using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
-	using Point_3 = Kernel::Point_3;
+	using Vb =  CGAL::Triangulation_vertex_base_with_info_3<uint32_t, Kernel>;
+	using Tds = CGAL::Triangulation_data_structure_3<Vb>;
+
+	using Triangulation = CGAL::Triangulation_3<Kernel, Tds>;
+	using Delaunay = CGAL::Delaunay_triangulation_3<Kernel, Tds>;
+	using Alpha_shape = CGAL::Alpha_shape_3<CGAL::Delaunay_triangulation_3<Kernel>>;
+
+	using CGAL_Point = Triangulation::Point;
+
+	// Use Regular Triangulation instead of Delaunay Triangulation
+	using Triangulation_Regular = CGAL::Regular_triangulation_3<Kernel>;
+	using Weighted_Alpha_shape =  CGAL::Alpha_shape_3<Triangulation_Regular>;
+	using Point_3  = Kernel::Point_3;
 	using Weighted_point = Kernel::Weighted_point_3;
 
-	using Rt_Vb = CGAL::Regular_triangulation_vertex_base_3<Kernel>;
-	using Rt_Alpha_Vb = CGAL::Alpha_shape_vertex_base_3<Kernel, Rt_Vb>;
-	using Vb_with_info = CGAL::Triangulation_vertex_base_with_info_3<unsigned int, Kernel, Rt_Alpha_Vb>;
-
-	using Rt_Cb = CGAL::Regular_triangulation_cell_base_3<Kernel>;
-	using Cb_with_alpha = CGAL::Alpha_shape_cell_base_3<Kernel, Rt_Cb>;
-
-	// 4. Mesh Assembly Topology Types
-	using Tds = CGAL::Triangulation_data_structure_3<Vb_with_info, Cb_with_alpha>;
-	using Rt = CGAL::Regular_triangulation_3<Kernel, Tds>;
-	using Weighted_Alpha_shape = CGAL::Alpha_shape_3<Rt>;  
-
-	//using CGAL_CellHandle = Triangulation::Cell_handle;
-	//using CGAL_VtxHandle = Triangulation::Vertex_handle;
-	//using CGAL_LocateType = Triangulation::Locate_type;
+	//
+	using CGAL_CellHandle = Triangulation::Cell_handle;
+	using CGAL_VtxHandle = Triangulation::Vertex_handle;
+	using CGAL_LocateType = Triangulation::Locate_type;
 
 	const size_t points_count = positions.size();
 
@@ -107,100 +103,65 @@ bool PhantomTrimesh::buildTetrahedrons(const T& positions, const GuideCurvesCont
 	}
 	LOG_DBG << "PhantomTrimesh::buildTetrahedrons(...) for " << positions.size() << " points.";
 
+	std::vector< std::pair<CGAL_Point, uint32_t> > points;
+	for(size_t i = 0; i < points_count; ++i) {
+		const auto& pxr_pt = positions[i];
+  		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
+  	}
+
+	//Triangulation TR(points.begin(), points.end());
+	Delaunay TR(points.begin(), points.end());
+
+	LOG_DBG << "T number of cells: " << (size_t)TR.number_of_cells();
+	LOG_DBG << "T number of finite cells: " << (size_t)TR.number_of_finite_cells();
+
+
 	// Mark root and tip vertices
 	std::vector<bool> tipVerticesFlags;
 	std::vector<bool> rootVerticesFlags;
 
 	if(pCurvesContainer) {
-		if(points_count != pCurvesContainer->getTotalVertexCount())	{
-			LOG_ERR << "PhantomTrimesh::buildTetrahedrons positions and pCurvesContainer points count mismatch!! Filtering disabled!";
-			return false;
-		}
+		if(points_count == pCurvesContainer->getTotalVertexCount())	{
 			
-		tipVerticesFlags.resize(points_count);
-		rootVerticesFlags.resize(points_count);
+			tipVerticesFlags.resize(points_count);
+			rootVerticesFlags.resize(points_count);
 
-		std::fill(tipVerticesFlags.begin(), tipVerticesFlags.begin(), false);
-		std::fill(rootVerticesFlags.begin(), rootVerticesFlags.begin(), false);
+			std::fill(tipVerticesFlags.begin(), tipVerticesFlags.begin(), false);
+			std::fill(rootVerticesFlags.begin(), rootVerticesFlags.begin(), false);
 
-		const auto& curve_vertex_counts = pCurvesContainer->getCurveVertexCounts();
-		//const auto& curves_offsets = pCurvesContainer->getCurveOffsets();
+			const auto& curve_vertex_counts = pCurvesContainer->getCurveVertexCounts();
 
-		size_t curr_idx = 0;
-		for(auto count: curve_vertex_counts) {
-			if(count == 0) continue;
+			size_t curr_idx = 0;
+			for(auto count: curve_vertex_counts) {
+				if(count == 0) continue;
 
-			rootVerticesFlags[curr_idx] = true;
-			tipVerticesFlags[curr_idx + count - 1] = true;
-			curr_idx += count;
+				rootVerticesFlags[curr_idx] = true;
+				tipVerticesFlags[curr_idx + count - 1] = true;
+				curr_idx += count;
+			}
+		} else {
+			LOG_ERR << "PhantomTrimesh::buildTetrahedrons positions and pCurvesContainer points count mismatch!! Filtering disabled!";
 		}
+	
+
+		weighted_cloud.push_back(Weighted_point(Point_3(0, 0, 0), 0.01)); 
+
+    weighted_cloud.push_back(Weighted_point(Point_3(5, 5, 5), 1.5));
+
+
 	}
-/*
-	std::vector<std::pair<CGAL_Point, uint32_t>> points;
-	for(size_t i = 0; i < points_count; ++i) {
-		const auto& pxr_pt = positions[i];
-  		points.push_back( std::make_pair( CGAL_Point(pxr_pt[0], pxr_pt[1], pxr_pt[2]), (uint32_t)i ));
-  	}
+
+/* Old triangulation technique... 
+	mTetrahedrons.resize(TR.number_of_finite_cells());
+	size_t i = 0;
+	for(const CGAL_CellHandle& cell_handle: TR.finite_cell_handles()) {
+		mTetrahedrons[i].indices[0] = cell_handle->vertex(0)->info();
+		mTetrahedrons[i].indices[1] = cell_handle->vertex(1)->info();
+		mTetrahedrons[i].indices[2] = cell_handle->vertex(2)->info();
+		mTetrahedrons[i].indices[3] = cell_handle->vertex(3)->info();
+		i++;
+	}
 */
-
-	// Calc point weights
-	neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = neighbour_search::KDTree<float, 3>(positions, true /* multi threaded */);
-
-	std::vector<std::tuple<Weighted_point, unsigned int>> input_data;
-     
-	static const auto kClosestNeighborsCount = 4;
-
-	for(size_t i = 0; i < points_count; ++i) {
-		const auto& pxr_pt = positions[i];
-  		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_points(kClosestNeighborsCount);
-  		deformer_restpoints_kdtree.findKNearestNeighbours(pxr_pt, kClosestNeighborsCount, closest_points);
-
-  		double total_distance = 0.0;
-  		uint count = 0;
-  		for(uint32_t j = 0; j < kClosestNeighborsCount; ++j) {
-  			auto dist = distance(pxr_pt, positions[closest_points[j].first]);
-  			if(dist > 0.0001) {
-  				total_distance += dist;
-  				count++;
-  			}
-  		}
-
-  		double avg_neighbor_distance = (count > 0) ? (total_distance / count) : 1.0;
-  		double calculated_radius = avg_neighbor_distance * 0.5;
-  		double target_weight = calculated_radius * calculated_radius;
-
-  		input_data.push_back({Weighted_point(Point_3(pxr_pt[0], pxr_pt[1], pxr_pt[2]), target_weight), (unsigned int)i});
-  	}
-
-  	Rt rt;
-
-  	// Insert points one-by-one to explicitly couple the vertex info
-    for (const auto& item : input_data) {
-        Weighted_point wp = std::get<0>(item);
-        uint32_t source_idx   = std::get<1>(item);
-
-        Rt::Vertex_handle vh = rt.insert(wp);
-        
-        // Handle overlapping points or geometric degeneracies gracefully
-        if (vh != Rt::Vertex_handle()) {
-            vh->info() = source_idx; // Assign the original index to the CGAL vertex
-        }
-    }
-
-	//Triangulation tr(points.begin(), points.end());
-	//Delaunay tr(points.begin(), points.end());
-	double base_alpha = 0.0; 
-	Weighted_Alpha_shape tr(rt, Kernel::FT(base_alpha), Weighted_Alpha_shape::REGULARIZED);
-
-	// Alternate strategy: If 0.0 is too aggressive, let CGAL find the optimal 
-    // baseline where your weights begin to matter dynamically:
-    Weighted_Alpha_shape::Alpha_iterator opt_alpha_it = tr.find_optimal_alpha(1);
-    double calculated_best_alpha = *opt_alpha_it;
-    tr.set_alpha(calculated_best_alpha); // Finds the sharpest crisp boundary threshold
-    LOG_DBG << "Dynamic alpha threshold derived from weightd: " << calculated_best_alpha;
-
-	LOG_DBG << "T number of cells: " << (size_t)tr.number_of_cells();
-	LOG_DBG << "T number of finite cells: " << (size_t)tr.number_of_finite_cells();
 
 	// Check that tetra is not connecting all tips or all root vertices of a cureves 
 	auto checkIsValid = [&tipVerticesFlags, &rootVerticesFlags](uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3) {
@@ -215,9 +176,7 @@ bool PhantomTrimesh::buildTetrahedrons(const T& positions, const GuideCurvesCont
 		return true;
 	};
 
-	for(auto cit = tr.finite_cells_begin(); cit != tr.finite_cells_end(); ++cit) {
-		if(tr.classify(cit) != Weighted_Alpha_shape::CELL) continue;
-
+	for(auto cit = TR.finite_cells_begin(); cit != TR.finite_cells_end(); ++cit) {
         // Access vertices via cit->vertex(0), cit->vertex(1), etc.
         if(checkIsValid(cit->vertex(0)->info() ,cit->vertex(1)->info(), cit->vertex(2)->info() ,cit->vertex(3)->info())) {
         	mTetrahedrons.emplace_back(

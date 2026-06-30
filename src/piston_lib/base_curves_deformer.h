@@ -177,7 +177,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) {};
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {};
 
 		bool canProduceOutputTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
 			return mDeformerGeoPrimHandle.hasPositionsTimeSamples(time_from, time_to);

@@ -47,6 +47,8 @@ class PxrCurvesContainer {
 
 		int 		getCurveVertexCount(size_t curve_idx) const { return mCurveVertexCounts[curve_idx]; }
 
+		const pxr::GfVec3f& getCurveVector(size_t curve_idx, uint32_t vtx) const { return mCurveVectors[mCurveOffsets[curve_idx] + vtx]; }
+
 		CurveDataPtr getCurveDataPtr(size_t curve_idx);
 		CurveDataConstPtr getCurveDataPtr(size_t curve_idx) const;
 
@@ -54,10 +56,7 @@ class PxrCurvesContainer {
 
 		const pxr::VtArray<pxr::GfVec3f>& getRestCurvePoints() const { return mRestCurvePoints.AsConst(); }
 
-		bool  sUpdated() const { return mUpdated; }
-
 		Space getSpace() const { return mSpace;}
-
 		void  setSpace(const Space space) { mSpace = space; }
 
 	private:
@@ -76,7 +75,6 @@ class PxrCurvesContainer {
 		pxr::VtArray<pxr::GfVec3f>              mRestCurvePoints;
 
 		pxr::UsdTimeCode                        mLastUpdateTimeCode;
-		bool                                    mUpdated;
 };
 
 inline std::string to_string(PxrCurvesContainer::Space space) {

@@ -1,0 +1,6 @@
+#ifndef __PISTON_GIT_VERSION__
+#define __PISTON_GIT_VERSION__
+
+#define GIT_HASH "@GIT_HASH@"
+
+#endif  // __PISTON_GIT_VERSION__

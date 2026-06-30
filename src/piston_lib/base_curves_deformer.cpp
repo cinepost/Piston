@@ -312,9 +312,9 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 			return false;
 		}
 
-		//if(!mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty())) {
-		//	return false;
-		//}
+		if(mpCurvesContainer && !mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty())) {
+			return false;
+		}
 		
 		if(multi_threaded) { return deformMtImpl(points, time_code); }
 
@@ -477,7 +477,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	}
 
 	if(mShowDebugGeometry) {
-		drawDebugGeometry(time_code);
+		drawDebugGeometry(time_code, deformed_points_list_ptr);
 	}
 
 	return true;
@@ -487,7 +487,6 @@ void BaseCurvesDeformer::setMotionBlurState(bool state) {
 	if(mCalcMotionVectors == state) return;
 	mCalcMotionVectors = state;
 	makeDirty();
-
 	DLOG_DBG << "Motion blur calculation " << (mCalcMotionVectors ? "enabled." : "disabled.");
 }
 
@@ -495,7 +494,6 @@ void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
 	if(mVelocityAttrName == name) return;
 	mVelocityAttrName = name;
 	makeDirty();
-
 	DLOG_DBG << "Velocity attribute name is set to: " << mVelocityAttrName;
 }
 
@@ -503,7 +501,6 @@ void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
 	if(mSkinPrimAttrName == name) return;
 	mSkinPrimAttrName = name;
 	makeDirty();
-
 	DLOG_DBG << "Skin prim ID attribute name is set to: " << mSkinPrimAttrName;
 }
 

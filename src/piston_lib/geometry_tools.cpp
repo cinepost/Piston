@@ -45,26 +45,6 @@ pxr::GfMatrix3f rotateAlign2(const pxr::GfVec3f& n1, const pxr::GfVec3f& n2) {
     };
 }
 
-
-glm::mat3 rotateAlign(const glm::vec3& n1, const glm::vec3& n2) {
-    const float cosA = dot(n1, n2);
-    const glm::vec3 axis = cross(n1, n2);
-    const float k = 1.0f / (1.0f + cosA);
-
-    glm::mat3 result( (axis.x * axis.x * k) + cosA,
-		(axis.y * axis.x * k) - axis.z, 
-		(axis.z * axis.x * k) + axis.y,
-		(axis.x * axis.y * k) + axis.z,  
-		(axis.y * axis.y * k) + cosA,      
-		(axis.z * axis.y * k) - axis.x,
-		(axis.x * axis.z * k) - axis.y,  
-		(axis.y * axis.z * k) + axis.x,  
-		(axis.z * axis.z * k) + cosA 
-	);
-
-    return result;
-}
-
 bool pointTriangleProject(const pxr::GfVec3f &pt, const pxr::GfVec3f &n, const pxr::GfVec3f &v0, const pxr::GfVec3f &v1, const pxr::GfVec3f &v2, float &u, float &v) {
     pxr::GfVec3f v0v1 = v1 - v0;
     pxr::GfVec3f v0v2 = v2 - v0;
@@ -220,10 +200,12 @@ void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const Phanto
         
         for(uint32_t i = 0; i < edges_count; ++i) {
             const auto& vtx_pair = pAdjacency->getCornerVertexPair(vtx_offset + i);
-            vn += pxr::GfGetNormalized(pxr::GfCross(pt_positions[vtx_pair.first] - pt_positions[vtx], pt_positions[vtx_pair.second] - pt_positions[vtx]));
+            vn += pxr::GfGetNormalized(pxr::GfCross(pt_positions[vtx_pair.first] - pt_positions[vtx], pt_positions[vtx_pair.second] - pt_positions[vtx])
+                , MIN_VECTOR_LENGTH_F
+            );
         }
 
-        vertex_normals[vtx] = pxr::GfGetNormalized(vn);
+        vertex_normals[vtx] = pxr::GfGetNormalized(vn, MIN_VECTOR_LENGTH_F);
     };
 
     if(pThreadPool) {
@@ -246,10 +228,10 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
     assert(curve_points_count > 1);
     assert(std::distance(it_begin, it_end) == curve_points_count);
 
-    static const float kZeroLength = 1e-7; // pxr epsilon is 1e-10
+    static const float kZeroLength = MIN_VECTOR_LENGTH_F; // pxr epsilon is 1e-10, but for double
 
     // root frame
-    const pxr::GfVec3f root_Tn = pxr::GfGetNormalized(root_tangent);
+    const pxr::GfVec3f root_Tn = pxr::GfGetNormalized(root_tangent, MIN_VECTOR_LENGTH_F);
     const pxr::GfVec3f root_Bn = pxr::GfCross(root_Tn, root_up_vector);
     const pxr::GfVec3f root_Nn = pxr::GfCross(root_Bn, root_Tn);
 
@@ -287,8 +269,8 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
         pxr::GfVec3f v2 = tj - tLi;
         float c2 = pxr::GfDot(v2,v2);
 
-        it_next->n = pxr::GfGetNormalized(nLi - (2.0 / c2) * pxr::GfDot(v2, nLi) * v2);
-        it_next->b = pxr::GfGetNormalized(pxr::GfCross(tj,it_next->n));
+        it_next->n = pxr::GfGetNormalized(nLi - (2.0 / c2) * pxr::GfDot(v2, nLi) * v2, MIN_VECTOR_LENGTH_F);
+        it_next->b = pxr::GfGetNormalized(pxr::GfCross(tj,it_next->n), MIN_VECTOR_LENGTH_F);
     }
 }
 

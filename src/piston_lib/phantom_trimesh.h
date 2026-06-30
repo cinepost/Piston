@@ -5,6 +5,7 @@
 #include "common.h"
 #include "kdtree.hpp"
 #include "serializable_data.h"
+#include "tetrahedron.h"
 #include "logging.h"
 
 #include <pxr/usd/usdGeom/mesh.h>
@@ -34,6 +35,7 @@ struct IndicesArrayHasher {
 	}   
 };
 
+class GuideCurvesContainer;
 class SerializablePhantomTrimesh;
 
 // PhantomTrimesh is a special kind of structure that holds virtual triangles that references existing UsdGeomMesh vertices.
@@ -76,20 +78,7 @@ class PhantomTrimesh {
 			pxr::GfVec3f 	restNormal;
 		};
 
-		struct Tetrahedron {
-			using IndicesList = std::array<PxrIndexType, 4>;
-			static constexpr PxrIndexType kInvalidVertexID = std::numeric_limits<PxrIndexType>::max();
-
-			Tetrahedron(): indices{kInvalidVertexID} { }
-			Tetrahedron(PxrIndexType a, PxrIndexType b, PxrIndexType c, PxrIndexType d): indices{a, b, c, d} { }
-
-			bool isValid() const { return !(
-				indices[0] == indices[1] || indices[0] == indices[2] || indices[0] == indices[3] ||
-				indices[0] == kInvalidVertexID || indices[1] == kInvalidVertexID || indices[2] == kInvalidVertexID || indices[3] == kInvalidVertexID); 
-			}
-
-			IndicesList 	indices;
-		};
+		using Tetrahedron = Piston::Tetrahedron<PxrIndexType>;
 
 		PhantomTrimesh();
 
@@ -112,7 +101,13 @@ class PhantomTrimesh {
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
 		const TriFace& getFace(const uint32_t id) const { 
+
+			if(id >= mFaces.size()) {
+				LOG_ERR << "Id " << id << " faces " << mFaces.size();
+			}
+
 			assert(id < mFaces.size()); 
+
 			return mFaces[id]; 
 		}
 		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
@@ -124,9 +119,9 @@ class PhantomTrimesh {
 		void invalidate();
 
 		template <typename T>
-		bool buildTetrahedrons(const T& positions);
+		bool buildTetrahedrons(const T& positions, const GuideCurvesContainer* pCurvesContainer = nullptr /* used to filter out invald tetrahedrons */);
 
-		bool hasTetrahedrons() const { return !mTetrahedrons.empty() && (mTetrahedronCounts.size() == mTetrahedronOffsets.size() == mPointsCount); }
+		bool hasTetrahedrons() const;
 		const std::vector<Tetrahedron>& getTetrahedrons() const { return mTetrahedrons; }
 		const Tetrahedron& getTetrahedron(size_t i) const { assert(i < mTetrahedrons.size()); return mTetrahedrons[i]; }
 

@@ -101,7 +101,7 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
 			
 			pxr::GfVec3f interpolated_normal = pxr::GfGetNormalized(
 				bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]
-			);
+			, MIN_VECTOR_LENGTH_F);
 
 			points[i] = pDeformerMeshContainer->getInterpolatedLivePosition(face, bind.u, bind.v) + (interpolated_normal * bind.dist);
 		}
@@ -141,7 +141,7 @@ bool WrapCurvesDeformer::buildCurvesLocalAnimVectors(bool multi_threaded) {
 
 				const pxr::GfVec3f T = p1 - p0;
 				const pxr::GfVec3f B = p2 - p0;
-				const pxr::GfVec3f N = pxr::GfGetNormalized(pxr::GfCross(T, B));
+				const pxr::GfVec3f N = pxr::GfGetNormalized(pxr::GfCross(T, B), MIN_VECTOR_LENGTH_F);
 
 				mTmpFaceNTBMatrices[face_id] = pxr::GfMatrix3f(N[0], T[0], B[0], N[1], T[1], B[1], N[2], T[2], B[2]).GetInverse();
 			}
@@ -219,7 +219,7 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 
 					const pxr::GfVec3f T = p1 - p0;
 					const pxr::GfVec3f B = p2 - p0;
-					const pxr::GfVec3f N = pxr::GfGetNormalized(pxr::GfCross(T, B));
+					const pxr::GfVec3f N = pxr::GfGetNormalized(pxr::GfCross(T, B), MIN_VECTOR_LENGTH_F);
 
 					mTmpFaceNTBMatrices[face_id] = pxr::GfMatrix3f(N[0], T[0], B[0], N[1], T[1], B[1], N[2], T[2], B[2]);
 				}
@@ -509,8 +509,6 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 
 						bind.u = (d11 * d20 - d01 * d21) / denom;
 						bind.v = (d00 * d21 - d01 * d20) / denom;
-
-						const pxr::GfVec3f projected_point = pDeformerMeshContainer->getInterpolatedRestPosition(face, bind.u, bind.v);
 			    		bind.dist = face_distance;
 						bind.face_id = face_id;
 					};
@@ -686,8 +684,6 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 
     			}
 
-				const pxr::GfVec3f projected_pt = curr_pt - face_normal * face_distance; // project point on to face plane
-
 				const pxr::GfVec3f v0 = p1 - p0, v1 = p2 - p0, v2 = curr_pt - p0;
 				float d00 = pxr::GfDot(v0, v0);
 				float d01 = pxr::GfDot(v0, v1);
@@ -709,7 +705,6 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
         	if(bound_curve_vertices_count == 0) {
         		for(uint32_t curve_vtx = 0; curve_vtx < curve_vertices_count; ++curve_vtx) {
         			auto& bind = pointBinds[curve_vertex_offset + curve_vtx];
-        			pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + curve_vtx);
         			const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDtree->findNearestNeighbour(curve_root_pt);
         			const auto nearest_face_id = nearest_pt.first;
         			

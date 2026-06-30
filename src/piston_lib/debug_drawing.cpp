@@ -47,8 +47,32 @@ DebugGeo::UniquePtr DebugGeo::create(const std::string& name) {
 
 bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
     static const std::string kSimpleLinesPostfix = "/simpleLines";
+    static const std::string kWireBoxesPostfix = "/simpleWireBoxes";
+    static const std::string kTetrasPostfix = "/simpleTetras";
 
     const std::lock_guard<std::mutex> lock(mMutex);
+
+    pxr::VtArray<pxr::GfVec3f> points;
+    pxr::VtArray<pxr::GfVec3f> colors;
+    pxr::VtArray<float> widths;
+
+    auto pushLine = [&](const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& color, float width) {
+        points.push_back(p0);
+        points.push_back(p1);
+        colors.push_back(color);
+        colors.push_back(color);
+        widths.push_back(width);
+        widths.push_back(width);
+    };
+
+     auto pushLineMC = [&](const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& c0, const pxr::GfVec3f& c1, float w0, float w1) {
+        points.push_back(p0);
+        points.push_back(p1);
+        colors.push_back(c0);
+        colors.push_back(c1);
+        widths.push_back(w0);
+        widths.push_back(w1);
+    };
 
     // Simple colored lines
     if(!mLines.empty()) {
@@ -58,22 +82,91 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
         pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(pStage, simpleLinesPath);
         curves.GetTypeAttr().Set(pxr::UsdGeomTokens->linear);
 
-        pxr::VtArray<pxr::GfVec3f> points;
-        pxr::VtArray<pxr::GfVec3f> colors;
-        pxr::VtArray<float> widths;
+        points.clear();
+        colors.clear();
+        widths.clear();
 
         for(const auto& l: mLines) {
-            points.push_back(l.p0);
-            points.push_back(l.p1);
-            colors.push_back(l.c0);
-            colors.push_back(l.c1);
-            widths.push_back(l.w0);
-            widths.push_back(l.w1);
+            pushLineMC(l.p0, l.p1 ,l.c0, l.c1, l.w0, l.w1);
         }
 
         assert(points.size() == widths.size());
 
         pxr::VtArray<int> curveVertexCounts(mLines.size());
+        for(size_t i = 0; i < curveVertexCounts.size(); ++i) {
+            curveVertexCounts[i] = 2;
+        }
+        curves.GetCurveVertexCountsAttr().Set(curveVertexCounts);
+    
+        curves.GetPointsAttr().Set(points);
+        curves.GetWidthsAttr().Set(widths);
+
+        if(points.size() == colors.size()) {
+            pxr::UsdGeomPrimvar colorPrimvar = curves.CreateDisplayColorPrimvar(pxr::UsdGeomTokens->vertex);
+            colorPrimvar.Set(colors);
+        }
+    }
+
+    // Wireframe boxes
+    if(!mWireBoxes.empty()) {
+        pxr::SdfPath simpleWireBoxesPath(path + kWireBoxesPostfix);
+        removePrimIfExist(pStage, simpleWireBoxesPath);
+
+        pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(pStage, simpleWireBoxesPath);
+        curves.GetTypeAttr().Set(pxr::UsdGeomTokens->linear);
+
+        points.clear();
+        colors.clear();
+        widths.clear();
+
+        for(const auto& box: mWireBoxes) {
+            pxr::GfVec3f extents = box.max - box.min;
+            pushLine(box.min, box.min + pxr::GfVec3f(extents[0], 0.0f, 0.0f), box.color, box.width);
+            pushLine(box.min, box.min + pxr::GfVec3f(0.0f, extents[1], 0.0f), box.color, box.width);
+            pushLine(box.min, box.min + pxr::GfVec3f(0.0f, 0.0f, extents[2]), box.color, box.width);
+
+            pushLine(box.max, box.max - pxr::GfVec3f(extents[0], 0.0f, 0.0f), box.color, box.width);
+            pushLine(box.max, box.max - pxr::GfVec3f(0.0f, extents[1], 0.0f), box.color, box.width);
+            pushLine(box.max, box.max - pxr::GfVec3f(0.0f, 0.0f, extents[2]), box.color, box.width);
+        }
+
+        pxr::VtArray<int> curveVertexCounts(mWireBoxes.size() * 6);
+        for(size_t i = 0; i < curveVertexCounts.size(); ++i) {
+            curveVertexCounts[i] = 2;
+        }
+        curves.GetCurveVertexCountsAttr().Set(curveVertexCounts);
+    
+        curves.GetPointsAttr().Set(points);
+        curves.GetWidthsAttr().Set(widths);
+
+        if(points.size() == colors.size()) {
+            pxr::UsdGeomPrimvar colorPrimvar = curves.CreateDisplayColorPrimvar(pxr::UsdGeomTokens->vertex);
+            colorPrimvar.Set(colors);
+        }
+    }
+
+    // Wire tetras
+    if(!mWireTetras.empty()) {
+        pxr::SdfPath simpleTetrasPath(path + kTetrasPostfix);
+        removePrimIfExist(pStage, simpleTetrasPath);
+
+        pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(pStage, simpleTetrasPath);
+        curves.GetTypeAttr().Set(pxr::UsdGeomTokens->linear);
+
+        points.clear();
+        colors.clear();
+        widths.clear();
+
+        for(const auto& tetra: mWireTetras) {
+            pushLine(tetra.p0, tetra.p1, tetra.color, tetra.width);
+            pushLine(tetra.p0, tetra.p2, tetra.color, tetra.width);
+            pushLine(tetra.p0, tetra.p3, tetra.color, tetra.width);
+            pushLine(tetra.p1, tetra.p2, tetra.color, tetra.width);
+            pushLine(tetra.p2, tetra.p3, tetra.color, tetra.width);
+            pushLine(tetra.p3, tetra.p1, tetra.color, tetra.width);
+        }
+
+        pxr::VtArray<int> curveVertexCounts(mWireTetras.size() * 6);
         for(size_t i = 0; i < curveVertexCounts.size(); ++i) {
             curveVertexCounts[i] = 2;
         }

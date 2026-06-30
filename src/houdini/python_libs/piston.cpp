@@ -220,6 +220,8 @@ BOOST_PYTHON_MODULE(_piston) {
 		.value("NTB", GuideCurvesDeformer::BindMode::NTB)
 		.value("ANGLE", GuideCurvesDeformer::BindMode::ANGLE)
 		.value("SPACE", GuideCurvesDeformer::BindMode::SPACE)
+		.value("LHS", GuideCurvesDeformer::BindMode::LHS)
+		.value("BLEND", GuideCurvesDeformer::BindMode::BLEND)
 		.export_values()
 	;
 

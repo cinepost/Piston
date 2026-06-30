@@ -40,7 +40,7 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code) override;
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override;
 
 		virtual void invalidateData(DeformerDataCache& cache) override;
 

@@ -20,6 +20,11 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
   set(default_build_type "Debug")
 endif()
 
+#### CGAL
+#set(CGAL_DISABLE_GMP ON CACHE BOOL "Disable GMP" FORCE)
+#set(CMAKE_DISABLE_FIND_PACKAGE_GMP ON CACHE BOOL "Disable GMP package lookup" FORCE)
+#set(CGAL_CMAKE_EXACT_NT_BACKEND "BOOST_BACKEND" CACHE STRING "Use Boost Backend" FORCE)
+
 if( NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES )
   message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
   set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING "Choose the type of build." FORCE)
@@ -98,9 +103,32 @@ else()
   project( Piston VERSION ${PROJECT_VERSION} )
 endif()
 
-# Version generators
-#include (cmake/GenerateLavaVersionCpp.cmake)
-#include (cmake/GenerateLavaVersionPython.cmake)
+# Version generator
+
+# Find Git package
+find_package(Git REQUIRED)
+
+# Get the latest commit hash (falls back to "unknown" if not a git repo)
+execute_process(
+    COMMAND ${GIT_EXECUTABLE} describe --always --dirty --tags
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+
+# If git command failed, set a default
+if(NOT GIT_HASH)
+    set(GIT_HASH "unknown")
+endif()
+
+# Generate version.h from the template
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/version/version.h
+)
+set(PISTON_VERSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/")
+
 
 # ccache
 #include(cmake/CPM.cmake)
