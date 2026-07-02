@@ -44,10 +44,102 @@ inline void from_json(const json& j, GuideCurvesDeformerData::GuideOrigin& o) {
 	o.raw_data = j.at(0).template get<uint32_t>();
 }
 
+inline void to_json(json& j, const GuideCurvesDeformerData::PointBindDataLHS& bind) {
+	j = {
+		bind.curveIndices[0], //u32 
+		bind.curveIndices[1], //u32
+		bind.curveIndices[2], //u32
+
+		static_cast<uint32_t>(bind.v[0]) | (static_cast<uint32_t>(bind.v[1]) << 8) | (static_cast<uint32_t>(bind.v[2]) << 16), //u32
+		static_cast<uint32_t>(bind.v[3]) | (static_cast<uint32_t>(bind.v[4]) << 8) | (static_cast<uint32_t>(bind.v[5]) << 16), //u32
+
+		static_cast<uint32_t>(bind.w[0].toBits()) | (static_cast<uint32_t>(bind.w[1].toBits()) << 16), //u32
+		static_cast<uint32_t>(bind.w[2].toBits()) | (static_cast<uint32_t>(bind.w[3].toBits()) << 16), //u32
+		static_cast<uint32_t>(bind.w[4].toBits()) | (static_cast<uint32_t>(bind.w[5].toBits()) << 16) //u32
+
+	};
+/*
+	uint32_t curveIndices[3]; 	// TODO: use three 24 or 30 bit indices and rest bits are for flags
+	uint8_t v[6];            	// TODO: use relative 8bit vertex indices
+	float16_t w[6];				// TODO: float16_t weight
+*/	
+}
+
+inline void from_json(const json& j, GuideCurvesDeformerData::PointBindDataLHS& bind) {
+	bind.curveIndices[0] = j.at(0).template get<uint32_t>();
+	bind.curveIndices[1] = j.at(1).template get<uint32_t>();
+	bind.curveIndices[2] = j.at(2).template get<uint32_t>();
+
+	uint32_t v012 = j.at(3).template get<uint32_t>();
+	bind.v[0] = v012 & 0x000000FF;
+	bind.v[1] = (v012 >> 8 ) & 0x000000FF;
+	bind.v[2] = v012 >> 16;
+
+	uint32_t v345 = j.at(4).template get<uint32_t>();
+	bind.v[3] = v345 & 0x000000FF;
+	bind.v[4] = (v345 >> 8 ) & 0x000000FF;
+	bind.v[5] = v345 >> 16;
+
+	uint32_t w01 = j.at(5).template get<uint32_t>();
+	bind.w[0].fromBits(w01 & 0x0000FFFF); 
+	bind.w[1].fromBits(w01 >> 16);
+
+	uint32_t w23 = j.at(6).template get<uint32_t>();
+	bind.w[2].fromBits(w23 & 0x0000FFFF); 
+	bind.w[3].fromBits(w23 >> 16);
+
+	uint32_t w45 = j.at(7).template get<uint32_t>();
+	bind.w[4].fromBits(w45 & 0x0000FFFF); 
+	bind.w[5].fromBits(w45 >> 16);
+}
+
+inline void to_json(json& j, const GuideCurvesDeformerData::BlendedNTBData& bind) {
+	j = {
+		bind.guide_id[0], //u32 
+		bind.guide_id[1], //u32
+		bind.guide_id[2], //u32
+		static_cast<uint32_t>(bind.v[0]) | (static_cast<uint32_t>(bind.v[1]) << 8) | (static_cast<uint32_t>(bind.v[2]) << 16), //u32
+		static_cast<uint32_t>(bind.w[0].toBits()) | (static_cast<uint32_t>(bind.w[1].toBits()) << 16), //u32
+		static_cast<uint16_t>(bind.w[2].toBits()), // u16
+		bind.coords[0][0], bind.coords[0][1], bind.coords[0][2],
+		bind.coords[1][0], bind.coords[1][1], bind.coords[1][2],
+		bind.coords[2][0], bind.coords[2][1], bind.coords[2][2]
+	};
+/*
+	uint32_t 	guide_id[3];
+	uint8_t  	v[3]; 		// vertices. 2 vertices per guide
+	float16_t   w[3]; 		// weights. 2 weights per guide
+	pxr::GfVec3f coords[3]; // ntb coords
+*/
+}
+
+inline void from_json(const json& j, GuideCurvesDeformerData::BlendedNTBData& bind) {
+	bind.guide_id[0] = j.at(0).template get<uint32_t>();
+	bind.guide_id[1] = j.at(1).template get<uint32_t>();
+	bind.guide_id[2] = j.at(2).template get<uint32_t>();
+
+	uint32_t v012 = j.at(3).template get<uint32_t>();
+	bind.v[0] = v012 & 0x000000FF;
+	bind.v[1] = (v012 >> 8 ) & 0x000000FF;
+	bind.v[2] = v012 >> 16;
+
+	uint32_t w01 = j.at(4).template get<uint32_t>();
+	bind.w[0].fromBits(w01 & 0x0000FFFF); 
+	bind.w[1].fromBits(w01 >> 16);
+	bind.w[2].fromBits(j.at(5).template get<uint16_t>());
+
+	bind.coords[0] = {j.at(6).template get<float>(), j.at(7).template get<float>(), j.at(8).template get<float>()};
+	bind.coords[1] = {j.at(9).template get<float>(), j.at(10).template get<float>(), j.at(11).template get<float>()};
+	bind.coords[2] = {j.at(12).template get<float>(), j.at(13).template get<float>(), j.at(14).template get<float>()};
+}
+
 void GuideCurvesDeformerData::clearData() {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
 	mPointBinds.clear();
+	mBlendNTBPointBinds.clear();
+	mLHSPointBinds.clear();
+
 	mPointSurfaceBinds.clear();
 	mGuideOrigins.clear();
 	mSkinPrimPath = "";
@@ -61,6 +153,16 @@ size_t GuideCurvesDeformerData::calcHash() const {
 		hash += bind.hash();
 	}
 	hash += mPointBinds.size();
+
+	for(const auto& bind: mBlendNTBPointBinds) {
+		hash += bind.hash();
+	}
+	hash += mBlendNTBPointBinds.size();
+
+	for(const auto& bind: mLHSPointBinds) {
+		hash += bind.hash();
+	}
+	hash += mLHSPointBinds.size();
 
 	for(const auto& bind: mPointSurfaceBinds) {
 		hash += bind.hash();
@@ -82,6 +184,10 @@ size_t GuideCurvesDeformerData::calcHash() const {
 
 static const char* kJMode = "mode";
 static const char* kJPointBinds = "pointbinds";
+
+static const char* kJLHSPointBinds = "lhs_pointbinds";
+static const char* kJBlendNTBPointBinds = "ntb_blend_pointbinds";
+
 static const char* kJPointSurfaceBinds = "pointsurfacebinds";
 static const char* kJGuideOrigins = "guideorigs";
 static const char* kJDataHash = "data_hash";
@@ -92,8 +198,16 @@ bool GuideCurvesDeformerData::dumpToJSON(json& j) const {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
 	static const std::vector<GuideOrigin> kEmptyGuideOrigins;
+	static const std::vector<PointBindDataLHS> kEmptyLHSBinds;
+	static const std::vector<BlendedNTBData> kEmptyBlendNTBBinds;
+
 	j[kJMode] = static_cast<uint8_t>(mBindMode);
+	
 	j[kJPointBinds] = mPointBinds;
+
+	j[kJLHSPointBinds] = (mBindMode == BindMode::LHS) ? mLHSPointBinds : kEmptyLHSBinds;
+	j[kJBlendNTBPointBinds] = (mBindMode == BindMode::BLEND) ? mBlendNTBPointBinds : kEmptyBlendNTBBinds;
+
 	j[kJPointSurfaceBinds] = mPointSurfaceBinds;
 	j[kJGuideOrigins] = (mBindMode == BindMode::NTB) ? mGuideOrigins : kEmptyGuideOrigins;
 	j[kJSkinPrimPath] = mSkinPrimPath;
@@ -126,6 +240,10 @@ bool GuideCurvesDeformerData::readFromJSON(const json& j) {
 
 	if(mBindMode == BindMode::NTB) {
 		mGuideOrigins = j[kJGuideOrigins].template get<std::vector<GuideOrigin>>();
+	} else if(mBindMode == BindMode::LHS) {
+		mLHSPointBinds = j[kJLHSPointBinds].template get<std::vector<PointBindDataLHS>>();
+	} else if(mBindMode == BindMode::BLEND) {
+		mBlendNTBPointBinds = j[kJBlendNTBPointBinds].template get<std::vector<BlendedNTBData>>();
 	}
 
 	mPointSurfaceBinds = j[kJPointSurfaceBinds].template get<std::vector<PointSurfaceBindData>>();

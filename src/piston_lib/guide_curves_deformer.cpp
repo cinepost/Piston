@@ -234,24 +234,37 @@ bool GuideCurvesDeformer::hasSkinPrimitiveData() const {
 }
 
 bool GuideCurvesDeformer::deformImpl_LHSMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
+	const auto& pointBinds = mpGuideCurvesDeformerData->getLHSPointBinds();
 
-	const auto& positions = mpGuideCurvesContainer->getLiveCurvePoints();
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		const auto* pGuideCurvesContainer = mpGuideCurvesContainer.get();
+		const auto& positions = pGuideCurvesContainer->getLiveCurvePoints();
 
-	for(size_t i = 0; i < points.size(); ++i) {
-		assert(i < mTestLHSData6P.size());
+		for(size_t i = start; i < end; ++i) {
+			assert(i < pointBinds.size());
 
-		const auto& bind = mTestLHSData6P[i];
-		points[i] = {0.0f, 0.0f, 0.0f};
+			const auto& bind = pointBinds[i];
+			points[i] = {0.0f, 0.0f, 0.0f};
 
-		if(bind.isValid()) {
-			points[i] += positions[bind.v[0]] * bind.w[0];
-			points[i] += positions[bind.v[1]] * bind.w[1];
-			points[i] += positions[bind.v[2]] * bind.w[2];
-			points[i] += positions[bind.v[3]] * bind.w[3];
-			points[i] += positions[bind.v[4]] * bind.w[4];
-			points[i] += positions[bind.v[5]] * bind.w[5];
+			if(bind.isValid()) {
+				points[i] += positions[bind.v[0] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[0];
+				points[i] += positions[bind.v[1] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[1];
 
+				points[i] += positions[bind.v[2] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[1])] * bind.w[2];
+				points[i] += positions[bind.v[3] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[1])] * bind.w[3];
+				
+				points[i] += positions[bind.v[4] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[2])] * bind.w[4];
+				points[i] += positions[bind.v[5] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[2])] * bind.w[5];
+
+			}
 		}
+	};
+
+	if(multi_threaded) {
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func);
+		blocks.wait();
+	} else {
+		func(0u, pointBinds.size());
 	}
 
 	return true;
@@ -313,7 +326,7 @@ bool GuideCurvesDeformer::deformImpl_BlendNTBMode(bool multi_threaded, PointsLis
 	mpSkinMeshContainer->update(mGuidesSkinGeoPrimHandle, time_code, isDirty());
 
 	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
-	const auto& pointBinds = mTestBlendNTBData;
+	const auto& pointBinds = mpGuideCurvesDeformerData->getBlendNTBPointBinds();
 	assert(pointBinds.size() == points.size());
 
 	std::vector<NTBFrame> live_guide_frames(mpGuideCurvesContainer->getLiveCurvePoints().size());
@@ -412,7 +425,6 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 
 bool GuideCurvesDeformer::
 buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	printf("GuideCurvesDeformer::buildCurvesRootsBindDeformerData()\n");
 	assert(mpCurvesContainer);
 	assert(mpGuideCurvesContainer);
 	assert(mpGuideCurvesDeformerData);
@@ -604,8 +616,6 @@ bool GuideCurvesDeformer::guideIndicesNeeded() const {
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	printf("GuideCurvesDeformer::buildDeformerDataImpl()\n");
-
 	if(!mpGuideCurvesContainer) {
 		mpGuideCurvesContainer = GuideCurvesContainer::create();
 	}
@@ -1281,11 +1291,11 @@ static std::array<float, 6> calculate3DWeights(const pxr::GfVec3f& P, const std:
         if (distSq < 1e-9) {
             std::array<float, 6> exactWeights;
             std::fill(exactWeights.begin(), exactWeights.end(), 0.0f);
-            exactWeights[i] = 1.0;
+            exactWeights[i] = 1.0f;
             return exactWeights;
         }
         
-        A[i][i] = 2.0 * distSq; // Weight penalization matrix
+        A[i][i] = 2.0f * distSq; // Weight penalization matrix
     }
 
     // Add Constraints to the linear system
@@ -1299,15 +1309,15 @@ static std::array<float, 6> calculate3DWeights(const pxr::GfVec3f& P, const std:
         A[i][N + 2] = points[i][2]; // Z constraint row
         A[N + 2][i] = points[i][2];
         
-        A[i][N + 3] = 1.0;         // Sum = 1 constraint row
-        A[N + 3][i] = 1.0;
+        A[i][N + 3] = 1.0f;         // Sum = 1 constraint row
+        A[N + 3][i] = 1.0f;
     }
 
     // Set target vector B
     B[N]     = P[0];
     B[N + 1] = P[1];
     B[N + 2] = P[2];
-    B[N + 3] = 1.0;
+    B[N + 3] = 1.0f;
 
     // Solve Ax = B using Gaussian Elimination with partial pivoting
     for (int i = 0; i < matrixSize; ++i) {
@@ -1330,7 +1340,7 @@ static std::array<float, 6> calculate3DWeights(const pxr::GfVec3f& P, const std:
     }
 
     // Back substitution
-    std::vector<float> X(matrixSize, 0.0);
+    std::vector<float> X(matrixSize, 0.0f);
     for (int i = matrixSize - 1; i >= 0; --i) {
         X[i] = B[i];
         for (int j = i + 1; j < matrixSize; ++j) {
@@ -1349,8 +1359,6 @@ static std::array<float, 6> calculate3DWeights(const pxr::GfVec3f& P, const std:
 }
 
 bool GuideCurvesDeformer::buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	mTestLHSData6P.clear();
-
 	// Check we have guide indices (clump ids) and curves count matches.
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 	assert(curves_count <= mGuideIndices.AsConst().size());
@@ -1372,8 +1380,8 @@ bool GuideCurvesDeformer::buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_co
 	size_t bound_points = 0;
 
 	// preallocate 
-	mTestLHSData6P.resize(pCurvesContainer->getTotalVertexCount()); 
-
+	auto& pointBinds = mpGuideCurvesDeformerData->lhsPointBinds();
+	pointBinds.resize(pCurvesContainer->getTotalVertexCount()); 
 
 	// pre compute per vertex distances
 	std::vector<float> dist_from_root(mpCurvesContainer->getTotalVertexCount());
@@ -1431,17 +1439,13 @@ bool GuideCurvesDeformer::buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_co
 			pGuideCurvesContainer->getVeticesAtLength(root_points[0].first.curveIndex, curr_dist_from_root, gv[2], gv[3]);
 			pGuideCurvesContainer->getVeticesAtLength(root_points[1].first.curveIndex, curr_dist_from_root, gv[4], gv[5]);
 
-			auto& bind = mTestLHSData6P[curve_vertex_offset + i];
+			auto& bind = pointBinds[curve_vertex_offset + i];
 
 			// another test
 
 			bind.curveIndices[0] = guide_id;
 			bind.curveIndices[1] = root_points[0].first.curveIndex;
 			bind.curveIndices[2] = root_points[1].first.curveIndex;
-
-			bind.v[0] = gv[0]; bind.v[1] = gv[1]; 
-			bind.v[2] = gv[2]; bind.v[3] = gv[3]; 
-			bind.v[4] = gv[4]; bind.v[5] = gv[5];
 
 			std::array<pxr::GfVec3f, 6> pts;
 			pts[0] = guides_rest_points[gv[0]];
@@ -1450,8 +1454,9 @@ bool GuideCurvesDeformer::buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_co
 			pts[3] = guides_rest_points[gv[3]];
 			pts[4] = guides_rest_points[gv[4]];
 			pts[5] = guides_rest_points[gv[5]];
-			std::array<float, 6> weights = calculate3DWeights(curr_pt, pts);
 
+
+			std::array<float, 6> weights = calculate3DWeights(curr_pt, pts);
 			bind.w[0] = weights[0];
 			bind.w[1] = weights[1];
 			bind.w[2] = weights[2];
@@ -1459,48 +1464,14 @@ bool GuideCurvesDeformer::buildDeformerDataLHSMode(pxr::UsdTimeCode rest_time_co
 			bind.w[4] = weights[4];
 			bind.w[5] = weights[5];
 
-/*
-			if (calculateWeights<float>(curr_pt, guides_rest_points, gv, bind.w)) {
-				bind.curveIndices[0] = guide_id;
-				bind.curveIndices[1] = root_points[0].first.curveIndex;
-				bind.curveIndices[2] = root_points[1].first.curveIndex;
+			bind.v[0] = gv[0] - pGuideCurvesContainer->getCurveVertexOffset(guide_id);
+			bind.v[1] = gv[1] - pGuideCurvesContainer->getCurveVertexOffset(guide_id);
 
-				bind.v[0] = gv[0]; bind.v[1] = gv[1]; 
-				bind.v[2] = gv[2]; bind.v[3] = gv[3]; 
-				bind.v[4] = gv[4]; bind.v[5] = gv[5];
+			bind.v[2] = gv[2] - pGuideCurvesContainer->getCurveVertexOffset(root_points[0].first.curveIndex);
+			bind.v[3] = gv[3] - pGuideCurvesContainer->getCurveVertexOffset(root_points[0].first.curveIndex);
 
-				float weightSum = 0.0;
-				for (int i = 0; i < 6; ++i) weightSum += bind.w[i];
-
-				if (std::abs(weightSum) > 1e-9) {
-				    for (int j = 0; j < 6; ++j) {
-				        //bind.w[j] /= weightSum; // Forces sum to be exactly 1.0
-				    }
-				}
-
-
-				// another test
-				std::array<pxr::GfVec3f, 6> pts;
-				pts[0] = guides_rest_points[gv[0]];
-				pts[1] = guides_rest_points[gv[1]];
-				pts[2] = guides_rest_points[gv[2]];
-				pts[3] = guides_rest_points[gv[3]];
-				pts[4] = guides_rest_points[gv[4]];
-				pts[5] = guides_rest_points[gv[5]];
-				std::array<float, 6> weights = calculate3DWeights(curr_pt, pts);
-
-				bind.w[0] = weights[0];
-				bind.w[1] = weights[1];
-				bind.w[2] = weights[2];
-				bind.w[3] = weights[3];
-				bind.w[4] = weights[4];
-				bind.w[5] = weights[5];
-
-				DLOG_DBG << "Wsum " << (bind.w[0] + bind.w[1] + bind.w[2] + bind.w[3] + bind.w[4] + bind.w[5]);
-			} else {
-				DLOG_ERR << "Err binding point ";
-			}
-*/
+			bind.v[4] = gv[4] - pGuideCurvesContainer->getCurveVertexOffset(root_points[1].first.curveIndex);
+			bind.v[5] = gv[5] - pGuideCurvesContainer->getCurveVertexOffset(root_points[1].first.curveIndex);
        	}
 
        	bound_curves++;
@@ -1592,8 +1563,6 @@ static inline pxr::GfVec3f calculateInverseDistanceWeights(
 }
 
 bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	multi_threaded = false;
-
 	bool skin_prim_data_created = true;
 	if(!buildSkinPrimData(multi_threaded, rest_time_code, skin_prim_data_created)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
@@ -1618,6 +1587,11 @@ bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_ti
 	const size_t curves_count = mpCurvesContainer->getCurvesCount();
 	assert(curves_count == mGuideIndices.size());
 
+	// pre allocate
+	auto& pointBinds = mpGuideCurvesDeformerData->blendNTBPointBinds();
+	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
+	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
+
 	std::vector<NTBFrame> rest_guide_frames(pGuideCurvesContainer->getRestCurvePoints().size());
 
 	static const bool build_live = false;
@@ -1630,10 +1604,6 @@ bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_ti
 	for(size_t i = 0; i < rest_guide_frames.size(); ++i) {
 		matrices[i] = rest_guide_frames[i].getMatrix3f().GetInverse();
 	}
-
-	auto& pointBinds = mpGuideCurvesDeformerData->pointBinds();
-	const PxrCurvesContainer* pCurvesContainer = mpCurvesContainer.get();
-	pointBinds.resize(mpCurvesContainer->getTotalVertexCount());
 
 	const size_t guide_curves_count = pGuideCurvesContainer->getCurvesCount();
 
@@ -1656,9 +1626,6 @@ bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_ti
 		}
 	}
 
-	// pre allocate
-	mTestBlendNTBData.resize(pCurvesContainer->getTotalVertexCount());
-
 	auto func = [&](const std::size_t start, const std::size_t end) {
 
 		for(size_t curve_index = start; curve_index < end; ++curve_index) {
@@ -1676,7 +1643,7 @@ bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_ti
 				float curr_dist_from_root = dist_from_root[curve_vertex_offset + i];
 
 				const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i); 
-				auto& bind = mTestBlendNTBData[curve_vertex_offset + i];
+				auto& bind = pointBinds[curve_vertex_offset + i];
 
 				std::array<uint32_t, 6> gv; // 6 neightbour guides vertices
 
@@ -1751,8 +1718,6 @@ bool GuideCurvesDeformer::buildDeformerDataBlendNTBMode(pxr::UsdTimeCode rest_ti
 
 
 bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	multi_threaded = false;
-
 	bool skin_prim_data_created = true;
 	if(!buildSkinPrimData(multi_threaded, rest_time_code, skin_prim_data_created)) {
 		mpGuideCurvesDeformerData->skinPrimIndices().clear();
@@ -1953,7 +1918,6 @@ bool GuideCurvesDeformer::buildDeformerDataAngleMode(pxr::UsdTimeCode rest_time_
 }
 
 bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCode rest_time_code, bool& created) {
-	printf("GuideCurvesDeformer::buildSkinPrimData()\n");
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
 	if(!mGuidesSkinGeoPrimHandle) {
@@ -2076,37 +2040,36 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 			}
 
 			// vector from curve point to frame
-			if(1==1){
-				const auto& pointBinds = mTestBlendNTBData;
-				
-				const auto& deformed_points = pDeformedPoints->getVtArray();
+			const auto& pointBinds = mpGuideCurvesDeformerData->getBlendNTBPointBinds();
+			
+			const auto& deformed_points = pDeformedPoints->getVtArray();
 
-				for(size_t i = 0; i < pointBinds.size(); ++i) {
-					const auto& bind = pointBinds[i];
-					if(!bind.isValid()) continue;
+			for(size_t i = 0; i < pointBinds.size(); ++i) {
+				const auto& bind = pointBinds[i];
+				if(!bind.isValid()) continue;
 
-					uint32_t frame_id_0 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[0]) + bind.v[0];
-					uint32_t frame_id_1 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[1]) + bind.v[1];
-					uint32_t frame_id_2 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[2]) + bind.v[2];
+				uint32_t frame_id_0 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[0]) + bind.v[0];
+				uint32_t frame_id_1 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[1]) + bind.v[1];
+				uint32_t frame_id_2 = mpGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[2]) + bind.v[2];
 
-					const pxr::GfVec3f& pt = deformed_points[i];
+				const pxr::GfVec3f& pt = deformed_points[i];
 
-					DebugGeo::Line l0(guides_live_points[frame_id_0], pt);
-					l0.setColor({1.0f, 1.0f, 1.0f});
-					l0.setWidth(0.0025f);
-					mpDebugGeo->addLine(l0);
+				DebugGeo::Line l0(guides_live_points[frame_id_0], pt);
+				l0.setColor({1.0f, 1.0f, 1.0f});
+				l0.setWidth(0.0025f);
+				mpDebugGeo->addLine(l0);
 
-					DebugGeo::Line l1(guides_live_points[frame_id_1], pt);
-					l1.setColor({1.0f, 1.0f, 1.0f});
-					l1.setWidth(0.0025f);
-					mpDebugGeo->addLine(l1);
+				DebugGeo::Line l1(guides_live_points[frame_id_1], pt);
+				l1.setColor({1.0f, 1.0f, 1.0f});
+				l1.setWidth(0.0025f);
+				mpDebugGeo->addLine(l1);
 
-					DebugGeo::Line l2(guides_live_points[frame_id_2], pt);
-					l2.setColor({1.0f, 1.0f, 1.0f});
-					l2.setWidth(0.0025f);
-					mpDebugGeo->addLine(l2);
-				}
+				DebugGeo::Line l2(guides_live_points[frame_id_2], pt);
+				l2.setColor({1.0f, 1.0f, 1.0f});
+				l2.setWidth(0.0025f);
+				mpDebugGeo->addLine(l2);
 			}
+			
 			mpDebugGeo->build("/debugBlebdedNTBFrames", mCurvesGeoPrimHandle.getStage());
 		}
 			break;

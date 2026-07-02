@@ -126,10 +126,6 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		std::string                                     		mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
 		pxr::VtArray<int> 										mGuideIndices;
 
-		std::vector<GuideCurvesDeformerData::PointBindDataLHS>  mTestLHSData;
-		std::vector<GuideCurvesDeformerData::PointBindDataLHS_6P>  mTestLHSData6P;
-		std::vector<GuideCurvesDeformerData::BlendedNTBData>    mTestBlendNTBData;
-
 		float                                       			mFalloff = .0f;
 		BindMode                                                mBindMode;
 

@@ -11,6 +11,7 @@
 #include <string>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/curves.h>
+#include <pxr/base/tf/hash.h>
 
 #include <glm/vec3.hpp> // glm::vec3
 
@@ -27,30 +28,6 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			SPACE,
 			LHS,
 			BLEND
-		};
-
-		struct PointBindDataLHS {
-			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
-
-			uint32_t curveIndices[3];
-			float uCoords[3];
-			float weights[3];
-		
-			bool isValid() const { return curveIndices[0] != kInvalidCurveID; }
-
-			PointBindDataLHS(): curveIndices{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID} {}
-		};
-
-		struct PointBindDataLHS_6P {
-			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
-
-			uint32_t curveIndices[3]; // TODO: use three 24 or 30 bit indices and rest bits are for flags
-			uint32_t v[6]; 
-			float w[6];
-		
-			bool isValid() const { return curveIndices[0] != kInvalidCurveID; }
-
-			PointBindDataLHS_6P(): curveIndices{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID} {}
 		};
 
 		struct PointSurfaceBindData {
@@ -75,6 +52,24 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 			}
 		};
 
+		struct PointBindDataLHS {
+			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
+
+			uint32_t curveIndices[3]; 	// TODO: use three 24 or 30 bit indices and rest bits are for flags
+			uint8_t v[6];            	// TODO: use relative 8bit vertex indices
+			float16_t w[6];				// TODO: float16_t weight
+		
+			bool isValid() const { return curveIndices[0] != kInvalidCurveID; }
+
+			PointBindDataLHS(): curveIndices{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID}, w{0.h, 0.h, 0.h, 0.h, 0.h, 0.h} {}
+
+			size_t hash() const { 
+				return (static_cast<size_t>(curveIndices[0]) | static_cast<size_t>(curveIndices[1]) << 16 | static_cast<size_t>(curveIndices[2]) << 32) + 
+					   (static_cast<size_t>(v[0]) | static_cast<size_t>(v[1]) << 6 | static_cast<size_t>(v[2]) << 12 | static_cast<size_t>(v[3]) << 18 | static_cast<size_t>(v[4]) << 24 | static_cast<size_t>(v[5]) << 32) +
+					   (size_t)(w[0] + w[1] + w[2] + w[3] + w[4] + w[5]);
+			}
+		};
+
 		struct BlendedNTBData {
 			static constexpr uint32_t kInvalidCurveID = std::numeric_limits<uint32_t>::max();
 			static constexpr uint8_t kInvalidVertexID = std::numeric_limits<uint8_t>::max();
@@ -86,8 +81,16 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 
 			bool isValid() const { return guide_id[0] != kInvalidCurveID && v[0] != kInvalidVertexID; }
 
-			BlendedNTBData(): guide_id{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID} {
+			BlendedNTBData(): guide_id{kInvalidCurveID, kInvalidCurveID, kInvalidCurveID}, w{0.h, 0.h, 0.h} {
 				std::memset(v, kInvalidVertexID, sizeof(v));
+			}
+
+			size_t hash() const { 
+				size_t hashValue = (static_cast<size_t>(guide_id[0]) | static_cast<size_t>(guide_id[1]) << 16 | static_cast<size_t>(guide_id[2]) << 32) + 
+					   (static_cast<size_t>(v[0]) | static_cast<size_t>(v[1]) << 16 | static_cast<size_t>(v[2]) << 32) +
+					   (static_cast<size_t>(w[0].toBits()) << 0) | static_cast<size_t>(w[1].toBits()) << 16 | (static_cast<size_t>(w[2].toBits()) << 32); 
+
+			    return hashValue | pxr::TfHash::Combine(coords[0], coords[1], coords[2]);
 			}
 		};
 
@@ -216,6 +219,9 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		GuideCurvesDeformerData(): mIsValid(false) {}
 
 		const std::vector<PointBindData>& 			getPointBinds() const { return mPointBinds; }
+		const std::vector<BlendedNTBData>&          getBlendNTBPointBinds() const { return mBlendNTBPointBinds; }
+		const std::vector<PointBindDataLHS>&        getLHSPointBinds() const { return mLHSPointBinds; }
+
 		const std::vector<PointSurfaceBindData>& 	getPointSurfaceBinds() const { return mPointSurfaceBinds; }
 		const std::vector<GuideOrigin>& 			getGuideOrigins() const { return mGuideOrigins; }
 		const std::vector<int>& 					getSkinPrimIndices() const { return mSkinPrimIndices; }
@@ -233,6 +239,9 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		virtual void clearData() override;
 
 		std::vector<PointBindData>& 		pointBinds() { return mPointBinds; }
+		std::vector<BlendedNTBData>&        blendNTBPointBinds() { return mBlendNTBPointBinds; }
+		std::vector<PointBindDataLHS>&      lhsPointBinds() { return mLHSPointBinds; }
+
 		std::vector<PointSurfaceBindData>& 	pointSurfaceBinds() { return mPointSurfaceBinds; }
 		std::vector<GuideOrigin>& 			guideOrigins() { return mGuideOrigins; }
 		std::vector<int>&               	skinPrimIndices() { return mSkinPrimIndices; }
@@ -245,6 +254,11 @@ class GuideCurvesDeformerData : public SerializableDeformerDataBase {
 		std::vector<PointBindData> 			mPointBinds;
 		std::vector<GuideOrigin> 			mGuideOrigins;
 		std::vector<PointSurfaceBindData> 	mPointSurfaceBinds;
+
+		// Now this section is weird. I have to come up with something better. For now we just have these for additional bind modes
+		std::vector<BlendedNTBData>         mBlendNTBPointBinds;
+		std::vector<PointBindDataLHS>  		mLHSPointBinds;
+
 		BindMode                    		mBindMode = BindMode::NTB;
 		std::string                 		mSkinPrimPath;
 		std::vector<int> 					mSkinPrimIndices;
