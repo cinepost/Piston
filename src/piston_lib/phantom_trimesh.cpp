@@ -156,7 +156,7 @@ bool PhantomTrimesh::buildTetrahedrons(const T& positions, const GuideCurvesCont
   		deformer_restpoints_kdtree.findKNearestNeighbours(pxr_pt, kClosestNeighborsCount, closest_points);
 
   		double total_distance = 0.0;
-  		uint count = 0;
+  		uint32_t count = 0;
   		for(uint32_t j = 0; j < kClosestNeighborsCount; ++j) {
   			auto dist = distance(pxr_pt, positions[closest_points[j].first]);
   			if(dist > 0.0001) {
@@ -530,7 +530,7 @@ const SerializableDeformerDataBase::DataVersion& SerializablePhantomTrimesh::jso
 	return kTrimeshDataVersion;
 }
 
-template bool PhantomTrimesh::buildTetrahedrons(const std::vector<pxr::GfVec3f>& positions, const GuideCurvesContainer* pCurvesContainer = nullptr);
-template bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions, const GuideCurvesContainer* pCurvesContainer = nullptr);
+template bool PhantomTrimesh::buildTetrahedrons(const std::vector<pxr::GfVec3f>& positions, const GuideCurvesContainer* pCurvesContainer);
+template bool PhantomTrimesh::buildTetrahedrons(const pxr::VtArray<pxr::GfVec3f>& positions, const GuideCurvesContainer* pCurvesContainer);
 
 } // namespace Piston

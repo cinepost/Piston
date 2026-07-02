@@ -6,6 +6,7 @@
 #include <optional>
 #include <cmath>
 #include <numeric>
+#include <array>
 
 // Core OpenUSD Includes
 #include <pxr/base/gf/vec3f.h>

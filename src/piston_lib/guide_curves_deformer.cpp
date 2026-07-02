@@ -2160,12 +2160,12 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 				if (!pNode) return;
 
 				DebugGeo::WireframeBox box(pNode->nodeBounds);
-				box.setColor({1.0 * k_c, 0.0, 0.0});
-				box.setWidth(0.05);
+				box.setColor({1.0f * k_c, 0.0f, 0.0f});
+				box.setWidth(0.05f);
 				mpDebugGeo->addWireBox(box);
 
-				if (pNode->left)  drawNodeBound(pNode->left, k_c * 0.85);
-				if (pNode->right) drawNodeBound(pNode->right, k_c * 0.85);
+				if (pNode->left)  drawNodeBound(pNode->left, k_c * 0.85f);
+				if (pNode->right) drawNodeBound(pNode->right, k_c * 0.85f);
 			};
 
 			drawNodeBound(pRootNode, 1.0 /* color k */);
@@ -2175,8 +2175,8 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 			for(const auto& tetra: tetrahedrons) {
 
 				DebugGeo::WireTetra tet(points[tetra.indices[0]], points[tetra.indices[1]], points[tetra.indices[2]], points[tetra.indices[3]]);
-				tet.setColor({0.0, 1.0, 0.0});
-				tet.setWidth(0.05);
+				tet.setColor({0.0f, 1.0f, 0.0f});
+				tet.setWidth(0.05f);
 				mpDebugGeo->addWireTetra(tet);
 			}
 
