@@ -49,6 +49,7 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
     static const std::string kSimpleLinesPostfix = "/simpleLines";
     static const std::string kWireBoxesPostfix = "/simpleWireBoxes";
     static const std::string kTetrasPostfix = "/simpleTetras";
+    static const std::string kPointsPostfix = "/simplePoints";
 
     const std::lock_guard<std::mutex> lock(mMutex);
 
@@ -75,10 +76,10 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
     };
 
     // Simple colored lines
-    if(!mLines.empty()) {
-        pxr::SdfPath simpleLinesPath(path + kSimpleLinesPostfix);
-        removePrimIfExist(pStage, simpleLinesPath);
-    
+    pxr::SdfPath simpleLinesPath(path + kSimpleLinesPostfix);
+    removePrimIfExist(pStage, simpleLinesPath);
+
+    if(!mLines.empty()) {    
         pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(pStage, simpleLinesPath);
         curves.GetTypeAttr().Set(pxr::UsdGeomTokens->linear);
 
@@ -108,10 +109,10 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
     }
 
     // Wireframe boxes
-    if(!mWireBoxes.empty()) {
-        pxr::SdfPath simpleWireBoxesPath(path + kWireBoxesPostfix);
-        removePrimIfExist(pStage, simpleWireBoxesPath);
+    pxr::SdfPath simpleWireBoxesPath(path + kWireBoxesPostfix);
+    removePrimIfExist(pStage, simpleWireBoxesPath);
 
+    if(!mWireBoxes.empty()) {
         pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(pStage, simpleWireBoxesPath);
         curves.GetTypeAttr().Set(pxr::UsdGeomTokens->linear);
 
@@ -146,10 +147,10 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
     }
 
     // Wire tetras
-    if(!mWireTetras.empty()) {
-        pxr::SdfPath simpleTetrasPath(path + kTetrasPostfix);
-        removePrimIfExist(pStage, simpleTetrasPath);
+    pxr::SdfPath simpleTetrasPath(path + kTetrasPostfix);
+    removePrimIfExist(pStage, simpleTetrasPath);
 
+    if(!mWireTetras.empty()) {
         pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(pStage, simpleTetrasPath);
         curves.GetTypeAttr().Set(pxr::UsdGeomTokens->linear);
 
@@ -181,6 +182,33 @@ bool DebugGeo::build(const std::string& path, pxr::UsdStageRefPtr pStage) {
         }
     }
 
+    // Point cloud
+    pxr::SdfPath ptCloudPath(path + kPointsPostfix);
+    removePrimIfExist(pStage, ptCloudPath);
+
+    if(!mPoints.empty()) {
+        pxr::VtArray<pxr::GfVec3f> positions(mPoints.size());
+        pxr::VtArray<pxr::GfVec3f> colors(mPoints.size());
+        pxr::VtArray<float> widths(mPoints.size());
+
+        for(size_t i = 0; i < mPoints.size(); ++i) {
+            const auto& pt = mPoints[i];
+
+            positions[i] = pt.pos;
+            colors[i] = pt.col;
+            widths[i] = pt.w;
+        }
+
+        pxr::UsdGeomPoints pointCloud = pxr::UsdGeomPoints::Define(pStage, ptCloudPath);
+        pointCloud.CreatePointsAttr(pxr::VtValue(positions));
+
+        pxr::UsdAttribute widthsAttr = pointCloud.CreateWidthsAttr(pxr::VtValue(widths));
+        widthsAttr.SetMetadata(pxr::UsdGeomTokens->interpolation, pxr::UsdGeomTokens->constant);
+
+        pxr::UsdAttribute colorAttr = pointCloud.CreateDisplayColorAttr(pxr::VtValue(colors));
+        colorAttr.SetMetadata(pxr::UsdGeomTokens->interpolation, pxr::UsdGeomTokens->vertex);
+    }
+
     return true;
 }
 
@@ -188,6 +216,9 @@ void DebugGeo::clear() {
     const std::lock_guard<std::mutex> lock(mMutex);
 
     mLines.clear();
+    mPoints.clear();
+    mWireBoxes.clear();
+    mWireTetras.clear();
 }
 
 } // namespace Piston

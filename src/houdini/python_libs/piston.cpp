@@ -152,6 +152,9 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setInstancingState", &BaseCurvesDeformer::setInstancingState)
 		.def("getInstancingState", &BaseCurvesDeformer::getInstancingState)
 
+		.def("setDeformerSubdivLevel", &BaseCurvesDeformer::setDeformerSubdivLevel)
+		.def("getDeformerSubdivLevel", &BaseCurvesDeformer::getDeformerSubdivLevel)
+
 		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
 		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_dbg_overloads(args("time_code")))
 

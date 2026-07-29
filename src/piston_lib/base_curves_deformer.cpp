@@ -25,6 +25,7 @@ BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const s
 	DLOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
 
 	mUniqueName = toString() + mName + std::to_string(mID);
+	mDeformerSubdivLevel = 0;
 }
 
 void BaseCurvesDeformer::setDataPrimPath(const std::string& path) {
@@ -62,6 +63,7 @@ void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
 	}
 
 	auto new_handle = UsdPrimHandle(prim);
+	new_handle.setSubdivLevel(mDeformerSubdivLevel);
 	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle, getRestTimeCode()) : false;
 
 	mDeformerGeoPrimHandle = std::move(new_handle);
@@ -250,6 +252,26 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 	mDirty = false;
 	return true;
 }
+
+void BaseCurvesDeformer::setDeformerSubdivLevel(uint8_t level) {
+	if(mDeformerSubdivLevel == level && mDeformerGeoPrimHandle.getSubdivLevel() == level) return;
+	mDeformerSubdivLevel = level;
+
+	if(mDeformerGeoPrimHandle.isValid()) {
+		mDeformerGeoPrimHandle.setSubdivLevel(mDeformerSubdivLevel);
+	}
+
+	makeDirty();
+}
+
+
+uint8_t BaseCurvesDeformer::getDeformerSubdivLevel() const {
+	if(mDeformerGeoPrimHandle.isValid()) {
+		assert(mDeformerSubdivLevel == mDeformerGeoPrimHandle.getSubdivLevel());
+	}
+	return mDeformerGeoPrimHandle.getSubdivLevel();
+}
+
 
 void BaseCurvesDeformer::setPointsCacheUsageState(bool state) {
 	if(mUsePointsCache == state) return;
@@ -477,10 +499,43 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	}
 
 	if(mShowDebugGeometry) {
+		drawDebugSubdivDeformerGeometry(time_code);
 		drawDebugGeometry(time_code, deformed_points_list_ptr);
 	}
 
 	return true;
+}
+
+void BaseCurvesDeformer::drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) {
+	if(!mDeformerGeoPrimHandle.isMeshGeoPrim()) return;
+
+	auto* pRefiner = mDeformerGeoPrimHandle.getMeshRefiner(mDeformerRestAttrName, getRestTimeCode());
+	if(!pRefiner || pRefiner->getMaxLevel() == 0) return;
+
+	pRefiner->update(time_code);
+	const pxr::UsdGeomMesh& subdMesh = pRefiner->getSubdividedMesh();
+
+	if(!mpSubdivDebugGeo) {
+		mpSubdivDebugGeo = DebugGeo::create(getName() + "_subdiv_mesh");
+	} 
+	
+	mpSubdivDebugGeo->clear();
+	
+	pxr::VtArray<pxr::GfVec3f> subd_points;
+
+	if(!subdMesh.GetPointsAttr().Get(&subd_points, time_code)) {
+		LOG_ERR << "Error getting " << mDeformerGeoPrimHandle.getPath() << " subdivided surface points at " << time_code.GetValue();
+		return;
+	}
+
+	LOG_TRC << "Subd points count " << subd_points.size();
+
+	for(const auto& point: subd_points) {
+		DebugGeo::Pt pt(point, {0.0, 1.0, 0.0}, 5.f * mDebugGeometryMult);
+		mpSubdivDebugGeo->addPoint(pt);
+	}
+
+	mpSubdivDebugGeo->build("/debugSubdivMesh", mDeformerGeoPrimHandle.getStage());
 }
 
 void BaseCurvesDeformer::setMotionBlurState(bool state) {

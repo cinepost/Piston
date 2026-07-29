@@ -140,7 +140,7 @@ const char *stringifyMemSize(size_t bytes) {
 	return output;
 }
 
-UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()), mpDeformer(nullptr), mpTopology(nullptr) {}
+UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()), mpDeformer(nullptr), mpTopology(nullptr), mSubdivLevel(0) {}
 
 UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim): UsdPrimHandle() {  
 	mPrim = prim; 
@@ -151,13 +151,14 @@ UsdPrimHandle::UsdPrimHandle(const BaseCurvesDeformer::SharedPtr& pDeformer): Us
 	mpDeformer = pDeformer;
 }
 
-UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : mPrim(std::move(other.mPrim)), mpDeformer(std::move(other.mpDeformer)), mpTopology(std::move(other.mpTopology)) { }
+UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : mPrim(std::move(other.mPrim)), mpDeformer(std::move(other.mpDeformer)), mpTopology(std::move(other.mpTopology)), mSubdivLevel(other.mSubdivLevel) { }
 
 UsdPrimHandle& UsdPrimHandle::operator=(UsdPrimHandle&& other) noexcept {
 	if (this != &other) {
 		mPrim = std::move(other.mPrim);
 		mpDeformer = std::move(other.mpDeformer);
 		mpTopology = std::move(other.mpTopology);
+		mSubdivLevel = other.mSubdivLevel;
 	}
 	return *this;
 }
@@ -170,10 +171,29 @@ const pxr::UsdPrim& UsdPrimHandle::getPrim() const {
 	return mPrim.IsValid() ? mPrim : sNullPrim;
 }
 
+
+const PersistentMeshRefiner* UsdPrimHandle::getMeshRefiner(const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) const {
+	static const PersistentMeshRefiner* sNullRefiner = nullptr;
+
+	if(!isMeshGeoPrim() || mSubdivLevel == 0) {
+		return sNullRefiner;
+	}
+
+	if(!mpRefiner) {
+		mpRefiner = PersistentMeshRefiner::create();
+	}
+
+	mpRefiner->init(pxr::UsdGeomMesh(mPrim), mSubdivLevel, rest_p_name, rest_time_code);
+	return mpRefiner.get();
+}
+
 void UsdPrimHandle::clear() {
 	mPrim = pxr::UsdPrim();
 	mpDeformer = nullptr;
 	mpTopology = nullptr;
+	if(mpRefiner) {
+		mpRefiner->clear();
+	}
 }
 
 double UsdPrimHandle::getStageFPS() const {
@@ -190,6 +210,19 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 	}
 
 	return getStage()->GetTimeCodesPerSecond();
+}
+
+void UsdPrimHandle::setSubdivLevel(uint8_t level) {
+	if(mSubdivLevel == level) return;
+
+	mSubdivLevel = std::min(level, (uint8_t)1);
+	if(mSubdivLevel > 0) {
+		if(!mpRefiner) {
+			mpRefiner = PersistentMeshRefiner::create();
+		}
+	} else {
+		mpRefiner = nullptr;
+	}
 }
 
 bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {

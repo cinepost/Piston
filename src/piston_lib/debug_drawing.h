@@ -20,6 +20,19 @@ class DebugGeo {
 	public:
 		using UniquePtr = std::unique_ptr<DebugGeo>;
 
+		struct Pt {
+			pxr::GfVec3f pos;
+			pxr::GfVec3f col;
+			float w;
+
+			Pt(): pos(0.0f), col(1.0f), w(0.01f) {}
+			Pt(const pxr::GfVec3f& p): pos(p), col(1.0f), w(0.01f) {}
+			Pt(const pxr::GfVec3f& p, const pxr::GfVec3f& _c, float _w): pos(p), col(_c), w(_w) {}
+
+			void setColor(const pxr::GfVec3f& c) { col = c; }
+			void setWidth(const float _w) { w = _w; }
+		};
+
 		struct Line {
 			pxr::GfVec3f p0, p1;
 			pxr::GfVec3f c0, c1;
@@ -59,6 +72,7 @@ class DebugGeo {
 			void setWidth(const float w) { width = w; }
 		};
 
+		void addPoint(const Pt& pt) { mPoints.push_back(pt); }
 		void addLine(const Line& l) { mLines.push_back(l); }
 		void addWireBox(const WireframeBox& b) { mWireBoxes.push_back(b); }
 		void addWireTetra(const WireTetra& t) { mWireTetras.push_back(t); }
@@ -71,6 +85,7 @@ class DebugGeo {
 
 	private:
 		std::string mName;
+		std::vector<Pt> mPoints;
 		std::vector<Line> mLines;
 		std::vector<WireframeBox> mWireBoxes;
 		std::vector<WireTetra> mWireTetras;

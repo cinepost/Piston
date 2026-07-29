@@ -6,6 +6,7 @@
 #include "points_list.h"
 #include "curves_container.h"
 #include "mesh_container.h"
+#include "debug_drawing.h"
 #include "deformer_stats.h"
 #include "deformer_data_cache.h"
 #include "serializable_data.h"
@@ -69,6 +70,9 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		 */		
 		void setCurvesGeoPrim(const pxr::UsdPrim& prim);
 		const pxr::UsdPrim& getCurvesGeoPrim() const;
+
+		void setDeformerSubdivLevel(uint8_t level = 0);
+		uint8_t getDeformerSubdivLevel() const; 
 
 		void setPointsCacheUsageState(bool state);
 		bool getPointsCacheUsageState() const;
@@ -138,6 +142,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		const UsdPrimHandle& getCurvesGeoPrimHandle() const { return mCurvesGeoPrimHandle; }
 		const UsdPrimHandle& getOutputPrimHandle() const { return mCurvesGeoPrimHandle; }
 
+		void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
+
 		void makeDirty();
 		void clearLRUCaches();
 
@@ -203,6 +209,10 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 
 		bool mReadJsonDeformerData = false;
 		bool mWriteJsonDeformerData = false;
+
+		uint8_t mDeformerSubdivLevel = 0;
+
+		DebugGeo::UniquePtr mpSubdivDebugGeo;
 
 		friend class UsdPrimHandle;
 };

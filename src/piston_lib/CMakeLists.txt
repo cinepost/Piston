@@ -64,6 +64,7 @@ file( GLOB SOURCES
     ./curves_container.cpp
     ./curves_container_utils.cpp
     ./mesh_container.cpp
+    ./mesh_subdiv.cpp
     ./phantom_trimesh.cpp
     ./tetrahedron.cpp
     ./geometry_tools.cpp
@@ -174,6 +175,8 @@ if(WIN32)
         ${_HOU_DSOLIB_}/libpxr_vt.lib
         ${_HOU_DSOLIB_}/libpxr_work.lib
         ${_HOU_DSOLIB_}/libpxr_trace.lib
+        ${_HOU_DSOLIB_}/libosdCPU.lib
+        ${_HOU_DSOLIB_}/libosdGPU.lib
     )
 
 endif() #WIN32

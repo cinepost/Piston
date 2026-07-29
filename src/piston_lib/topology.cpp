@@ -58,6 +58,8 @@ bool isSameTopology(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r, pxr:
 bool isSameTopology(const UsdPrimHandle& handle, const pxr::UsdPrim& prim, pxr::UsdTimeCode time_code) {
     assert(handle.isValid() && "Invalid prim handle");
     assert(prim.IsValid() && "Invalid prim");
+    if(handle.getSubdivLevel() > 0) return false;
+    
     if(!isSameType(handle.getPrim(), prim)) return false;
 
     size_t handle_topology_hash;
@@ -84,6 +86,7 @@ bool isSameTopology(const UsdPrimHandle& handle_l, const UsdPrimHandle& handle_r
     assert(handle_l.isValid() && "Invalid prim handle_l");
     assert(handle_r.isValid() && "Invalid prim handle_r");
     if(!isSameType(handle_l.getPrim(), handle_r.getPrim())) return false;
+    if(handle_l.getSubdivLevel() != handle_r.getSubdivLevel()) return false;
 
     return handle_l.getTopology(time_code) == handle_r.getTopology(time_code);    
 }

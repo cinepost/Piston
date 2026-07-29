@@ -2,11 +2,14 @@
 #define PISTON_LIB_COMMON_H_
 
 #include "framework.h"
+#include "logging.h"
+#include "mesh_subdiv.h"
 
 #include <nlohmann/json.hpp>
 
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/usd/usdGeom/points.h>
 #include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
 #include <pxr/usd/usd/attributeQuery.h>
@@ -71,6 +74,28 @@ std::string getStageName(pxr::UsdStageRefPtr pStage);
 inline bool isMeshGeoPrim(const pxr::UsdPrim& prim) { return prim.IsValid() && prim.IsA<pxr::UsdGeomMesh>(); }
 inline bool isBasisCurvesGeoPrim(const pxr::UsdPrim& prim) { return prim.IsValid() && prim.IsA<pxr::UsdGeomBasisCurves>(); }
 
+inline bool isValidMesh(const pxr::UsdGeomMesh& mesh) {
+    pxr::VtVec3fArray points;
+    mesh.GetPointsAttr().Get(&points);
+
+    pxr::VtIntArray faceCounts;
+    mesh.GetFaceVertexCountsAttr().Get(&faceCounts);
+
+    pxr::VtIntArray faceIndices;
+    mesh.GetFaceVertexIndicesAttr().Get(&faceIndices);
+
+    std::string reason;
+    bool isValid = pxr::UsdGeomMesh::ValidateTopology(
+        faceIndices, faceCounts, points.size(), &reason
+    );
+
+    if (!isValid) {
+        LOG_ERR << "Mesh " << mesh.GetPrim().GetPath() << " topology is invalid: " << reason << " !";
+    }
+
+    return isValid;
+}
+
 inline bool isSameType(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r) {
 	return prim_l.GetTypeName() == prim_r.GetTypeName();
 }
@@ -95,6 +120,9 @@ class UsdPrimHandle {
 
 		bool isMeshGeoPrim() const { return Piston::isMeshGeoPrim(getPrim()); }
 		bool isBasisCurvesGeoPrim() const { return Piston::isBasisCurvesGeoPrim(getPrim()); }
+
+		void setSubdivLevel(uint8_t level);
+		uint8_t getSubdivLevel() const { return mSubdivLevel; }
 
 		std::string  getFullName() const { return getPath().GetText(); }
 		std::string  getName() const { return getPath().GetName(); }
@@ -127,6 +155,8 @@ class UsdPrimHandle {
 		const Topology& getTopology(pxr::UsdTimeCode time_code) const;
 		size_t getTopologyHash(pxr::UsdTimeCode time_code) const;
 
+		const PersistentMeshRefiner* getMeshRefiner(const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) const;
+
 		/* Invalidate handle */
 		void clear();
 
@@ -147,6 +177,9 @@ class UsdPrimHandle {
 		std::shared_ptr<BaseCurvesDeformer> mpDeformer;
 		mutable std::unique_ptr<Topology> mpTopology;
 
+		mutable std::unique_ptr<PersistentMeshRefiner> mpRefiner;
+
+		uint8_t mSubdivLevel;
 };
 
 inline std::ostream& operator<<( std::ostream& os, const pxr::UsdPrim& prim ) {
