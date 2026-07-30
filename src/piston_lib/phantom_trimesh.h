@@ -85,7 +85,7 @@ class PhantomTrimesh {
 	public:
 		static PhantomTrimesh::UniquePtr create();
 
-		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default());
 
 		size_t getPointsCount() const { return mPointsCount; }
 
@@ -165,7 +165,7 @@ class SerializablePhantomTrimesh: public SerializableDeformerDataBase {
 
 		SerializablePhantomTrimesh();
 
-		bool buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool buildInPlace(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 		virtual bool isValid() const override { const std::lock_guard<std::mutex> lock(mMutex); return mpTrimesh && mpTrimesh->isValid(); }
 		
 		PhantomTrimesh* getTrimesh();

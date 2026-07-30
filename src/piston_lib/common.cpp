@@ -172,7 +172,7 @@ const pxr::UsdPrim& UsdPrimHandle::getPrim() const {
 }
 
 
-const PersistentMeshRefiner* UsdPrimHandle::getMeshRefiner(const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) const {
+const PersistentMeshRefiner* UsdPrimHandle::getMeshRefiner(pxr::UsdTimeCode rest_time_code) const {
 	static const PersistentMeshRefiner* sNullRefiner = nullptr;
 
 	if(!isMeshGeoPrim() || mSubdivLevel == 0) {
@@ -183,7 +183,7 @@ const PersistentMeshRefiner* UsdPrimHandle::getMeshRefiner(const std::string& re
 		mpRefiner = PersistentMeshRefiner::create();
 	}
 
-	mpRefiner->init(pxr::UsdGeomMesh(mPrim), mSubdivLevel, rest_p_name, rest_time_code);
+	mpRefiner->init(pxr::UsdGeomMesh(mPrim), mSubdivLevel, mRestAttrName, rest_time_code);
 	return mpRefiner.get();
 }
 
@@ -231,6 +231,10 @@ bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_t
 		return false;
 	}
 	return true;
+}
+
+pxr::UsdGeomPrimvarsAPI UsdPrimHandle::getPrimvarsAPI() const { 
+	return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); 
 }
 
 template<typename T>
@@ -426,6 +430,13 @@ size_t UsdPrimHandle::getTopologyHash(pxr::UsdTimeCode time_code) const {
 	if(mpTopology && (mpTopology->time_code == time_code)) return mpTopology->topology_hash;
 
 	return getTopology(time_code).topology_hash;
+}
+
+void UsdPrimHandle::setRestAttrName(const std::string& name) { 
+	if(mRestAttrName == name) return;
+
+	mpRefiner = nullptr; 
+	mRestAttrName = name; 
 }
 
 std::string getStageName(pxr::UsdStageRefPtr pStage) {

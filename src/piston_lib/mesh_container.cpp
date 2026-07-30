@@ -9,9 +9,10 @@
 namespace Piston {
 
 template <typename T>
-typename TemplatedMeshContainer<T>::UniquePtr TemplatedMeshContainer<T>::create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
+typename TemplatedMeshContainer<T>::UniquePtr TemplatedMeshContainer<T>::create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	auto pMeshContainer = std::make_unique<TemplatedMeshContainer<T>>();
-	if(!pMeshContainer->init(prim_handle, rest_p_name, time_code)) {
+
+	if(!pMeshContainer->init(prim_handle, rest_time_code)) {
 		return nullptr;
 	}
 	return pMeshContainer;
@@ -37,14 +38,14 @@ TemplatedMeshContainer<T>::TemplatedMeshContainer(TemplatedMeshContainer<T>&& ot
 }
 
 template <typename T>
-bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
+bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
-	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
+	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
 		
 	if(!restPositionPrimVar) {
-		LOG_WRN << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
+		LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
 
 		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
 
@@ -69,14 +70,14 @@ bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, const std
 		const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
 		if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
-			if(!restPosAttr.Get(&mUsdMeshRestPositions, time_code)) {
+			if(!restPosAttr.Get(&mUsdMeshRestPositions, rest_time_code)) {
 				LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
 				return false;
 			}
 		} else {
 			static_assert(std::is_same_v<T, std::vector<PointType>>);
 			pxr::VtArray<PointType> tmp;
-			if(!restPosAttr.Get(&tmp, time_code)) {
+			if(!restPosAttr.Get(&tmp, rest_time_code)) {
 				LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
 				return false;
 			}
@@ -87,7 +88,7 @@ bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, const std
 	}
 
 	mUsdMeshLivePositions = mUsdMeshRestPositions;
-	mLastUpdateTimeCode = time_code;
+	mLastUpdateTimeCode = rest_time_code;
 	return true;
 }
 

@@ -139,21 +139,19 @@ const pxr::UsdPrim& BaseCurvesDeformer::getCurvesGeoPrim() const {
 }
 
 void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
-	if(mDeformerRestAttrName == name) return;
-	mDeformerRestAttrName = name;
+	if(mDeformerGeoPrimHandle.getRestAttrName() == name) return;
+	mDeformerGeoPrimHandle.setRestAttrName(name);
 	makeDirty();
 
-	DLOG_DBG << "Geometry rest attribute name is set to: " <<  name;
+	DLOG_DBG << "Deformer gseometry rest attribute name is set to: " <<  name;
 }
 
 void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
-	if(mCurvesRestAttrName == name) return;
-	mCurvesRestAttrName = name;
-
-	mpCurvesContainer = nullptr;
+	if(mCurvesGeoPrimHandle.getRestAttrName() == name) return;
+	mCurvesGeoPrimHandle.setRestAttrName(name);
 	makeDirty();
 
-	DLOG_DBG << "Curves geometry rest attribute name is set to: " << name;
+	DLOG_DBG << "Curves rest attribute name is set to: " << name;
 }
 
 void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
@@ -225,13 +223,13 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 	}
 
 	if(!mpDeformerMeshContainer) {
-		mpDeformerMeshContainer = MeshContainer::create(mDeformerGeoPrimHandle, getDeformerRestAttrName(), rest_time_code);
+		mpDeformerMeshContainer = MeshContainer::create(mDeformerGeoPrimHandle, rest_time_code);
 		if(!mpDeformerMeshContainer) {
 			DLOG_ERR << "Error creating deformer mesh container for prim " << mDeformerGeoPrimHandle << " !";
 			return false;
 		}
 	} else {
-		if(!mpDeformerMeshContainer->init(mDeformerGeoPrimHandle, getDeformerRestAttrName(), rest_time_code)) {
+		if(!mpDeformerMeshContainer->init(mDeformerGeoPrimHandle, rest_time_code)) {
 			DLOG_ERR << "Error initializing curves container for prim " << mDeformerGeoPrimHandle << " !";
 			return false;
 		}
@@ -509,7 +507,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 void BaseCurvesDeformer::drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) {
 	if(!mDeformerGeoPrimHandle.isMeshGeoPrim()) return;
 
-	auto* pRefiner = mDeformerGeoPrimHandle.getMeshRefiner(mDeformerRestAttrName, getRestTimeCode());
+	auto* pRefiner = mDeformerGeoPrimHandle.getMeshRefiner(getRestTimeCode());
 	if(!pRefiner || pRefiner->getMaxLevel() == 0) return;
 
 	pRefiner->update(time_code);

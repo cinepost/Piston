@@ -38,17 +38,17 @@ PhantomTrimesh::PhantomTrimesh() : mPointsCount(0u), mIsValid(false) {
 	mFaceFlags.reserve(reserve_size);
 }
 
-bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
+bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	mIsValid = false;
 
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
-	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(rest_p_name));
+	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
 	pxr::VtArray<pxr::GfVec3f> points;
 
 	if(!restPositionPrimVar) {
-		LOG_WRN << "No valid primvar \"" << rest_p_name << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
+		LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
 
 		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
 
@@ -61,7 +61,7 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, const std::string& r
 	} else {
 		const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
 	
-		if(!restPosAttr.Get(&points, time_code)) {
+		if(!restPosAttr.Get(&points, rest_time_code)) {
 			LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
 			return false;
 		}
@@ -416,7 +416,7 @@ SerializablePhantomTrimesh::SerializablePhantomTrimesh() {
 	mpTrimesh = PhantomTrimesh::create();
 }
 
-bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code) {
+bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) {
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	if(isValid()) {
@@ -432,7 +432,7 @@ bool SerializablePhantomTrimesh::buildInPlace(const UsdPrimHandle& prim_handle, 
 		mpTrimesh = PhantomTrimesh::create();
 	}
 
-	bool result = mpTrimesh->init(prim_handle, rest_p_name);
+	bool result = mpTrimesh->init(prim_handle);
 
 	if(!result) {
 		mpTrimesh->invalidate();

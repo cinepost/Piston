@@ -11,14 +11,8 @@ UsdGeomMeshFaceAdjacency::UniquePtr UsdGeomMeshFaceAdjacency::create() {
 	return std::make_unique<UsdGeomMeshFaceAdjacency>();
 }
 
-bool UsdGeomMeshFaceAdjacency::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
-	assert(prim_handle.isMeshGeoPrim());
-
+bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode rest_time_code) {
 	invalidate();
-
-	if(!prim_handle.isMeshGeoPrim()) return false;
-
-	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
 
 	mFaceCount = static_cast<uint32_t>(mesh.GetFaceCount(rest_time_code));
 	if(mFaceCount == 0) {
@@ -285,8 +279,6 @@ const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacen
 }
 
 bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& prim_handle) {
-	assert(prim_handle.isMeshGeoPrim());
-
 	if(isValid()) {
 		// Data is valid. No need to rebuild it.
 		return true;
@@ -296,12 +288,20 @@ bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& pri
 
 	const std::lock_guard<std::mutex> lock(mMutex);
 
+	if(!prim_handle.isMeshGeoPrim()) return false;
+
 	if(!mpAdjacency) {
 		mpAdjacency = UsdGeomMeshFaceAdjacency::create();
 	}
 
-	bool result = mpAdjacency->init(prim_handle);
+	assert(prim_handle.isMeshGeoPrim());
+	pxr::UsdGeomMesh mesh(prim_handle.getPrim());
 
+	if(!isValidMesh(mesh)) {
+		return false;
+	}
+
+	bool result = mpAdjacency->init(mesh);
 	if(!result) {
 		mpAdjacency->invalidate();
 	}

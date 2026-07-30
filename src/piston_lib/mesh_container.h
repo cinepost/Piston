@@ -40,9 +40,9 @@ class TemplatedMeshContainer: public TemplatedMeshContainerBase {
 		void makeUnique();
 
 	public:
-		static UniquePtr create(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		static UniquePtr create(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code);
 
-		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_p_name, pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code);
 
 		const T& getRestPositions() const {
 			if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {

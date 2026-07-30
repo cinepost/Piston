@@ -35,6 +35,8 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 namespace Piston {
 
+static const std::string kDefaultRestPositionAttrName = "";
+
 class BaseCurvesDeformer;
 
 using PxrTopologyVariant = std::variant<pxr::HdMeshTopology, pxr::HdBasisCurvesTopology>;
@@ -129,6 +131,10 @@ class UsdPrimHandle {
 		pxr::SdfPath getPath() const { return getPrim().GetPath(); }
 		pxr::UsdStageWeakPtr getStage() const { return getPrim().GetStage(); }
 
+		void setRestAttrName(const std::string& name);
+		const std::string& getRestAttrName() const { return mRestAttrName; }
+
+
 		bool getDataFromBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const;
 		bool writeDataToBson(const pxr::SdfPath& prim_path, SerializableDeformerDataBase* pDeformerData) const;
 
@@ -147,7 +153,7 @@ class UsdPrimHandle {
 
 		bool getPoints(pxr::VtArray<pxr::GfVec3f>& array, pxr::UsdTimeCode time_code) const;
 
-		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const { return pxr::UsdGeomPrimvarsAPI::Get(getStage(), getPath()); }
+		pxr::UsdGeomPrimvarsAPI getPrimvarsAPI() const;
 
 		double getStageFPS() const;
 		double getStageTimeCodesPerSecond() const;
@@ -155,7 +161,7 @@ class UsdPrimHandle {
 		const Topology& getTopology(pxr::UsdTimeCode time_code) const;
 		size_t getTopologyHash(pxr::UsdTimeCode time_code) const;
 
-		const PersistentMeshRefiner* getMeshRefiner(const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) const;
+		const PersistentMeshRefiner* getMeshRefiner(pxr::UsdTimeCode rest_time_code) const;
 
 		/* Invalidate handle */
 		void clear();
@@ -173,7 +179,8 @@ class UsdPrimHandle {
   		bool mightBeTimeVarying(const pxr::UsdAttributeQuery& attrQuery) const { return attrQuery.ValueMightBeTimeVarying(); }
 
 	private:
-		pxr::UsdPrim     mPrim;
+		pxr::UsdPrim     	mPrim;
+		std::string 		mRestAttrName = kDefaultRestPositionAttrName;
 		std::shared_ptr<BaseCurvesDeformer> mpDeformer;
 		mutable std::unique_ptr<Topology> mpTopology;
 

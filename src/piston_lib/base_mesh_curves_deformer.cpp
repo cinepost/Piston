@@ -61,7 +61,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 	// Get phantom mesh json data if present
 	if(trimesh_data_created || !getReadJsonDataState() || !mCurvesGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
 		// Build in place if no json data present or not needed
-		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
+		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle)) {
 			DLOG_ERR << "Error building phantom mesh data!";
 			return false;
 		}

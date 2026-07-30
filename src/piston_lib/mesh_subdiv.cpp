@@ -259,7 +259,7 @@ void PersistentMeshRefiner::getSubdividedPrimsFromSource(int sourceFaceId, std::
     outVertexIds.assign(uniqueVerts.begin(), uniqueVerts.end());
 }
 
-void PersistentMeshRefiner::querySubdividedPoints(int sourceFaceId, std::vector<pxr::GfVec3f>& points, uint32_t& count) {
+void PersistentMeshRefiner::querySubdividedPoints(int sourceFaceId, std::vector<pxr::GfVec3f>& points, uint32_t& count) const {
     std::vector<int> subFaceIds;
     std::vector<int> subVertexIds;
     

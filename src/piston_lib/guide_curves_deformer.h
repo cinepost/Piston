@@ -24,7 +24,6 @@ namespace Piston {
 namespace {
 	const std::string kGuideIDPrimAttrName = "clumpid";
 	const std::string kGuidesSkinPrimAttrName = "skinprim";
-	const std::string kGuidesSkinPrimRestAttrName = "rest";
 }
 
 
@@ -54,7 +53,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		void setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim);
 
 		void setGuidesSkinGeoPrimRestAttrName(const std::string& name);
-		const std::string& getGuidesSkinGeoPrimRestAttrName() const { return mGuidesSkinPrimRestAttrName; }
+		const std::string& getGuidesSkinGeoPrimRestAttrName() const { return mGuidesSkinGeoPrimHandle.getRestAttrName(); }
 
 		void setBindRootsToSkinSurface(bool bind);
 		bool getBindRootsToSkinSurface() const { return mBindRootsToSkinSurface; }
@@ -123,7 +122,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		std::string 											mGuideIDPrimAttrName = kGuideIDPrimAttrName;
 		std::string 											mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;
-		std::string                                     		mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
+		//std::string                                     		mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
 		pxr::VtArray<int> 										mGuideIndices;
 
 		float                                       			mFalloff = .0f;

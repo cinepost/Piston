@@ -22,6 +22,10 @@ namespace Piston {
 
 GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::GUIDES, name) {
 	mBindMode = BindMode::NTB;
+
+	static const std::string kDefaultSkinPrimRestAttrName = "rest";
+
+	mGuidesSkinGeoPrimHandle.setRestAttrName(kDefaultSkinPrimRestAttrName);
 }
 
 GuideCurvesDeformer::SharedPtr GuideCurvesDeformer::create(const std::string& name) {
@@ -60,11 +64,11 @@ void GuideCurvesDeformer::setGuidesSkinGeoPrimAttrName(const std::string& name) 
 }
 
 void GuideCurvesDeformer::setGuidesSkinGeoPrimRestAttrName(const std::string& name) {
-	if(mGuidesSkinPrimRestAttrName == name) return;
-	mGuidesSkinPrimRestAttrName = name;
+	if(mGuidesSkinGeoPrimHandle.getRestAttrName() == name) return;
+	mGuidesSkinGeoPrimHandle.setRestAttrName(name);
 	makeDirty();
 
-	DLOG_DBG << "Guide skin prim rest attribute name is set to: " << mGuidesSkinPrimRestAttrName;
+	DLOG_DBG << "Guide skin prim rest attribute name is set to: " << mGuidesSkinGeoPrimHandle.getRestAttrName();
 }
 
 void GuideCurvesDeformer::setGuidesSkinGeoPrim(const pxr::UsdPrim& geoPrim) {
@@ -725,7 +729,7 @@ bool GuideCurvesDeformer::buildDeformerDataSpaceMode(pxr::UsdTimeCode rest_time_
 	if(guides_trimesh_data_created || !mpGuidesPhantomTrimeshData->isValid()) {
 		if(!getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpGuidesPhantomTrimeshData.get())) {
 			// Build in place if no json data present or not needed
-			if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle, getDeformerRestAttrName())) {
+			if(!mpGuidesPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle)) {
 				DLOG_ERR << "Error building phantom mesh data!";
 				return false;
 			}
@@ -1925,13 +1929,13 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCod
 	}
 
 	if(!mpSkinMeshContainer) {
-		mpSkinMeshContainer = MeshContainer::create(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName, getRestTimeCode());
+		mpSkinMeshContainer = MeshContainer::create(mGuidesSkinGeoPrimHandle, getRestTimeCode());
 		if(!mpSkinMeshContainer) {
 			DLOG_FTL << "Error creating mesh container for skin prim " << mGuidesSkinGeoPrimHandle << " !!!";
 			return false;
 		}
 	} else {
-		if(!mpSkinMeshContainer->init(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName, getRestTimeCode())) {
+		if(!mpSkinMeshContainer->init(mGuidesSkinGeoPrimHandle, getRestTimeCode())) {
 			DLOG_FTL << "Error initializing mesh container for skin prim " << mGuidesSkinGeoPrimHandle << " !!!";
 			return false;
 		}
@@ -1963,7 +1967,7 @@ bool GuideCurvesDeformer::buildSkinPrimData(bool multi_threaded, pxr::UsdTimeCod
 	}
 
 	if(skin_trimesh_data_created || !getReadJsonDataState() || !mGuidesSkinGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpSkinPhantomTrimeshData.get())) {
-		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle, mGuidesSkinPrimRestAttrName)) {
+		if(!mpSkinPhantomTrimeshData->buildInPlace(mGuidesSkinGeoPrimHandle)) {
 			DLOG_ERR << "Error building guides skin trimesh data!";
 			return false;
 		}
