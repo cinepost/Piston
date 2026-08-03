@@ -16,7 +16,7 @@ namespace Piston {
 BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): 
 	mDirty(true), 
 	mDeformerDataWritten(false), 
-	mPool(std::max(1u, std::thread::hardware_concurrency() - 1)), 
+	mPool(std::max(2u, std::thread::hardware_concurrency()) - 1), 
 	mType(t), 
 	mName(name), 
 	mID(current_id++),
@@ -511,7 +511,7 @@ void BaseCurvesDeformer::drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_c
 	if(!pRefiner || pRefiner->getMaxLevel() == 0) return;
 
 	pRefiner->update(time_code);
-	const pxr::UsdGeomMesh& subdMesh = pRefiner->getSubdividedMesh();
+	const pxr::UsdGeomMesh& subdMesh = pRefiner->getOutputMesh();
 
 	if(!mpSubdivDebugGeo) {
 		mpSubdivDebugGeo = DebugGeo::create(getName() + "_subdiv_mesh");

@@ -63,7 +63,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	}
 
 	assert(mpAdjacencyData);
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	const auto* pAdjacency = mpAdjacencyData->getAdjacencyFinal(); // source or subdivided deformer mesh adjacency
 	assert(pAdjacency);
 
 	if(!pAdjacency) {
@@ -206,7 +206,7 @@ bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	}
 
 	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	const auto* pAdjacency = mpAdjacencyData->getAdjacencyFinal(); // source or subdivided mesh adjacency
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	
 	if(deformer_data_created || !mpFastCurvesDeformerData->isValid() || !mpPhantomTrimeshData->isValid()) {
@@ -464,10 +464,12 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 		bind.face_id = CurveBindData::kInvalidFaceID;
 	}
 
+	const PersistentMeshRefiner* pRefiner = mDeformerGeoPrimHandle.getMeshRefiner(rest_time_code);
+
 	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 
 	assert(mpAdjacencyData);
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	const auto* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
 	assert(pAdjacency);
 
 	assert(mpPhantomTrimeshData);
@@ -537,6 +539,8 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 						mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
 						(skin_prim_indices.size() > 0) &&
 						validatePrimIndices(skin_prim_indices, total_curves_count, &err_log_stream);
+
+	const bool has_subdiv_mesh = pRefiner && pRefiner->isValidOutputMesh();
 	
 	DLOG_INF << "Binding curves to mesh" << (has_skin_prim_attr ? " using skin prim attribute." : ".");
 
@@ -544,58 +548,80 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDTree;
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
-		std::vector<float> tmp_squared_distances(pAdjacency->getMaxFaceVertexCount());
-		std::vector<std::pair<float, uint32_t>> tmp_indexed_squared_distances(pAdjacency->getMaxFaceVertexCount());
+		const auto* pAdjacencySource = mpAdjacencyData->getAdjacency();
+
+		std::vector<float> tmp_squared_distances(std::max(pAdjacency->getMaxFaceVertexCount(), pAdjacencySource->getMaxFaceVertexCount()));
+		std::vector<std::pair<float, uint32_t>> tmp_indexed_squared_distances;
+		tmp_indexed_squared_distances.reserve(128);
 
 		for(uint32_t curve_index = static_cast<uint32_t>(start); curve_index < static_cast<uint32_t>(end); ++curve_index) {
 
 			auto& bind = curveBinds[curve_index];
+			bind.face_id = PhantomTrimesh::kInvalidTriFaceID;
 
 			// Strategy: 1. First we try to bind curves using skin prim ids
 			if(has_skin_prim_attr) {
 				if(skin_prim_indices[curve_index] < 0) continue; // pixar uses negative indices as invalid
 
-				const uint32_t prim_id = static_cast<uint32_t>(skin_prim_indices[curve_index]);
-				if(!bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */)) {
-					const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);				
-					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
+				std::vector<uint32_t> prim_indices;
 
-					if(prim_vertex_count == 3) {
-						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
-							pAdjacency->getFaceVertex(prim_id, 0), 
-							pAdjacency->getFaceVertex(prim_id, 1),
-							pAdjacency->getFaceVertex(prim_id, 2)
-						);
-					} else {
+				if(has_subdiv_mesh) {
+					// Subd 
+					std::vector<int> outFaceIds;
+					pRefiner->getSubdividedPrimsFromSource(skin_prim_indices[curve_index], outFaceIds);
 
-						for(size_t j = 0; j < prim_vertex_count; ++j) {
-							const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
-							tmp_indexed_squared_distances[j] = { distanceSquared(pt, rest_positions[vtx]), vtx };
+					for(int subdivided_prim_id: outFaceIds) {
+						if(subdivided_prim_id >= 0) {
+							prim_indices.push_back(static_cast<uint32_t>(subdivided_prim_id));
 						}
-						
-						std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.begin() + prim_vertex_count);
-
-						assert(	tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second &&
-								tmp_indexed_squared_distances[1].second != tmp_indexed_squared_distances[2].second &&
-								tmp_indexed_squared_distances[2].second != tmp_indexed_squared_distances[0].second
-						);
-						
-						bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
-							tmp_indexed_squared_distances[0].second,
-							tmp_indexed_squared_distances[1].second,
-							tmp_indexed_squared_distances[2].second
-						);
 					}
+				} else {
+					// No subd
+					prim_indices.push_back(static_cast<uint32_t>(skin_prim_indices[curve_index]));
+				}
+
+				const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+				tmp_indexed_squared_distances.clear();
+
+				for(uint32_t prim_id: prim_indices) {
+					if(bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */)) {
+						skin_bound_curves_count++;
+						continue;
+					}
+				
+					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
+					for(size_t j = 0; j < prim_vertex_count; ++j) {
+						const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
+						tmp_indexed_squared_distances.emplace_back(distanceSquared(pt, rest_positions[vtx]), vtx);
+					}
+				}
+
+				// now sort and finalize candidate tri-faces
+
+				if(bind.face_id == PhantomTrimesh::kInvalidTriFaceID) {
+					assert(tmp_indexed_squared_distances.size() > 0);
+					
+					std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.end());
+
+					assert(	tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second &&
+						tmp_indexed_squared_distances[1].second != tmp_indexed_squared_distances[2].second &&
+						tmp_indexed_squared_distances[2].second != tmp_indexed_squared_distances[0].second
+					);
+				
+					bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
+						tmp_indexed_squared_distances[0].second,
+						tmp_indexed_squared_distances[1].second,
+						tmp_indexed_squared_distances[2].second
+					);
 
 					assert(bind.face_id != PhantomTrimesh::kInvalidTriFaceID);
 					pDeformerMeshContainer->projectPoint(pt, pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
+					skin_bound_curves_count++;
 				}
-
-				skin_bound_curves_count++;
 			}
 
 			if(bind.face_id != CurveBindData::kInvalidFaceID) continue; // bound already
-			// Strategy: 2. Bind ramaining curves using nearest point
+			// Strategy: 2. Bind remaining curves using nearest point
 
 			// Build guide kdtree if needed
 			{

@@ -38,7 +38,7 @@ namespace neighbour_search {
 
 #endif
 
-const static auto DEFAULT_RECURSION_DEPTH = static_cast<std::uint32_t>(std::floor(std::log2(std::thread::hardware_concurrency())));
+static const auto sDefaultRecursionDepth = static_cast<std::uint32_t>(std::floor(std::log2(std::max(1u, std::thread::hardware_concurrency()))));
 
 /// @brief Definition of the point struct
 template <typename CoordinateType, std::size_t number_of_dimensions, typename = std::enable_if_t<(number_of_dimensions == 2) || (number_of_dimensions == 3)>>
@@ -335,7 +335,8 @@ template <typename CoordinateType, std::size_t number_of_dimensions> class KDTre
                                                      typename std::vector<Node>::iterator end, std::size_t index,
                                                      std::uint32_t recursion_depth = 0U) const noexcept
     {
-        if (recursion_depth > DEFAULT_RECURSION_DEPTH) {
+
+        if (recursion_depth > sDefaultRecursionDepth) {
             return buildTreeRecursively(begin, end, index);
         } else {
             if (begin >= end) return nullptr;

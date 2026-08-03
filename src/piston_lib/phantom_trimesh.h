@@ -64,10 +64,7 @@ class PhantomTrimesh {
 
 			bool isValid() const { return indices[0] != kInvalidVertexID && indices[1] != kInvalidVertexID && indices[2] != kInvalidVertexID; }
 
-			//const pxr::GfVec3f& getRestNormal() const { return restNormal; }
-
 			const IndicesList&  getIndices() const { return indices; }
-
 			const PxrIndexType& operator[](size_t index) const { return indices[index]; }
 
 			size_t calcHash() const {

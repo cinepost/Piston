@@ -3,7 +3,7 @@
 
 namespace Piston {
 
-static const SerializableDeformerDataBase::DataVersion kAdjacencyDataVersion( 0u, 0u, 0u);
+static const SerializableDeformerDataBase::DataVersion kAdjacencyDataVersion( 1u, 0u, 0u);
 
 UsdGeomMeshFaceAdjacency::UsdGeomMeshFaceAdjacency(): mFaceCount(0), mVertexCount(0), mMaxFaceVertexCount(0), mValid(false), mHash(0) {};
 
@@ -260,8 +260,9 @@ std::string UsdGeomMeshFaceAdjacency::toString() const {
 	return s;
 }
 
-SerializableUsdGeomMeshFaceAdjacency::SerializableUsdGeomMeshFaceAdjacency(): SerializableDeformerDataBase() {
+SerializableUsdGeomMeshFaceAdjacency::SerializableUsdGeomMeshFaceAdjacency(): SerializableDeformerDataBase(), mHasSubdividedAdjacencyData(false) {
 	mpAdjacency = UsdGeomMeshFaceAdjacency::create();
+	mpAdjacencySubd = nullptr;
 }
 
 void SerializableUsdGeomMeshFaceAdjacency::clearData() { 
@@ -269,13 +270,25 @@ void SerializableUsdGeomMeshFaceAdjacency::clearData() {
 
 	if(mpAdjacency) {
 		mpAdjacency->invalidate();
+
+		if(mpAdjacencySubd) {
+			mpAdjacencySubd->invalidate();
+		}
+
+		mpAdjacencySubd = nullptr;
 	}
+
+	mHasSubdividedAdjacencyData = false;
 }
 
 const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacency() const {
 	if(!isValid()) return nullptr;
 
 	return mpAdjacency.get();
+}
+
+const UsdGeomMeshFaceAdjacency* SerializableUsdGeomMeshFaceAdjacency::getAdjacencySubd() const {
+	return mpAdjacencySubd.get();
 }
 
 bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& prim_handle) {
@@ -304,8 +317,26 @@ bool SerializableUsdGeomMeshFaceAdjacency::buildInPlace(const UsdPrimHandle& pri
 	bool result = mpAdjacency->init(mesh);
 	if(!result) {
 		mpAdjacency->invalidate();
-	}
+		return false;
+	}	
+	
+	// Init subdivided adjacency if needed
+	const PersistentMeshRefiner* pRefiner = prim_handle.getMeshRefiner();
+	if(pRefiner && pRefiner->isInitialized() && pRefiner->isValidOutputMesh()) {
+		if(!mpAdjacencySubd) {
+			mpAdjacencySubd = UsdGeomMeshFaceAdjacency::create();
+		}
 
+		assert(mpAdjacencySubd);
+
+		if(!mpAdjacencySubd->init(pRefiner->getOutputMesh())) {
+			mpAdjacencySubd->invalidate();
+			LOG_ERR << "Error initializing adjacency data for subdivided mesh " << prim_handle;
+		} else {
+			mHasSubdividedAdjacencyData = true;
+		}
+	}
+	
 	return result;
 }
 
@@ -327,23 +358,35 @@ static constexpr const char* kJDataHash = "data_hash";
 bool SerializableUsdGeomMeshFaceAdjacency::dumpToJSON(json& j) const {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
-	if(!mpAdjacency || !mpAdjacency->isValid()) return false;
+	auto data_to_json = [](const UsdGeomMeshFaceAdjacency* pAdjacency) -> json {
+		json j;
 
-	j[kJFaceCount] = mpAdjacency->mFaceCount;
-	j[kJVertexCount] = mpAdjacency->mVertexCount;
-	j[kJMaxFaceCount] = mpAdjacency->mMaxFaceVertexCount;
+		if(pAdjacency && pAdjacency->isValid()) {
+			j[kJFaceCount] = pAdjacency->mFaceCount;
+			j[kJVertexCount] = pAdjacency->mVertexCount;
+			j[kJMaxFaceCount] = pAdjacency->mMaxFaceVertexCount;
 
-	j[kJCounts] = mpAdjacency->mCounts;
-	j[kJOffsets] = mpAdjacency->mOffsets;
-	j[kJPrimData] = mpAdjacency->mPrimData;
-	j[kJVtxToFace] = mpAdjacency->mVtxToFace;
-	j[kJCornerVertexData] = mpAdjacency->mCornerVertexData;
-	
-	j[kJSrcFaceVertexOffsets] = mpAdjacency->mSrcFaceVertexOffsets;
-	j[kJSrcFaceVertexIndices] = mpAdjacency->mSrcFaceVertexIndices;
-	j[kJSrcFaceVertexCounts] = mpAdjacency->mSrcFaceVertexCounts;
+			j[kJCounts] = pAdjacency->mCounts;
+			j[kJOffsets] = pAdjacency->mOffsets;
+			j[kJPrimData] = pAdjacency->mPrimData;
+			j[kJVtxToFace] = pAdjacency->mVtxToFace;
+			j[kJCornerVertexData] = pAdjacency->mCornerVertexData;
+			
+			j[kJSrcFaceVertexOffsets] = pAdjacency->mSrcFaceVertexOffsets;
+			j[kJSrcFaceVertexIndices] = pAdjacency->mSrcFaceVertexIndices;
+			j[kJSrcFaceVertexCounts] = pAdjacency->mSrcFaceVertexCounts;
 
-	j[kJDataHash] = mpAdjacency->calcHash();
+			j[kJDataHash] = pAdjacency->calcHash();
+		}
+
+        return j;
+    };
+
+	j["adj_data"] = data_to_json(mpAdjacency.get());
+	if(mpAdjacencySubd && mpAdjacencySubd->isValid()) {
+		j["adj_has_subd_data"] = true;
+		j["adj_subd_data"] = data_to_json(mpAdjacencySubd.get());
+	}
 
 	return true;
 }
@@ -351,6 +394,42 @@ bool SerializableUsdGeomMeshFaceAdjacency::dumpToJSON(json& j) const {
 bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
+	auto json_to_data = [](const json& j, UsdGeomMeshFaceAdjacency* pAdjacency) -> bool {
+		if(!pAdjacency) {
+			LOG_ERR << "SerializableUsdGeomMeshFaceAdjacency::readFromJSON lambda error. No pAdjacency !";
+			return false;
+		}
+
+		pAdjacency->mValid = false;
+
+		pAdjacency->mFaceCount = j[kJFaceCount];
+		pAdjacency->mVertexCount = j[kJVertexCount];
+		pAdjacency->mMaxFaceVertexCount = j[kJMaxFaceCount];
+
+		pAdjacency->mCounts = j[kJCounts].template get<std::vector<unsigned int>>();
+		pAdjacency->mOffsets = j[kJOffsets].template get<std::vector<unsigned int>>();
+		pAdjacency->mPrimData = j[kJPrimData].template get<std::vector<unsigned int>>();
+		pAdjacency->mVtxToFace = j[kJVtxToFace].template get<std::vector<unsigned int>>();
+		pAdjacency->mCornerVertexData = j[kJCornerVertexData];
+
+		pAdjacency->mSrcFaceVertexOffsets = j[kJSrcFaceVertexOffsets].template get<std::vector<unsigned int>>();
+		pAdjacency->mSrcFaceVertexIndices = j[kJSrcFaceVertexIndices].template get<std::vector<UsdGeomMeshFaceAdjacency::PxrIndexType>>();
+		pAdjacency->mSrcFaceVertexCounts = j[kJSrcFaceVertexCounts].template get<std::vector<UsdGeomMeshFaceAdjacency::PxrIndexType>>();
+
+		const size_t json_adjacency_data_hash = j[kJDataHash];
+		const size_t calc_adjacency_data_hash = pAdjacency->calcHash();
+
+		if(calc_adjacency_data_hash != json_adjacency_data_hash) {
+			LOG_ERR << "SerializableUsdGeomMeshFaceAdjacency::readFromJSON lambda error. Data hash mismatch !";
+			return false;
+		}
+
+		pAdjacency->mHash = calc_adjacency_data_hash;
+		pAdjacency->mValid = true;
+
+		return pAdjacency->mValid;
+    };
+/*
 	mpAdjacency->mFaceCount = j[kJFaceCount];
 	mpAdjacency->mVertexCount = j[kJVertexCount];
 	mpAdjacency->mMaxFaceVertexCount = j[kJMaxFaceCount];
@@ -375,6 +454,27 @@ bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
 
 	mpAdjacency->mHash = calc_adjacency_data_hash;
 	mpAdjacency->mValid = true;
+*/
+
+    if(!json_to_data(j["adj_data"], mpAdjacency.get())) {
+    	return false;
+    }
+
+    if(j["adj_has_subd_data"]) {
+    	if(!mpAdjacencySubd) {
+    		mpAdjacencySubd = UsdGeomMeshFaceAdjacency::create();
+    	}
+
+    	assert(mpAdjacencySubd);
+
+    	if(!json_to_data(j["adj_subd_data"], mpAdjacencySubd.get())) {
+    		LOG_WRN << "Error reading subdivided adjacency data !!!";
+    		mpAdjacencySubd->invalidate();
+    		return false;
+    	}
+
+    	LOG_DBG << "Subdivided adjacency data read from json payload.";
+    }
 
 	LOG_DBG << "Adjacency data read from json payload.";
 

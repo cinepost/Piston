@@ -41,50 +41,65 @@ template <typename T>
 bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
-	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
-	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
-		
-	if(!restPositionPrimVar) {
-		LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
 
-		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
-
-		static const pxr::UsdTimeCode s_zero_time_code(0.0);
-
+	const PersistentMeshRefiner* pRefiner = prim_handle.getMeshRefiner();
+	if( pRefiner && pRefiner->isInitialized() && pRefiner->isValidOutputMesh()) {
+		// Subdivided mesh path
 		if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
-			if(!mesh.GetPointsAttr().Get(&mUsdMeshRestPositions, s_zero_time_code)) {
-				LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << s_zero_time_code.GetValue();
+			if(!pRefiner->getOutputMesh().GetPointsAttr().Get(&mUsdMeshRestPositions, rest_time_code)) {
+				LOG_ERR << "TemplatedMeshContainer::init() error. Error getting subdivided mesh " << prim_handle << " point positions !";
 				return false;
 			}
 		} else {
-			static_assert(std::is_same_v<T, std::vector<PointType>>);
-			pxr::VtArray<PointType> tmp;
-			if(!mesh.GetPointsAttr().Get(&tmp, s_zero_time_code)) {
-				LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << s_zero_time_code.GetValue();
-				return false;
-			}
-			mUsdMeshRestPositions.resize(tmp.size());
-			for(size_t i = 0; i < tmp.size(); ++i) mUsdMeshRestPositions[i] = tmp[i];
+			LOG_FTL << "TemplatedMeshContainer::init() error. Error initializing for subdivided mesh " << prim_handle << ". std::vector<> not supported !";
+			return false;
 		}
 	} else {
-		const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
-	
-		if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
-			if(!restPosAttr.Get(&mUsdMeshRestPositions, rest_time_code)) {
-				LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
-				return false;
+		// Non-subdiv mesh path
+
+		pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
+		pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
+			
+		if(!restPositionPrimVar) {
+			LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
+
+			pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
+
+			if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
+				if(!mesh.GetPointsAttr().Get(&mUsdMeshRestPositions, rest_time_code)) {
+					LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << rest_time_code.GetValue();
+					return false;
+				}
+			} else {
+				static_assert(std::is_same_v<T, std::vector<PointType>>);
+				pxr::VtArray<PointType> tmp;
+				if(!mesh.GetPointsAttr().Get(&tmp, rest_time_code)) {
+					LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << rest_time_code.GetValue();
+					return false;
+				}
+				mUsdMeshRestPositions.resize(tmp.size());
+				for(size_t i = 0; i < tmp.size(); ++i) mUsdMeshRestPositions[i] = tmp[i];
 			}
 		} else {
-			static_assert(std::is_same_v<T, std::vector<PointType>>);
-			pxr::VtArray<PointType> tmp;
-			if(!restPosAttr.Get(&tmp, rest_time_code)) {
-				LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
-				return false;
+			const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
+		
+			if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
+				if(!restPosAttr.Get(&mUsdMeshRestPositions, rest_time_code)) {
+					LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
+					return false;
+				}
+			} else {
+				static_assert(std::is_same_v<T, std::vector<PointType>>);
+				pxr::VtArray<PointType> tmp;
+				if(!restPosAttr.Get(&tmp, rest_time_code)) {
+					LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
+					return false;
+				}
+				mUsdMeshRestPositions.resize(tmp.size());
+				for(size_t i = 0; i < tmp.size(); ++i) mUsdMeshRestPositions[i] = tmp.AsConst()[i];
 			}
-			mUsdMeshRestPositions.resize(tmp.size());
-			for(size_t i = 0; i < tmp.size(); ++i) mUsdMeshRestPositions[i] = tmp.AsConst()[i];
+			LOG_DBG << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions.";
 		}
-		LOG_DBG << "Prim " << prim_handle.getPath() << " has " << mUsdMeshRestPositions.size() << " rest positions.";
 	}
 
 	mUsdMeshLivePositions = mUsdMeshRestPositions;
@@ -232,7 +247,14 @@ bool TemplatedMeshContainer<T>::update(const UsdPrimHandle& prim_handle, pxr::Us
 		if(mLastUpdateTimeCode == time_code) return true;
 	}
 
-	if(!attr) attr = pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr();
+	const PersistentMeshRefiner* pRefiner = prim_handle.getMeshRefiner();
+	if( pRefiner && pRefiner->isInitialized()) {
+		pRefiner->update(time_code);
+		attr = pRefiner->getOutputMesh().GetPointsAttr();
+		LOG_DBG << "TemplatedMeshContainer::update() subdivided mesh " << prim_handle;
+	} else {
+		attr = pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr();
+	}
 
 	if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
 		if(!attr.Get(&mUsdMeshLivePositions, time_code)) {

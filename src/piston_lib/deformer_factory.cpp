@@ -17,13 +17,10 @@ static std::string tolower(std::string s) {
 }
 
 CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
+    std::lock_guard<std::mutex> lock(mMutex);
     if (mInstancePtr == nullptr) {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (mInstancePtr == nullptr) {
-            mInstancePtr = new CurvesDeformerFactory();
-        }
+        mInstancePtr = new CurvesDeformerFactory();
     }
-
     return *mInstancePtr;
 }
 
@@ -140,7 +137,7 @@ CurvesDeformerFactory::~CurvesDeformerFactory() {
 	//SimpleProfiler::printReport();
 }
 
-CurvesDeformerFactory::CurvesDeformerFactory(): mpPxrPointsLRUCache(nullptr) {
+CurvesDeformerFactory::CurvesDeformerFactory(): mpPxrPointsLRUCache(nullptr), mPointCacheState(false) {
 
 }
 

@@ -18,12 +18,12 @@ void PersistentMeshRefiner::clear() {
     mOutputMesh.GetExtentAttr().Clear();
 }
 
-const pxr::UsdGeomMesh& PersistentMeshRefiner::getSubdividedMesh() const {
+const pxr::UsdGeomMesh& PersistentMeshRefiner::getOutputMesh() const {
     if(mIsInitialized && mMaxLevel > 0) {
         return mOutputMesh;
     }   
 
-    return mSourceMesh;
+    return pxr::UsdGeomMesh();
 }
 
 bool PersistentMeshRefiner::isValidSourceMesh() const { 
@@ -34,17 +34,18 @@ bool PersistentMeshRefiner::isValidOutputMesh() const {
     return isValidMesh(mOutputMesh); 
 }
 
-void PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) {
-    maxLevel = std::min(maxLevel,(uint8_t)1);
+bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) {
+
+    maxLevel = std::min(maxLevel, kMaxSubdivLevel);
     if(maxLevel == 0) {
-        return;
+        return false;
     }
 
-    if(mIsInitialized && mRestPosName == rest_p_name && mRestTimeCode == rest_time_code && mMaxLevel == maxLevel) return;
+    if(mIsInitialized && mRestPosName == rest_p_name && (mRestTimeCode == rest_time_code || rest_time_code.IsDefault()) && mMaxLevel == maxLevel) return true;
 
     if(!isValidMesh(sourceMesh)) {
         LOG_ERR << "Error initializing PersistentMeshRefiner";
-        return;
+        return false;
     }
 
     mMaxLevel = maxLevel;
@@ -62,14 +63,14 @@ void PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
     if(!restPositionPrimVar) {
         if(!mSourceMesh.GetPointsAttr().Get(&usdPoints, rest_time_code)) {
             LOG_ERR << "Error getting mesh " << mSourceMesh.GetPrim().GetPath() << " positions !";
-            return;
+            return false; 
         }
     } else {
         const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
     
         if(!restPosAttr.Get(&usdPoints, rest_time_code)) {
             LOG_ERR << "Error getting mesh " << mSourceMesh.GetPrim().GetPath() << " rest positions \"" << mRestPosName << "\" !";
-            return;
+            return false;
         }
     }
 
@@ -104,7 +105,7 @@ void PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
 
     if (!mpRefiner) {
         LOG_ERR << "Failed to construct OpenSubdiv Refiner. Check topology validity.";
-        return;
+        return false;
     }
     
     mpRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
@@ -173,10 +174,12 @@ void PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
 
     mLastUpdateTimeCode = rest_time_code;
     mIsInitialized = true;
+
+    return true;
 }
 
 void PersistentMeshRefiner::update(pxr::UsdTimeCode time_code) const {
-    if (!mpRefiner || mLastUpdateTimeCode == time_code) return;
+    if (!mIsInitialized || mLastUpdateTimeCode == time_code) return;
 
     pxr::VtVec3fArray usdPoints;
     mSourceMesh.GetPointsAttr().Get(&usdPoints, time_code);
@@ -217,17 +220,47 @@ void PersistentMeshRefiner::update(pxr::UsdTimeCode time_code) const {
 
     assert(mTmpOutPoints.size() >= refinedNumVertices);
 
+    mTmpOutPoints.resize(refinedNumVertices);
     for (int i = 0; i < refinedNumVertices; ++i) {
         const auto& pt = mTmpVertexBuffer[targetLevelVertexOffset + i];
         mTmpOutPoints[i] = pt.position;
     }
+
+    LOG_DBG << "PersistentMeshRefiner::update(...) time_code is " << time_code.GetValue();
+    LOG_DBG << "PersistentMeshRefiner::update(...) refinedNumFaces count is " << refinedNumFaces;
+    LOG_DBG << "PersistentMeshRefiner::update(...) refinedNumVertices count is " << refinedNumVertices;
+
+    LOG_DBG << "PersistentMeshRefiner::update(...) mTmpOutPoints size is " << mTmpOutPoints.size();
 
     mOutputMesh.GetPointsAttr().Set(mTmpOutPoints);
 
     mLastUpdateTimeCode = time_code;
 }
 
-void PersistentMeshRefiner::getSubdividedPrimsFromSource(int sourceFaceId, std::vector<int>& outFaceIds, std::vector<int>& outVertexIds) const  {
+void PersistentMeshRefiner::getSubdividedPrimsFromSource(int sourceFaceId, std::vector<int>& outFaceIds) const  {
+    outFaceIds.clear();
+
+    if (!mpRefiner || sourceFaceId < 0 || sourceFaceId >= mpRefiner->GetLevel(0).GetNumFaces()) {
+        return;
+    }
+
+    const OpenSubdiv::Far::TopologyLevel& refLevel = mpRefiner->GetLevel(mMaxLevel);
+    int refinedNumFaces = refLevel.GetNumFaces();
+    
+    // Trace faces instantly via cached pointer maps
+    for (int face = 0; face < refinedNumFaces; ++face) {
+        int parentFace = face;
+        for (int l = mMaxLevel; l > 0; --l) {
+            parentFace = mpRefiner->GetLevel(l).GetFaceParentFace(parentFace);
+        }
+
+        if (parentFace == sourceFaceId) {
+            outFaceIds.push_back(face);
+        }
+    }
+}
+
+void PersistentMeshRefiner::getSubdividedPrimsAndVerticesFromSource(int sourceFaceId, std::vector<int>& outFaceIds, std::vector<int>& outVertexIds) const  {
     outFaceIds.clear();
     outVertexIds.clear();
 
@@ -263,7 +296,7 @@ void PersistentMeshRefiner::querySubdividedPoints(int sourceFaceId, std::vector<
     std::vector<int> subFaceIds;
     std::vector<int> subVertexIds;
     
-    getSubdividedPrimsFromSource(sourceFaceId, subFaceIds, subVertexIds);
+    getSubdividedPrimsAndVerticesFromSource(sourceFaceId, subFaceIds, subVertexIds);
 
     pxr::VtVec3fArray outPoints;
     mOutputMesh.GetPointsAttr().Get(&outPoints);

@@ -89,6 +89,12 @@ class SerializableUsdGeomMeshFaceAdjacency: public SerializableDeformerDataBase 
 		virtual bool isValid() const override { const std::lock_guard<std::mutex> lock(mMutex); return mpAdjacency && mpAdjacency->isValid(); }
 
 		const UsdGeomMeshFaceAdjacency* getAdjacency() const;
+		const UsdGeomMeshFaceAdjacency* getAdjacencySubd() const;
+
+		const UsdGeomMeshFaceAdjacency* getAdjacencyFinal() const {
+			return mHasSubdividedAdjacencyData ? getAdjacencySubd() : getAdjacency();
+		};
+
 		virtual const std::string& typeName() const override;
 		virtual const std::string& jsonDataKey() const override;
 		virtual const DataVersion& jsonDataVersion() const override;
@@ -100,7 +106,9 @@ class SerializableUsdGeomMeshFaceAdjacency: public SerializableDeformerDataBase 
 		virtual void clearData() override;
 
 	private:
+		bool mHasSubdividedAdjacencyData;
 		UsdGeomMeshFaceAdjacency::UniquePtr	mpAdjacency;
+		UsdGeomMeshFaceAdjacency::UniquePtr	mpAdjacencySubd;
 
 };
 

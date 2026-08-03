@@ -161,7 +161,7 @@ class UsdPrimHandle {
 		const Topology& getTopology(pxr::UsdTimeCode time_code) const;
 		size_t getTopologyHash(pxr::UsdTimeCode time_code) const;
 
-		const PersistentMeshRefiner* getMeshRefiner(pxr::UsdTimeCode rest_time_code) const;
+		const PersistentMeshRefiner* getMeshRefiner(pxr::UsdTimeCode rest_time_code = pxr::UsdTimeCode::Default()) const;
 
 		/* Invalidate handle */
 		void clear();

@@ -50,7 +50,15 @@ class PersistentMeshRefiner {
 	    PersistentMeshRefiner(const PersistentMeshRefiner&) = delete;
 	    PersistentMeshRefiner& operator=(const PersistentMeshRefiner&) = delete;
 
-		void init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code);
+		bool init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code);
+		bool isInitialized() const { return mIsInitialized; }
+
+		/**
+     	 * retrieves face and vertex IDs from the refined mesh that belong to a specific source face ID.
+     	 */
+
+		void getSubdividedPrimsFromSource(int sourceFaceId, std::vector<int>& outFaceIds) const;
+		void getSubdividedPrimsAndVerticesFromSource(int sourceFaceId, std::vector<int>& outFaceIds, std::vector<int>& outVertexIds) const;
 
 	    void querySubdividedPoints(int sourceFaceId, std::vector<pxr::GfVec3f>& points, uint32_t& count) const;
 
@@ -61,7 +69,7 @@ class PersistentMeshRefiner {
 	    bool isValidOutputMesh() const;
 
 	    const pxr::UsdGeomMesh& getSourceMesh() const { return mSourceMesh; }
-	    const pxr::UsdGeomMesh& getSubdividedMesh() const;
+	    const pxr::UsdGeomMesh& getOutputMesh() const;
 
 	    void update(pxr::UsdTimeCode time_code) const;
 
@@ -69,12 +77,6 @@ class PersistentMeshRefiner {
 
 	protected:
 		void clear();
-
-	private:
-		/**
-     	 * retrieves face and vertex IDs from the refined mesh that belong to a specific source face ID.
-     	 */
-		void getSubdividedPrimsFromSource(int sourceFaceId, std::vector<int>& outFaceIds, std::vector<int>& outVertexIds) const;
 
 	private:
 	    bool mIsInitialized = false;

@@ -25,6 +25,8 @@
 
 namespace Piston {
 
+const uint8_t kMaxSubdivLevel = 2;
+
 #define BSON_USES_PXR_VTARRAY 1
 #define MY_TYPE TYPE_INT
 

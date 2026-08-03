@@ -44,28 +44,41 @@ bool PhantomTrimesh::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode res
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
 	pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
-	pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
 	pxr::VtArray<pxr::GfVec3f> points;
 
-	if(!restPositionPrimVar) {
-		LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
+	// Check if there is subdivided mesh to use
 
-		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
+	const PersistentMeshRefiner* pRefiner = prim_handle.getMeshRefiner(rest_time_code);
+	if(pRefiner && pRefiner->isInitialized() && pRefiner->isValidOutputMesh()) {
+		// Subdivided mesh path
 
-		static const pxr::UsdTimeCode s_zero_time_code(0.0);
-
-		if(!mesh.GetPointsAttr().Get(&points, s_zero_time_code)) {
-			LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << s_zero_time_code.GetValue();
+		if(!pRefiner->getOutputMesh().GetPointsAttr().Get(&points, rest_time_code)) {
+			LOG_ERR << "Error getting subdivided " << prim_handle.getPath() << " point positions at time code " << rest_time_code.GetValue();
 			return false;
-		}
+		}	
+		
 	} else {
-		const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
-	
-		if(!restPosAttr.Get(&points, rest_time_code)) {
-			LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
-			return false;
+
+		// Non-subdivided mesh path
+
+		pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
+		if(!restPositionPrimVar) {
+			LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
+
+			pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
+			if(!mesh.GetPointsAttr().Get(&points, rest_time_code)) {
+				LOG_ERR << "Error getting " << prim_handle.getPath() << " point positions at time code " << rest_time_code.GetValue();
+				return false;
+			}
+		} else {
+			const pxr::UsdAttribute& restPosAttr = restPositionPrimVar.GetAttr();
+		
+			if(!restPosAttr.Get(&points, rest_time_code)) {
+				LOG_ERR << "Error getting prim " << prim_handle.getPath() << " \"rest\" positions !";
+				return false;
+			}
+			LOG_DBG << "Prim " << prim_handle.getPath() << " has " << points.size() << " points.";
 		}
-		LOG_DBG << "Prim " << prim_handle.getPath() << " has " << points.size() << " points.";
 	}
 
 	mPointsCount = points.size();
@@ -120,8 +133,8 @@ bool PhantomTrimesh::buildTetrahedrons(const T& positions, const GuideCurvesCont
 		tipVerticesFlags.resize(points_count);
 		rootVerticesFlags.resize(points_count);
 
-		std::fill(tipVerticesFlags.begin(), tipVerticesFlags.begin(), false);
-		std::fill(rootVerticesFlags.begin(), rootVerticesFlags.begin(), false);
+		std::fill(tipVerticesFlags.begin(), tipVerticesFlags.end(), false);
+		std::fill(rootVerticesFlags.begin(), rootVerticesFlags.end(), false);
 
 		const auto& curve_vertex_counts = pCurvesContainer->getCurveVertexCounts();
 		//const auto& curves_offsets = pCurvesContainer->getCurveOffsets();

@@ -183,7 +183,10 @@ const PersistentMeshRefiner* UsdPrimHandle::getMeshRefiner(pxr::UsdTimeCode rest
 		mpRefiner = PersistentMeshRefiner::create();
 	}
 
-	mpRefiner->init(pxr::UsdGeomMesh(mPrim), mSubdivLevel, mRestAttrName, rest_time_code);
+	if(!mpRefiner->init(pxr::UsdGeomMesh(mPrim), mSubdivLevel, mRestAttrName, rest_time_code)) {
+		LOG_ERR << "Error initializing mesh refiner for " << mPrim << " with subdiv level " << mSubdivLevel;
+		mpRefiner = nullptr;
+	}
 	return mpRefiner.get();
 }
 
@@ -213,13 +216,12 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 }
 
 void UsdPrimHandle::setSubdivLevel(uint8_t level) {
-	if(mSubdivLevel == level) return;
+	level = std::min(level, kMaxSubdivLevel);
+	if(mSubdivLevel == level || !isMeshGeoPrim()) return;
 
-	mSubdivLevel = std::min(level, (uint8_t)1);
+	mSubdivLevel = level;
 	if(mSubdivLevel > 0) {
-		if(!mpRefiner) {
-			mpRefiner = PersistentMeshRefiner::create();
-		}
+		mpRefiner = PersistentMeshRefiner::create();
 	} else {
 		mpRefiner = nullptr;
 	}
