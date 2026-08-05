@@ -590,17 +590,24 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 					}
 				
 					const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
+					assert(prim_vertex_count > 2);
+					
+					uint32_t tmp_face_id = PhantomTrimesh::kInvalidTriFaceID;
 					for(size_t j = 0; j < prim_vertex_count; ++j) {
+						float min_dist = FLT_MAX;
 						const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
 						tmp_indexed_squared_distances.emplace_back(distanceSquared(pt, rest_positions[vtx]), vtx);
 					}
+
+					assert(face_id != PhantomTrimesh::kInvalidTriFaceID);
+					tmp_indexed_squared_distances.emplace_back(min_dist, face_id);
 				}
 
 				// now sort and finalize candidate tri-faces
 
 				if(bind.face_id == PhantomTrimesh::kInvalidTriFaceID) {
 					assert(tmp_indexed_squared_distances.size() > 0);
-					
+
 					std::sort(tmp_indexed_squared_distances.begin(), tmp_indexed_squared_distances.end());
 
 					assert(	tmp_indexed_squared_distances[0].second != tmp_indexed_squared_distances[1].second &&
