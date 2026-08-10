@@ -10,6 +10,12 @@ PersistentMeshRefiner::UniquePtr PersistentMeshRefiner::create() {
     return PersistentMeshRefiner::UniquePtr(new PersistentMeshRefiner());
 }
 
+PersistentMeshRefiner::~PersistentMeshRefiner() {
+    if(mpRefiner) {
+        delete mpRefiner;
+    }
+}
+
 void PersistentMeshRefiner::clear() {
     mIsInitialized = false;
     mOutputMesh.GetPointsAttr().Clear();
@@ -34,7 +40,7 @@ bool PersistentMeshRefiner::isValidOutputMesh() const {
     return isValidMesh(mOutputMesh); 
 }
 
-bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code) {
+bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp) {
 
     maxLevel = std::min(maxLevel, kMaxSubdivLevel);
     if(maxLevel == 0) {
@@ -107,10 +113,21 @@ bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
         LOG_ERR << "Failed to construct OpenSubdiv Refiner. Check topology validity.";
         return false;
     }
+
+    std::unique_ptr<OpenSubdiv::Far::TopologyRefiner> pRestRefiner;
+
+    if(linear_rest_interp && (osdScheme != OpenSubdiv::Sdc::SCHEME_BILINEAR)) {
+        pRestRefiner = std::unique_ptr<OpenSubdiv::Far::TopologyRefiner>(
+            OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Create(desc, OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Options(OpenSubdiv::Sdc::SCHEME_BILINEAR))
+        );
+    }
+
+    auto* pRefiner = (pRestRefiner && linear_rest_interp) ? pRestRefiner.get() : mpRefiner;
     
+    pRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
     mpRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
 
-    int totalNumVertices = mpRefiner->GetNumVerticesTotal();
+    int totalNumVertices = pRefiner->GetNumVerticesTotal();
     mTmpVertexBuffer.resize(totalNumVertices);
 
     // fill level 0 with the baseline USD positions
@@ -118,21 +135,21 @@ bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
         mTmpVertexBuffer[i].position = usdPoints[i];
     }
 
-    OpenSubdiv::Far::PrimvarRefiner primvarRefiner(*mpRefiner);
+    OpenSubdiv::Far::PrimvarRefiner primvarRefiner(*pRefiner);
     
     OpenSubdVertex* srcPoints = &mTmpVertexBuffer[0];
     for (int level = 1; level <= mMaxLevel; ++level) {
-        OpenSubdVertex* dstPoints = srcPoints + mpRefiner->GetLevel(level - 1).GetNumVertices();
+        OpenSubdVertex* dstPoints = srcPoints + pRefiner->GetLevel(level - 1).GetNumVertices();
 
         // Linearly compute intermediate structures for the current refinement step
         primvarRefiner.Interpolate(level, srcPoints, dstPoints);
         srcPoints = dstPoints;
     }
 
-    const OpenSubdiv::Far::TopologyLevel& refLevel = mpRefiner->GetLevel(mMaxLevel);
+    const OpenSubdiv::Far::TopologyLevel& refLevel = pRefiner->GetLevel(mMaxLevel);
     int refinedNumFaces = refLevel.GetNumFaces();
     int refinedNumVertices = refLevel.GetNumVertices();
-    int targetLevelVertexOffset = mpRefiner->GetNumVerticesTotal() - refinedNumVertices;
+    int targetLevelVertexOffset = pRefiner->GetNumVerticesTotal() - refinedNumVertices;
 
     mTmpOutPoints.reserve(refinedNumVertices);
     

@@ -152,6 +152,8 @@ bool UsdGeomMeshFaceAdjacency::init(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCo
 		}
 	}
 
+	LOG_DBG << "Adjacency face count is " << mFaceCount;
+
 	mHash = calcHash();
 	mValid = true;
 

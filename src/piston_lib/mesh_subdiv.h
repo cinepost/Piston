@@ -42,15 +42,13 @@ class PersistentMeshRefiner {
 
 	    PersistentMeshRefiner(): mIsInitialized(false), mMaxLevel(0) {};
 
-	    ~PersistentMeshRefiner() {
-	        delete mpRefiner;
-	    }
+	    ~PersistentMeshRefiner();
 
 	    // protect the underlying raw OpenSubdiv pointer
 	    PersistentMeshRefiner(const PersistentMeshRefiner&) = delete;
 	    PersistentMeshRefiner& operator=(const PersistentMeshRefiner&) = delete;
 
-		bool init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code);
+		bool init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp = true);
 		bool isInitialized() const { return mIsInitialized; }
 
 		/**

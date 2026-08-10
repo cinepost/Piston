@@ -419,8 +419,7 @@ bool FastCurvesDeformer::bindCurveToTriface(uint32_t curve_index, uint32_t face_
 	for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
 		const pxr::GfVec3f pt = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
 		float dist = FLT_MAX;
-		bool bound = pDeformerMeshContainer->projectPoint(pt, face, bind.u, bind.v, dist);
-		if(bound) {
+		if(pDeformerMeshContainer->projectPoint(pt, face, bind.u, bind.v, dist)) {
 			bind.face_id = face_id;
 			return true;
 		} else {
@@ -479,16 +478,25 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	const MeshContainer::ContainerType& rest_positions = pDeformerMeshContainer->getRestPositions();
 
 	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_face_boundaries, std::pair<float, uint32_t>* p_best_candidate = nullptr) {
-		bool isBound = false;
 		const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
 		const uint32_t prim_vertex_offset = pAdjacency->getFaceVertexOffset(prim_id);
 
-
 		auto calcSquaredDistances = [&]() {
-			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
+			_tmp_sq_distances.resize(prim_vertex_count);
 
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
-				_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+				//_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+
+				_tmp_sq_distances[j] = FLT_MAX;
+				PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
+				const auto& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
+				const auto& prim_pt = rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)];
+					
+				for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
+					const pxr::GfVec3f curve_pt = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
+
+					_tmp_sq_distances[j] = std::min(_tmp_sq_distances[j], distanceSquared(curve_pt, prim_pt));
+				} 
 			}
 
 			std::vector<float>::iterator it = std::min_element(_tmp_sq_distances.begin(), _tmp_sq_distances.begin() + prim_vertex_count);
@@ -496,16 +504,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 		};
 
 		if ( prim_vertex_count > 3u){
-			/*
-			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
-			
-			for(size_t j = 0; j < prim_vertex_count; ++j) {
-				_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
-			}
-
-			std::vector<float>::iterator it = std::min_element(_tmp_sq_distances.begin(), _tmp_sq_distances.begin() + prim_vertex_count);
-			*/
-			uint32_t local_index = calcSquaredDistances();
+			uint32_t local_index = calcSquaredDistances(); // closest prim vertex
 			
 			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
 				// try using fan method
@@ -516,46 +515,47 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 				);
 
 				if(bindCurveToTriface(curve_index, face_id, bind, false /* respect face boundaries */)) {
-					isBound = true;
-					break;
+					return true;
 				} 
 			}
 
-			if(!isBound) {
-				// if ignore boundaries and we are still somewhere oustide
-				// ear triangle
-				uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
-					pAdjacency->getFaceVertex(prim_id, (local_index - 1) % prim_vertex_count), 
-					pAdjacency->getFaceVertex(prim_id, local_index),
-					pAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
-				);
+			// if ignore boundaries and we are still somewhere oustide
+			// ear triangle
+			uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
+				pAdjacency->getFaceVertex(prim_id, (local_index - 1) % prim_vertex_count), 
+				pAdjacency->getFaceVertex(prim_id, local_index),
+				pAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
+			);
 
-				if(ignore_face_boundaries) {
-					bindCurveToTriface(curve_index, face_id, bind, true /* ignore face boundaries */);
-				 	return true;
-				} else if(p_best_candidate) {
-					p_best_candidate->first = _tmp_sq_distances[local_index];
-					p_best_candidate->second = face_id;
-				}
+			if(ignore_face_boundaries) {
+				bindCurveToTriface(curve_index, face_id, bind, true /* ignore face boundaries */);
+			 	return true;
+			} else if(p_best_candidate) {
+				p_best_candidate->first = _tmp_sq_distances[local_index];
+				p_best_candidate->second = face_id;
+				return false;
 			}
-
 		} else {
 			const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
 				pAdjacency->getFaceVertex(prim_id, 0), 
 				pAdjacency->getFaceVertex(prim_id, 1),
 				pAdjacency->getFaceVertex(prim_id, 2)
 			);
-			isBound = bindCurveToTriface(curve_index, face_id, bind, ignore_face_boundaries);
+			
+			if(bindCurveToTriface(curve_index, face_id, bind, ignore_face_boundaries)) {
+				return true;
+			}
 
-			if(!isBound && p_best_candidate) {
+			if(p_best_candidate) {
 				uint32_t local_index = calcSquaredDistances();
 				p_best_candidate->first = _tmp_sq_distances[local_index];
 				p_best_candidate->second = face_id;
+				return false;
 			}
 		}
 
 		//mpPhantomTrimeshData->setValid(isBound); TODO: WTF was that !???
-		return isBound;
+		return false;
 	};
 
 	pxr::VtArray<int> skin_prim_indices;
@@ -571,6 +571,23 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 
 	std::mutex kdtree_mutex;  // protects kdree initialisation
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDTree;
+
+	// test subdivided prim indices
+
+	if((1==2) && has_skin_prim_attr && has_subdiv_mesh) {
+		for(auto prim_id: skin_prim_indices) {
+			std::vector<int> outFaceIds;
+			pRefiner->getSubdividedPrimsFromSource(prim_id, outFaceIds);
+
+			printf("Src prim: %u Out prim: ", (uint32_t)prim_id);
+			for(auto out_prim_id: outFaceIds) {
+				printf("%u ", (uint32_t)out_prim_id);
+			}
+			printf("\n");
+		}
+	}
+
+	// ----
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
 		const auto* pAdjacencySource = mpAdjacencyData->getAdjacency();
@@ -606,18 +623,18 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 				const auto& pt = mpCurvesContainer->getCurveRootPoint(curve_index);
 				
 				std::pair<float, uint32_t> min_dist(FLT_MAX, PhantomTrimesh::kInvalidTriFaceID);
+				std::pair<float, uint32_t> curr_min_dist;
 
 				for(uint32_t prim_id: prim_indices) {
-					
-					std::pair<float, uint32_t> curr_min_dist;
-
 					if(bindCurveToPrim(curve_index, bind, prim_id, tmp_squared_distances, false /* respect face boundaries */, &curr_min_dist)) {
 						skin_bound_curves_count++;
-						continue;
+						break;
 					}
 
+					bind.face_id = PhantomTrimesh::kInvalidTriFaceID;
 					assert(curr_min_dist.second != PhantomTrimesh::kInvalidTriFaceID);
 					if(curr_min_dist.first < min_dist.first) {
+						min_dist.first = curr_min_dist.first;
 						min_dist.second = curr_min_dist.second;
 					}
 				}
