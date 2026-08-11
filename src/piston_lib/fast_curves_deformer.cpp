@@ -495,7 +495,10 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 				for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
 					const pxr::GfVec3f curve_pt = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
 
-					_tmp_sq_distances[j] = std::min(_tmp_sq_distances[j], distanceSquared(curve_pt, prim_pt));
+					const auto sqdist = distanceSquared(curve_pt, prim_pt);
+					if(sqdist >= _tmp_sq_distances[j]) break;
+
+					_tmp_sq_distances[j] = sqdist;
 				} 
 			}
 
@@ -571,23 +574,6 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 
 	std::mutex kdtree_mutex;  // protects kdree initialisation
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDTree;
-
-	// test subdivided prim indices
-
-	if((1==2) && has_skin_prim_attr && has_subdiv_mesh) {
-		for(auto prim_id: skin_prim_indices) {
-			std::vector<int> outFaceIds;
-			pRefiner->getSubdividedPrimsFromSource(prim_id, outFaceIds);
-
-			printf("Src prim: %u Out prim: ", (uint32_t)prim_id);
-			for(auto out_prim_id: outFaceIds) {
-				printf("%u ", (uint32_t)out_prim_id);
-			}
-			printf("\n");
-		}
-	}
-
-	// ----
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
 		const auto* pAdjacencySource = mpAdjacencyData->getAdjacency();
