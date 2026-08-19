@@ -139,8 +139,6 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		const UsdPrimHandle& getCurvesGeoPrimHandle() const { return mCurvesGeoPrimHandle; }
 		const UsdPrimHandle& getOutputPrimHandle() const { return mCurvesGeoPrimHandle; }
 
-		void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
-
 		void makeDirty();
 		void clearLRUCaches();
 
@@ -179,6 +177,7 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {};
+		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
 
 		bool canProduceOutputTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
 			return mDeformerGeoPrimHandle.hasPositionsTimeSamples(time_from, time_to);

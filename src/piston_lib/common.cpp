@@ -217,14 +217,9 @@ double UsdPrimHandle::getStageTimeCodesPerSecond() const {
 
 void UsdPrimHandle::setSubdivLevel(uint8_t level) {
 	level = std::min(level, kMaxSubdivLevel);
-	if(mSubdivLevel == level || !isMeshGeoPrim()) return;
-
+	if(mSubdivLevel == level) return;
+	
 	mSubdivLevel = level;
-	if(mSubdivLevel > 0) {
-		mpRefiner = PersistentMeshRefiner::create();
-	} else {
-		mpRefiner = nullptr;
-	}
 }
 
 bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {

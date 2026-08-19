@@ -253,7 +253,7 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 
 void BaseCurvesDeformer::setDeformerSubdivLevel(uint8_t level) {
 	if(mDeformerSubdivLevel == level && mDeformerGeoPrimHandle.getSubdivLevel() == level) return;
-	mDeformerSubdivLevel = level;
+	mDeformerSubdivLevel = std::min(level, kMaxSubdivLevel);
 
 	if(mDeformerGeoPrimHandle.isValid()) {
 		mDeformerGeoPrimHandle.setSubdivLevel(mDeformerSubdivLevel);

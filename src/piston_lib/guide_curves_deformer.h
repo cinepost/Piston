@@ -55,6 +55,9 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		void setGuidesSkinGeoPrimRestAttrName(const std::string& name);
 		const std::string& getGuidesSkinGeoPrimRestAttrName() const { return mGuidesSkinGeoPrimHandle.getRestAttrName(); }
 
+		void setSkinGeoSubdivLevel(uint8_t level); 
+		uint8_t getSkinGeoSubdivLevel() const;
+
 		void setBindRootsToSkinSurface(bool bind);
 		bool getBindRootsToSkinSurface() const { return mBindRootsToSkinSurface; }
 
@@ -72,6 +75,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		virtual void invalidateData(DeformerDataCache& cache) override;
 
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override;
+		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) override;
 
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
@@ -111,6 +115,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		MeshContainer::UniquePtr                                mpSkinMeshContainer;
 		
 		UsdPrimHandle 											mGuidesSkinGeoPrimHandle;
+		uint8_t 												mSkinGeoSubdivLevel;
 
 		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpSkinAdjacencyData;
 		std::shared_ptr<SerializablePhantomTrimesh>				mpSkinPhantomTrimeshData;
@@ -122,7 +127,6 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		std::string 											mGuideIDPrimAttrName = kGuideIDPrimAttrName;
 		std::string 											mGuidesSkinPrimAttrName = kGuidesSkinPrimAttrName;
-		//std::string                                     		mGuidesSkinPrimRestAttrName = kGuidesSkinPrimRestAttrName;
 		pxr::VtArray<int> 										mGuideIndices;
 
 		float                                       			mFalloff = .0f;
@@ -131,6 +135,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		std::vector<pxr::GfVec3f>               				mTempSkinFaceLiveNormals; // temporary to save on per-frame reallocations
 
 		DebugGeo::UniquePtr                                 	mpDebugGeo;
+		DebugGeo::UniquePtr 									mpSkinSubdivDebugGeo;
 };
 
 } // namespace Piston

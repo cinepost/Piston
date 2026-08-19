@@ -202,6 +202,10 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getGuidesSkinGeoPrimRestAttrName", &GuideCurvesDeformer::getGuidesSkinGeoPrimRestAttrName, return_value_policy<copy_const_reference>())
 		.def("setGuidesSkinGeoPrim", &GuideCurvesDeformer::setGuidesSkinGeoPrim)
 		.def("setFastPointBind", &GuideCurvesDeformer::setFastPointBind)
+
+		.def("setSkinGeoSubdivLevel", &GuideCurvesDeformer::setSkinGeoSubdivLevel)
+		.def("getSkinGeoSubdivLevel", &GuideCurvesDeformer::getSkinGeoSubdivLevel)
+
 		.def("isFastPointBind", &GuideCurvesDeformer::isFastPointBind)
 		.def("toString", &GuideCurvesDeformer::toString, return_value_policy<copy_const_reference>())
 	;

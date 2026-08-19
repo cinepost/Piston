@@ -487,12 +487,12 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
 				//_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
 
-				_tmp_sq_distances[j] = FLT_MAX;
 				PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 				const auto& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
 				const auto& prim_pt = rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)];
+				_tmp_sq_distances[j] = distanceSquared(curve_root_pt, prim_pt);
 					
-				for(uint32_t ptr_offset = 0; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
+				for(uint32_t ptr_offset = 1; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
 					const pxr::GfVec3f curve_pt = curve_root_pt + *(curve_data_ptr.second + ptr_offset);
 
 					const auto sqdist = distanceSquared(curve_pt, prim_pt);
@@ -525,7 +525,7 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			// if ignore boundaries and we are still somewhere oustide
 			// ear triangle
 			uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
-				pAdjacency->getFaceVertex(prim_id, (local_index - 1) % prim_vertex_count), 
+				pAdjacency->getFaceVertex(prim_id, (prim_vertex_count + local_index - 1) % prim_vertex_count), 
 				pAdjacency->getFaceVertex(prim_id, local_index),
 				pAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
 			);
@@ -643,8 +643,6 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
         			pKDTree = std::make_unique<neighbour_search::KDTree<float, 3>>(rest_positions, false /* no threads */);
         		}
         	}
-
-			//std::vector<neighbour_search::KDTree<float, 3>::ReturnType> nearest_points;
 
 			const pxr::GfVec3f& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
 			const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pKDTree->findNearestNeighbour(curve_root_pt);
