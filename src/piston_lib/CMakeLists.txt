@@ -175,8 +175,8 @@ if(WIN32)
         ${_HOU_DSOLIB_}/libpxr_vt.lib
         ${_HOU_DSOLIB_}/libpxr_work.lib
         ${_HOU_DSOLIB_}/libpxr_trace.lib
-        ${_HOU_DSOLIB_}/libosdCPU.lib
-        ${_HOU_DSOLIB_}/libosdGPU.lib
+        ${_HOU_DSOLIB_}/libosdCPU_md.lib
+        ${_HOU_DSOLIB_}/libosdGPU_md.lib
     )
 
 endif() #WIN32
