@@ -1,5 +1,5 @@
 #include "global_config.h"
-#include "base_curves_deformer.h"
+#include "base_deformer.h"
 #include "deformer_data_cache.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
@@ -9,6 +9,7 @@
 #include "fast_curves_deformer_data.h"
 #include "wrap_curves_deformer_data.h"
 #include "guide_curves_deformer_data.h"
+#include "point_instancer_deformer_data.h"
 
 
 namespace Piston {
@@ -67,7 +68,7 @@ DeformerDataCache::KeyBase::KeyBase(const std::type_index& _type_idx, const std:
 }
 
 template< class T>
-std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created) {
+std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created) {
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
 	const std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
@@ -75,7 +76,7 @@ std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* 
 }
 
 template< class T>
-std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created) {
+std::shared_ptr<T> DeformerDataCache::getOrCreateData(const BaseDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created) {
 	static_assert(std::is_base_of<SerializableDeformerDataBase, T>::value, "Class needs to be SerializableDeformerDataBase");
 
 	assert(pDeformer);
@@ -127,7 +128,7 @@ void DeformerDataCache::clear() {
 }
 
 template< class T>
-void DeformerDataCache::invalidate(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code) {
+void DeformerDataCache::invalidate(const BaseDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code) {
 	LOG_DBG << " DeformerDataCache::invalidate(...) " << handle;
 
 	const std::vector<const UsdPrimHandle*> handle_ptrs({&handle});
@@ -135,7 +136,7 @@ void DeformerDataCache::invalidate(const BaseCurvesDeformer* pDeformer, const Us
 }
 
 template< class T>
-void DeformerDataCache::invalidate(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code) {
+void DeformerDataCache::invalidate(const BaseDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code) {
 	const DeformerDataCache::KeyStrict key(pDeformer->getUniqueID(), std::type_index(typeid(T)), handles, time_code);
 
 	const std::lock_guard<std::mutex> lock(mMutex);
@@ -178,10 +179,10 @@ DeformerDataCache::DeformerDataCache() {
 
 // Specialization Macro
 #define SPECIALIZE_TYPE_NAME(type) \
-template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created); \
-template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created); \
-template void DeformerDataCache::invalidate<type>(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code); \
-template void DeformerDataCache::invalidate<type>(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code); \
+template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created); \
+template std::shared_ptr<type> DeformerDataCache::getOrCreateData(const BaseDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created); \
+template void DeformerDataCache::invalidate<type>(const BaseDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code); \
+template void DeformerDataCache::invalidate<type>(const BaseDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code); \
 template void DeformerDataCache::invalidate(const std::shared_ptr<type>& pData);
 
 SPECIALIZE_TYPE_NAME(SerializablePhantomTrimesh)
@@ -189,6 +190,7 @@ SPECIALIZE_TYPE_NAME(SerializableUsdGeomMeshFaceAdjacency)
 SPECIALIZE_TYPE_NAME(FastCurvesDeformerData)
 SPECIALIZE_TYPE_NAME(WrapCurvesDeformerData)
 SPECIALIZE_TYPE_NAME(GuideCurvesDeformerData)
+SPECIALIZE_TYPE_NAME(PointInstancerDeformerData)
 
 #undef SPECIALIZE_TYPE_NAME
 

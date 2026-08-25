@@ -1,4 +1,3 @@
-#include "global_config.h"
 #include "deformer_factory.h"
 #include "base_curves_deformer.h"
 #include "geometry_tools.h"
@@ -13,97 +12,8 @@ static std::string gLRUCacheStatsLastUsageStr = "-";
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): 
-	mDirty(true), 
-	mDeformerDataWritten(false), 
-	mPool(std::max(2u, std::thread::hardware_concurrency()) - 1), 
-	mType(t), 
-	mName(name), 
-	mID(current_id++),
-	mRestTimeCode(pxr::UsdTimeCode::Default()) {
-	
+BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): BaseDeformer(t, name) {	
 	DLOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
-
-	mUniqueName = toString() + mName + std::to_string(mID);
-	mDeformerSubdivLevel = 0;
-}
-
-void BaseCurvesDeformer::setDataPrimPath(const std::string& path) {
-	const pxr::SdfPath new_path(path);
-	if(mDataPrimPath == new_path) return;
-	if(!new_path.IsPrimPath()) {
-		DLOG_ERR << "Unable to set data prim path to \"" << path << "\". Path is not a prim path !";
-		return;
-	}
-	mDataPrimPath = new_path;
-	makeDirty();
-}
-
-const pxr::SdfPath& BaseCurvesDeformer::getDataPrimPath() const { 
-	if(mDataPrimPath.IsPrimPath()) {
-		return mDataPrimPath; 
-	}
-
-	return GlobalConfig::getInstance().getDefaultDataPrimPath();
-}
-
-void BaseCurvesDeformer::setDeformerGeoPrim(const pxr::UsdPrim& prim) {
-	if(!prim.IsValid() || mDeformerGeoPrimHandle == prim) return;
-	
-	if(!validateDeformerGeoPrim(prim)) {
-		mDeformerGeoPrimHandle.clear();
-		DLOG_ERR << "Invalid geometry prim " << prim << " type!";
-		return;
-	}
-
-	if(mCurvesGeoPrimHandle == prim) {
-		mDeformerGeoPrimHandle.clear();
-		DLOG_ERR << "Can't use the same prim " << mCurvesGeoPrimHandle << " for curves and deformer geometry !!!";
-		return;
-	}
-
-	auto new_handle = UsdPrimHandle(prim);
-	new_handle.setSubdivLevel(mDeformerSubdivLevel);
-	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle, getRestTimeCode()) : false;
-
-	mDeformerGeoPrimHandle = std::move(new_handle);
-	if(!same_topology) {
-		makeDirty();
-	}
-
-	DLOG_DBG << "Deformer geometry prim is set to: " << mDeformerGeoPrimHandle;
-}
-
-void BaseCurvesDeformer::setDeformerGeoPrim(const BaseCurvesDeformer::SharedPtr& pDeformer) {
-	assert(pDeformer);
-
-	const auto& deformer_prim = pDeformer->getOutputPrimHandle().getPrim();
-
-	if(!deformer_prim.IsValid() || mDeformerGeoPrimHandle == deformer_prim) {
-		return;
-	}
-
-	if(!validateDeformerGeoPrim(deformer_prim)) {
-		mDeformerGeoPrimHandle.clear();
-		DLOG_ERR << "Invalid geometry prim " << deformer_prim << " type!";
-		return;
-	}
-
-	if(mCurvesGeoPrimHandle == deformer_prim) {
-		mDeformerGeoPrimHandle.clear();
-		DLOG_ERR << "Can't use the same prim " << deformer_prim << " for curves and deformer geometry !!!";
-		return;
-	}
-
-	auto new_handle = UsdPrimHandle(pDeformer);
-	const bool same_topology = mDeformerGeoPrimHandle.isValid() ? isSameTopology(mDeformerGeoPrimHandle, new_handle, getRestTimeCode()) : false;
-
-	mDeformerGeoPrimHandle = std::move(new_handle);
-	if(!same_topology) {
-		makeDirty();
-	}
-
-	DLOG_DBG << "Deformer prim is set to " << pDeformer->getName();
 }
 
 void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
@@ -130,20 +40,8 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 	DLOG_DBG << "Curves geometry prim is set to: " << mCurvesGeoPrimHandle;
 }
 
-const pxr::UsdPrim& BaseCurvesDeformer::getDeformerGeoPrim() const {
-	return mDeformerGeoPrimHandle.getPrim();
-}
-
 const pxr::UsdPrim& BaseCurvesDeformer::getCurvesGeoPrim() const {
 	return mCurvesGeoPrimHandle.getPrim();
-}
-
-void BaseCurvesDeformer::setDeformerRestAttrName(const std::string& name) {
-	if(mDeformerGeoPrimHandle.getRestAttrName() == name) return;
-	mDeformerGeoPrimHandle.setRestAttrName(name);
-	makeDirty();
-
-	DLOG_DBG << "Deformer gseometry rest attribute name is set to: " <<  name;
 }
 
 void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
@@ -152,46 +50,6 @@ void BaseCurvesDeformer::setCurvesRestAttrName(const std::string& name) {
 	makeDirty();
 
 	DLOG_DBG << "Curves rest attribute name is set to: " << name;
-}
-
-void BaseCurvesDeformer::setReadJsonDataFromPrim(bool state) {
-	if(mReadJsonDeformerData == state) return;
-	mReadJsonDeformerData = state;
-	makeDirty();
-}
-
-void BaseCurvesDeformer::setRestTimeCode(pxr::UsdTimeCode time_code) {
-	if(getRestTimeCode() == time_code) return;
-	mRestTimeCode = time_code;
-	makeDirty();
-}
-
-pxr::UsdTimeCode BaseCurvesDeformer::getRestTimeCode() const {
-	if(mRestTimeCode.IsDefault()) {
-		static const auto& conf = GlobalConfig::getInstance();
-		return conf.getDefaultRestTimeCode();
-	}
-
-	return mRestTimeCode;
-}
-
-bool BaseCurvesDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
-	if(mDeformerDataWritten) return true;
-
-	mDeformerDataWritten = false;
-
-	if(time_code.IsDefault()) {
-		time_code = getRestTimeCode();
-	}
-
-	// Write json data if needed
-	if(!buildDeformerData(time_code)) {
-		DLOG_ERR << "Error building " << mName << " deformer data !";
-		return false;
-	}
-
-	mDeformerDataWritten = writeJsonDataToPrimImpl();
-	return mDeformerDataWritten;
 }
 
 bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
@@ -249,58 +107,6 @@ bool BaseCurvesDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool
 
 	mDirty = false;
 	return true;
-}
-
-void BaseCurvesDeformer::setDeformerSubdivLevel(uint8_t level) {
-	if(mDeformerSubdivLevel == level && mDeformerGeoPrimHandle.getSubdivLevel() == level) return;
-	mDeformerSubdivLevel = std::min(level, kMaxSubdivLevel);
-
-	if(mDeformerGeoPrimHandle.isValid()) {
-		mDeformerGeoPrimHandle.setSubdivLevel(mDeformerSubdivLevel);
-	}
-
-	makeDirty();
-}
-
-
-uint8_t BaseCurvesDeformer::getDeformerSubdivLevel() const {
-	if(mDeformerGeoPrimHandle.isValid()) {
-		assert(mDeformerSubdivLevel == mDeformerGeoPrimHandle.getSubdivLevel());
-	}
-	return mDeformerGeoPrimHandle.getSubdivLevel();
-}
-
-
-void BaseCurvesDeformer::setPointsCacheUsageState(bool state) {
-	if(mUsePointsCache == state) return;
-	mUsePointsCache = state;
-
-	if(!mUsePointsCache) {
-		clearLRUCaches();
-	}
-}
-
-void BaseCurvesDeformer::setInstancingState(bool state) {
-	if(mInstancingEnabled == state) return;
-	mInstancingEnabled = state;
-
-	static auto const& conf = GlobalConfig::getInstance();
-	if(mInstancingEnabled && !conf.getDataInstancingState()) {
-		DLOG_INF << "Deformers data instancing is disabled!";
-		return;
-	}
-
-	makeDirty();
-}
-
-bool BaseCurvesDeformer::getInstancingState() const { 
-	static auto const& conf = GlobalConfig::getInstance();
-	return mInstancingEnabled && conf.getDataInstancingState(); 
-}
-
-bool BaseCurvesDeformer::getPointsCacheUsageState() const {
-	static auto const& conf = GlobalConfig::getInstance();
-	return mUsePointsCache && conf.getPointsCacheUsageState();
 }
 
 bool BaseCurvesDeformer::deform_dbg(pxr::UsdTimeCode time_code, bool ignoreVelocities) {	
@@ -397,8 +203,8 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	const PxrPointsLRUCache::CompositeKey curr_key = {uniqueName(), time_code};
 	PxrPointsLRUCache* pPointsLRUCache = mUsePointsCache ? CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr() : nullptr;
 
-	const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::LEADING) ? pxr::UsdTimeCode(time_code.GetValue() - 1.0) : time_code};
-	const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (mMotionBlurDirection != MotionBlurDirection::TRAILING) ? pxr::UsdTimeCode(time_code.GetValue() + 1.0) : time_code};
+	const PxrPointsLRUCache::CompositeKey key_from = {uniqueName(), (motionBlurDirection() != MotionBlurDirection::LEADING) ? pxr::UsdTimeCode(time_code.GetValue() - 1.0) : time_code};
+	const PxrPointsLRUCache::CompositeKey key_to = {uniqueName(), (motionBlurDirection() != MotionBlurDirection::TRAILING) ? pxr::UsdTimeCode(time_code.GetValue() + 1.0) : time_code};
 
 	PxrPointsLRUCacheShrinkLock cache_shrink_lock(pPointsLRUCache); // avoid cache shrinking during deformation stage
 	if(cache_shrink_lock.isValid()) {
@@ -415,12 +221,12 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	const PointsList* veolcities_list_ptr = pPointsLRUCache ? pPointsLRUCache->get(velocity_key) : nullptr;
 	bool output_motion_vectors = false;
 
-	if(!ignoreVelocities && mCalcMotionVectors && mDeformerGeoPrimHandle.hasPositionsTimeSamples(key_from.time, key_to.time)) {
+	if(!ignoreVelocities && calcMotionVectors() && mDeformerGeoPrimHandle.hasPositionsTimeSamples(key_from.time, key_to.time)) {
 		if(!veolcities_list_ptr) {
-			pPointsVBlurFrom = (mMotionBlurDirection == MotionBlurDirection::LEADING) ? nullptr :
+			pPointsVBlurFrom = (motionBlurDirection() == MotionBlurDirection::LEADING) ? nullptr :
 				(pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_from) : getDeformedPoints(mpDeformedPointsListStep, multi_threaded, mpCurvesContainer.get(), key_from));
 			
-			pPointsVBlurTo = (mMotionBlurDirection == MotionBlurDirection::TRAILING) ? nullptr : 
+			pPointsVBlurTo = (motionBlurDirection() == MotionBlurDirection::TRAILING) ? nullptr : 
 				(pPointsLRUCache ? getDeformedPointsLRU(multi_threaded, mpCurvesContainer.get(), pPointsLRUCache, key_to) : getDeformedPoints(mpDeformedPointsListStep, multi_threaded, mpCurvesContainer.get(), key_to));
 		}
 
@@ -448,7 +254,7 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 
 			assert(p_pts_from_ptr != p_pts_to_ptr);
 
-			const float k = ((mMotionBlurDirection == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mDeformerGeoPrimHandle.getStageTimeCodesPerSecond());
+			const float k = ((motionBlurDirection() == MotionBlurDirection::CENTERED) ? .5f : 1.0f) * static_cast<float>(mDeformerGeoPrimHandle.getStageTimeCodesPerSecond());
 
 			PointsList* tmp_velicities_list_ptr = pPointsLRUCache ? pPointsLRUCache->put(velocity_key, mpCurvesContainer->getTotalVertexCount()) : getTempVelocitiesList(mpCurvesContainer->getTotalVertexCount());
 			assert(tmp_velicities_list_ptr);
@@ -504,109 +310,9 @@ bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded,
 	return true;
 }
 
-void BaseCurvesDeformer::drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) {
-	if(!mDeformerGeoPrimHandle.isMeshGeoPrim()) return;
-
-	auto* pRefiner = mDeformerGeoPrimHandle.getMeshRefiner(getRestTimeCode());
-	if(!pRefiner || pRefiner->getMaxLevel() == 0) return;
-
-	pRefiner->update(time_code);
-	const pxr::UsdGeomMesh& subdMesh = pRefiner->getOutputMesh();
-
-	if(!mpSubdivDebugGeo) {
-		mpSubdivDebugGeo = DebugGeo::create(getName() + "_subdiv_mesh");
-	} 
-	
-	mpSubdivDebugGeo->clear();
-	
-	pxr::VtArray<pxr::GfVec3f> subd_points;
-
-	if(!subdMesh.GetPointsAttr().Get(&subd_points, time_code)) {
-		LOG_ERR << "Error getting " << mDeformerGeoPrimHandle.getPath() << " subdivided surface points at " << time_code.GetValue();
-		return;
-	}
-
-	LOG_TRC << "Subd points count " << subd_points.size();
-
-	for(const auto& point: subd_points) {
-		DebugGeo::Pt pt(point, {0.0, 1.0, 0.0}, 5.f * mDebugGeometryMult);
-		mpSubdivDebugGeo->addPoint(pt);
-	}
-
-	mpSubdivDebugGeo->build("/debugSubdivMesh", mDeformerGeoPrimHandle.getStage());
-}
-
-void BaseCurvesDeformer::setMotionBlurState(bool state) {
-	if(mCalcMotionVectors == state) return;
-	mCalcMotionVectors = state;
-	makeDirty();
-	DLOG_DBG << "Motion blur calculation " << (mCalcMotionVectors ? "enabled." : "disabled.");
-}
-
-void BaseCurvesDeformer::setVelocityAttrName(const std::string& name) {
-	if(mVelocityAttrName == name) return;
-	mVelocityAttrName = name;
-	makeDirty();
-	DLOG_DBG << "Velocity attribute name is set to: " << mVelocityAttrName;
-}
-
-void BaseCurvesDeformer::setSkinPrimAttrName(const std::string& name) {
-	if(mSkinPrimAttrName == name) return;
-	mSkinPrimAttrName = name;
-	makeDirty();
-	DLOG_DBG << "Skin prim ID attribute name is set to: " << mSkinPrimAttrName;
-}
-
-
-void BaseCurvesDeformer::makeDirty() {
-	if(mDirty) return;
-
-	DLOG_TRC << "BaseCurvesDeformer::makeDirty()";
-	mStats.clear();
-	mDirty = true;
-	mDeformerDataWritten = false;
-
-	clearLRUCaches();
-	invalidateData(DeformerDataCache::getInstance());
-	DLOG_TRC << "BaseCurvesDeformer::makeDirty() done";
-}
-
-void BaseCurvesDeformer::clearLRUCaches() {
-	if(PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr()) {
-		pPointsLRUCache->removeByName(uniqueName());
-		pPointsLRUCache->removeByName(velocityKeyName());
-	}
-}
-
-void BaseCurvesDeformer::showDebugGeometry(bool state) {
-	if(mShowDebugGeometry == state) return;
-	mShowDebugGeometry = state;
-}
-
 const std::string& BaseCurvesDeformer::toString() const {
 	static const std::string kBaseDeformerString = "BaseCurvesDeformer";
 	return kBaseDeformerString;
 }
 
-std::string BaseCurvesDeformer::repr() const {
-	std::stringstream ss;
-    ss << toString() << "(name='" << getName() << "')";
-    return ss.str();
-}
-
 } // namespace Piston
-
-std::string to_string(const Piston::BaseCurvesDeformer::Type& mt) {
-#define t2s(t_) case Piston::BaseCurvesDeformer::Type::t_: return #t_;
-    switch (mt) {
-        t2s(FAST);
-        t2s(WRAP);
-        t2s(GUIDES);
-        default:
-            assert(false);
-            return "UNKNOWN";
-    }
-#undef t2s
-}
-
-std::atomic_uint32_t Piston::BaseCurvesDeformer::current_id = 0;

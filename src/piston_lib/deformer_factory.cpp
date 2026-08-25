@@ -30,7 +30,7 @@ CurvesDeformerFactory::DeformersMap& CurvesDeformerFactory::deformers() {
 	return factory.mDeformers; 
 }
 
-void CurvesDeformerFactory::deleteDeformer(BaseCurvesDeformer::Type type, const std::string& name) {
+void CurvesDeformerFactory::deleteDeformer(BaseDeformer::Type type, const std::string& name) {
 	const CurvesDeformerFactory::Key key = {type, name};
 	CurvesDeformerFactory& factory = getInstance();
 	std::lock_guard<std::mutex> lock(factory.mMutex);
@@ -42,18 +42,18 @@ void CurvesDeformerFactory::deleteDeformer(BaseCurvesDeformer::Type type, const 
 }
 
 FastCurvesDeformer::SharedPtr CurvesDeformerFactory::getFastDeformer(const std::string& name) {
-	return std::dynamic_pointer_cast<FastCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::FAST, name));
+	return std::dynamic_pointer_cast<FastCurvesDeformer>(getInstance().getDeformer(BaseDeformer::Type::FAST, name));
 }
 
 WrapCurvesDeformer::SharedPtr CurvesDeformerFactory::getWrapDeformer(const std::string& name) {
-	return std::dynamic_pointer_cast<WrapCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::WRAP, name));
+	return std::dynamic_pointer_cast<WrapCurvesDeformer>(getInstance().getDeformer(BaseDeformer::Type::WRAP, name));
 }
 
 GuideCurvesDeformer::SharedPtr CurvesDeformerFactory::getGuidesDeformer(const std::string& name) {
-	return std::dynamic_pointer_cast<GuideCurvesDeformer>(getInstance().getDeformer(BaseCurvesDeformer::Type::GUIDES, name));
+	return std::dynamic_pointer_cast<GuideCurvesDeformer>(getInstance().getDeformer(BaseDeformer::Type::GUIDES, name));
 }
 
-BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDeformer::Type type, const std::string& name) {
+BaseDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseDeformer::Type type, const std::string& name) {
 	const CurvesDeformerFactory::Key key = {type, name};
 	std::lock_guard<std::mutex> lock(mMutex);
 
@@ -63,19 +63,19 @@ BaseCurvesDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseCurvesDefor
 	}
 
 	switch(type) {
-		case BaseCurvesDeformer::Type::WRAP: 
+		case BaseDeformer::Type::WRAP: 
 		{
 			auto result = mDeformers.emplace(key, WrapCurvesDeformer::create(name));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating WrapCurvesDeformer !");
 		}
-		case BaseCurvesDeformer::Type::GUIDES: 
+		case BaseDeformer::Type::GUIDES: 
 		{
 			auto result = mDeformers.emplace(key, GuideCurvesDeformer::create(name));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating GuideCurvesDeformer !");
 		}
-		case BaseCurvesDeformer::Type::FAST:
+		case BaseDeformer::Type::FAST:
 		default:
 		{
 			auto result = mDeformers.emplace(key, FastCurvesDeformer::create(name));

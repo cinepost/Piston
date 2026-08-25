@@ -1,6 +1,7 @@
 #ifndef PISTON_LIB_DEFORMER_FACTORY_H_
 #define PISTON_LIB_DEFORMER_FACTORY_H_
 
+#include "base_deformer.h"
 #include "base_curves_deformer.h"
 #include "fast_curves_deformer.h"
 #include "wrap_curves_deformer.h"
@@ -22,7 +23,7 @@ namespace Piston {
 class CurvesDeformerFactory {
 	public:
 		struct Key {
-			BaseCurvesDeformer::Type type;
+			BaseDeformer::Type type;
 			std::string name;
 
 			bool operator< (const Key &other) const {   
@@ -36,7 +37,7 @@ class CurvesDeformerFactory {
 		};
 
 	public:
-		using DeformersMap = std::map<Key, BaseCurvesDeformer::SharedPtr>;
+		using DeformersMap = std::map<Key, BaseDeformer::SharedPtr>;
 
 		~CurvesDeformerFactory();
 		
@@ -47,7 +48,7 @@ class CurvesDeformerFactory {
 	    static CurvesDeformerFactory& getInstance();
 
 	    static DeformersMap& deformers();
-	    static void deleteDeformer(BaseCurvesDeformer::Type type, const std::string& name);
+	    static void deleteDeformer(BaseDeformer::Type type, const std::string& name);
 
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
@@ -66,7 +67,7 @@ class CurvesDeformerFactory {
     	DeformersMap::iterator end() { return mDeformers.end(); }
 
 	private:
-		BaseCurvesDeformer::SharedPtr getDeformer(BaseCurvesDeformer::Type type, const std::string& name);
+		BaseDeformer::SharedPtr getDeformer(BaseDeformer::Type type, const std::string& name);
 
 	private:
 		DeformersMap mDeformers;

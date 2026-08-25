@@ -65,12 +65,14 @@ file( GLOB SOURCES
     ./curves_container_utils.cpp
     ./mesh_container.cpp
     ./mesh_subdiv.cpp
+    ./instancer_container.cpp
     ./phantom_trimesh.cpp
     ./tetrahedron.cpp
     ./geometry_tools.cpp
     ./cgal_tools.cpp
     ./serializable_data.cpp
     ./deformer_data_cache.cpp
+    ./base_deformer.cpp
     ./base_curves_deformer.cpp
     ./base_mesh_curves_deformer.cpp
     ./fast_curves_deformer.cpp
@@ -80,6 +82,10 @@ file( GLOB SOURCES
     ./guide_curves_container.cpp
     ./guide_curves_deformer.cpp
     ./guide_curves_deformer_data.cpp
+
+    ./point_instancer_deformer.cpp
+    ./point_instancer_deformer_data.cpp
+
     ./deformer_factory.cpp
     ./logging.cpp
     ./simple_profiler.cpp

@@ -19,7 +19,7 @@
 
 namespace Piston {
 
-class BaseCurvesDeformer;
+class BaseDeformer;
 
 /*
  * Factory singleton class
@@ -188,16 +188,16 @@ class DeformerDataCache {
 		static DeformerDataCache& getInstance();
 
 		template< class T>
-		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created);
+		std::shared_ptr<T> getOrCreateData(const BaseDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code, bool& created);
 
 		template< class T>
-		std::shared_ptr<T> getOrCreateData(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created);
+		std::shared_ptr<T> getOrCreateData(const BaseDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code, bool& created);
 
 		template< class T>
-		void invalidate(const BaseCurvesDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code);
+		void invalidate(const BaseDeformer* pDeformer, const UsdPrimHandle& handle, pxr::UsdTimeCode time_code);
 
 		template< class T>
-		void invalidate(const BaseCurvesDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code);
+		void invalidate(const BaseDeformer* pDeformer, const std::vector<const UsdPrimHandle*>& handles, pxr::UsdTimeCode time_code);
 
 		// Remove data from cache completely
 		template< class T>

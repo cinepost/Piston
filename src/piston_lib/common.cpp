@@ -4,7 +4,7 @@
 #include "topology.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
-#include "base_curves_deformer.h"
+#include "base_deformer.h"
 #include "logging.h"
 
 #include <pxr/base/tf/token.h>
@@ -146,7 +146,7 @@ UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim): UsdPrimHandle() {
 	mPrim = prim; 
 }
 
-UsdPrimHandle::UsdPrimHandle(const BaseCurvesDeformer::SharedPtr& pDeformer): UsdPrimHandle() {
+UsdPrimHandle::UsdPrimHandle(const BaseDeformer::SharedPtr& pDeformer): UsdPrimHandle() {
 	assert(pDeformer);
 	mpDeformer = pDeformer;
 }

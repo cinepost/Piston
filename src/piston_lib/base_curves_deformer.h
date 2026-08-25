@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "common.h"
 #include "points_list.h"
+#include "base_deformer.h"
 #include "curves_container.h"
 #include "mesh_container.h"
 #include "debug_drawing.h"
@@ -11,8 +12,6 @@
 #include "deformer_data_cache.h"
 #include "serializable_data.h"
 #include "simple_profiler.h"
-
-#include "BS_thread_pool.hpp" // BS::multi_future, BS::thread_pool
 
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
@@ -26,40 +25,15 @@
 
 namespace Piston {
 
-namespace {
-	const std::string kVelocitiAttrName = "velocities";
-	const std::string kСurvesSkinPrimAttrName = ""; //"skinprim"
-}
-
-class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeformer> {
+class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<BaseDeformer, BaseCurvesDeformer> {
 	public:
 		using SharedPtr = std::shared_ptr<BaseCurvesDeformer>;
 
-		enum class Type { 
-			FAST, 
-			WRAP,
-			GUIDES, 
-			UNKNOWN 
-		};
-
-		enum class MotionBlurDirection {
-			TRAILING,
-			CENTERED,
-			LEADING
-		};
-		
 	public:
 		virtual ~BaseCurvesDeformer() {}
 
-		// DocString: setDeformerGeoPrim
-		/**
-		 * @brief Sets the Pixar USD primitive used as the deformation geometry.
-		 * @param prim The USD primitive to be used for deformation.
-		 */
-		void setDeformerGeoPrim(const pxr::UsdPrim& prim);
-		void setDeformerGeoPrim(const BaseCurvesDeformer::SharedPtr& pDeformer);
-		const pxr::UsdPrim& getDeformerGeoPrim() const;
-
+		virtual const std::string& toString() const override;
+		
 		// DocString: setCurvesGeoPrim
 		/**
 		 * @brief Sets the Pixar USD curves primitive that will undergo deformation.
@@ -68,36 +42,8 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		void setCurvesGeoPrim(const pxr::UsdPrim& prim);
 		const pxr::UsdPrim& getCurvesGeoPrim() const;
 
-		void setDeformerSubdivLevel(uint8_t level = 0);
-		uint8_t getDeformerSubdivLevel() const; 
-
-		void setPointsCacheUsageState(bool state);
-		bool getPointsCacheUsageState() const;
-
-		void setInstancingState(bool state);
-		bool getInstancingState() const;
-		
-		void setDataPrimPath(const std::string& path);
-		const pxr::SdfPath& getDataPrimPath() const;
-
-		void setDeformerRestAttrName(const std::string& name);
-		const std::string& getDeformerRestAttrName() const { return mDeformerGeoPrimHandle.getRestAttrName(); }
 		void setCurvesRestAttrName(const std::string& name);
 		const std::string& getCurvesRestAttrName() const { return mCurvesGeoPrimHandle.getRestAttrName(); }
-		void setSkinPrimAttrName(const std::string& name);
-		const std::string& getSkinPrimAttrName() const { return mSkinPrimAttrName; }
-
-		void setReadJsonDataFromPrim(bool state);
-		bool getReadJsonDataState() const { return mReadJsonDeformerData; }
-		
-		void setRestTimeCode(pxr::UsdTimeCode time_code);
-		pxr::UsdTimeCode getRestTimeCode() const;
-
-		bool writeJsonDataToPrim(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
-
-		void setVelocityAttrName(const std::string& name);
-		const std::string& getVelocityAttrName() const { return mVelocityAttrName; }
-
 
 		// DocString: deform
 		/**
@@ -106,113 +52,27 @@ class BaseCurvesDeformer : public std::enable_shared_from_this<BaseCurvesDeforme
 		 * @return something
 		 *
 		 */	
-		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
-		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
+		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false) override;
+		virtual bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false) override;
 
-		const std::string& getName() const { return mName; }
-
-		std::string repr() const;
-		virtual const std::string& toString() const;
-
-		const DeformerStats& getStats() const { return mStats; }
-
-		void setMotionBlurState(bool state);
-
-		bool getMotionBlurState() const { return mCalcMotionVectors; }
-
-		void showDebugGeometry(bool state);
-
-		void setDebugGeometryMultiplier(float m) { mDebugGeometryMult = m; }
-
-		uint32_t getUniqueID() const { return mID; }
+	private:
+		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
-		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) = 0;
-
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-
-		virtual void invalidateData(DeformerDataCache& cache) = 0;
-
-		const UsdPrimHandle& getCurvesGeoPrimHandle() const { return mCurvesGeoPrimHandle; }
-		const UsdPrimHandle& getOutputPrimHandle() const { return mCurvesGeoPrimHandle; }
-
-		void makeDirty();
-		void clearLRUCaches();
-
-		bool isDirty() const { return mDirty; }
+		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mCurvesGeoPrimHandle; }
 
 	protected:
-		bool mUsePointsCache = true;
-		bool mShowDebugGeometry = false;
-		float mDebugGeometryMult = 1.0f;
-		bool mDirty = true;
-		bool mDeformerDataWritten = false;
-		bool mInstancingEnabled = true;
-		
-		UsdPrimHandle 	mDeformerGeoPrimHandle;
-		UsdPrimHandle 	mCurvesGeoPrimHandle;
-
-		std::string 	mSkinPrimAttrName = kСurvesSkinPrimAttrName;
-		
-		std::string   	mVelocityAttrName = kVelocitiAttrName;
-		
+		UsdPrimHandle 					mCurvesGeoPrimHandle;
 		PxrCurvesContainer::UniquePtr 	mpCurvesContainer;
-		MeshContainer::UniquePtr   		mpDeformerMeshContainer;
-
-		BS::thread_pool<BS::tp::none> mPool;
-		DeformerStats mStats;
-
-		std::mutex      mPrmMutex;
 
 		// we use these containers to store deformed points data when LRU cache is disabled
-		std::unique_ptr<PointsList> mpDeformedPointsList;
-		std::unique_ptr<PointsList> mpDeformedPointsListStep;
-		std::unique_ptr<PointsList> mpTempVelocitiesList;
-
-	protected:
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
-		virtual bool writeJsonDataToPrimImpl() const = 0;
-
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {};
-		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
-
-		bool canProduceOutputTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
-			return mDeformerGeoPrimHandle.hasPositionsTimeSamples(time_from, time_to);
-		}
-
-	private:
-		bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
-		const std::string& uniqueName() const { return mUniqueName; }
-		std::string velocityKeyName() const { return uniqueName() + "_vel"; }
-
-		static std::atomic_uint32_t current_id;
-
-		Type mType;
-		std::string mName;
-		uint32_t mID;
-		std::string mUniqueName;
-
-		bool mCalcMotionVectors = false;
-		MotionBlurDirection mMotionBlurDirection = MotionBlurDirection::TRAILING;
-
-		pxr::UsdTimeCode mRestTimeCode;
-		pxr::SdfPath mDataPrimPath;
-
-		bool mReadJsonDeformerData = false;
-		bool mWriteJsonDeformerData = false;
-
-		uint8_t mDeformerSubdivLevel = 0;
-
-		DebugGeo::UniquePtr mpSubdivDebugGeo;
-
-		friend class UsdPrimHandle;
+		std::unique_ptr<PointsList> 	mpDeformedPointsList;
+		std::unique_ptr<PointsList> 	mpDeformedPointsListStep;
+		std::unique_ptr<PointsList> 	mpTempVelocitiesList;
 };
 
 } // namespace Piston
-
-std::string to_string(const Piston::BaseCurvesDeformer::Type& mt);
 
 #endif // PISTON_LIB_BASE_CURVES_DEFORMER_H_
