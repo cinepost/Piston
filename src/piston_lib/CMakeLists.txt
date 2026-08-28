@@ -61,7 +61,6 @@ file( GLOB SOURCES
     ./adjacency.cpp
     ./topology.cpp
     ./points_list.cpp
-    ./instance_list.cpp
     ./curves_container.cpp
     ./curves_container_utils.cpp
     ./mesh_container.cpp

@@ -93,6 +93,8 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
 	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		auto* pOutPoints = points.points();
+
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.face_id == PointBindData::kInvalidFaceID) continue;
@@ -103,7 +105,7 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
 				bind.u * mLiveVertexNormals[face.indices[1]] + bind.v * mLiveVertexNormals[face.indices[2]] + (1.f - bind.u - bind.v) * mLiveVertexNormals[face.indices[0]]
 			, MIN_VECTOR_LENGTH_F);
 
-			points[i] = pDeformerMeshContainer->getInterpolatedLivePosition(face, bind.u, bind.v) + (interpolated_normal * bind.dist);
+			pOutPoints[i] = pDeformerMeshContainer->getInterpolatedLivePosition(face, bind.u, bind.v) + (interpolated_normal * bind.dist);
 		}
 	};
 
@@ -228,18 +230,20 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 	};
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		auto* pOutPoints = points.points();
+		
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			assert(bind.face_id != PointBindData::kInvalidFaceID);
 			assert(bind.face_id < mLiveTriFaceNormals.size());
 
-			points[i] = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v) + (mLiveTriFaceNormals[bind.face_id] * bind.dist);
+			pOutPoints[i] = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v) + (mLiveTriFaceNormals[bind.face_id] * bind.dist);
 		}
 
 		if(adjust_for_curve_local_anim) {
 			for(size_t i = start; i < end; ++i) {
 				const auto& m = mTmpFaceNTBMatrices[pointBinds[i].face_id];
-				points[i] += m * mTmpCurvesLocalAnimVectors[i];
+				pOutPoints[i] += m * mTmpCurvesLocalAnimVectors[i];
 			}
 		}
 	};
@@ -814,6 +818,10 @@ WrapCurvesDeformer::BindMode WrapCurvesDeformer::getBindMode() const {
 
 WrapCurvesDeformer::~WrapCurvesDeformer() {
 	PROFILE_PRINT();
+}
+
+void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
+
 }
 
 } // namespace Piston

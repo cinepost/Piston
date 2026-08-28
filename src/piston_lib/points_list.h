@@ -3,6 +3,7 @@
 
 #include "framework.h"
 
+#include <pxr/base/gf/quath.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/basisCurves.h>
@@ -22,23 +23,24 @@ namespace Piston {
 
 struct TemplatedPointsListBase {
     using PointType = pxr::GfVec3f;
+    using OrientationType = pxr::GfQuath;
 };
 
-template <typename T>
+template <typename T, typename O>
 class TemplatedPointsList : public TemplatedPointsListBase {
 	public:
-		TemplatedPointsList(size_t size);
-		TemplatedPointsList(Piston::TemplatedPointsList<T>&& other);
+		TemplatedPointsList(size_t size, bool with_orientations = false);
+		TemplatedPointsList(Piston::TemplatedPointsList<T, O>&& other);
 
 		size_t size() const;
 
-		PointType& operator [](size_t idx);
-		const PointType& operator [](size_t idx) const;
+		PointType* points();
+		const PointType* points() const;
+		const pxr::VtArray<PointType>& getPointsVtArray() const { return mPointsVtArray.AsConst(); }
 
-		PointType* data();
-		const PointType* data() const;
-
-		const pxr::VtArray<PointType>& getVtArray() const { return mVtArray.AsConst(); }
+		OrientationType* orientations();
+		const OrientationType* orientations() const;
+		const pxr::VtArray<OrientationType>& getOrientationsVtArray() const { return mOrientationsVtArray.AsConst(); }
 
 		void resize(size_t new_size);
 
@@ -56,15 +58,18 @@ class TemplatedPointsList : public TemplatedPointsListBase {
 
 		void calcSizeInBytes() const;
 
+		std::vector<PointType> 			mPoints;
+		pxr::VtArray<PointType> 		mPointsVtArray;
+		pxr::Vt_ArrayForeignDataSource 	mPointsForeignDataSource;
 
-		std::vector<PointType> 	mPoints;
-		pxr::VtArray<PointType> mVtArray;
-		pxr::Vt_ArrayForeignDataSource 	mForeignDataSource;
+		std::vector<OrientationType> 	mOrientations;
+		pxr::VtArray<OrientationType> 	mOrientationsVtArray;
+		pxr::Vt_ArrayForeignDataSource 	mOrientationsForeignDataSource;
 
 		mutable size_t mSizeInBytes;
 };
 
-using PointsList = TemplatedPointsList<std::vector<TemplatedPointsListBase::PointType>>;
+using PointsList = TemplatedPointsList<std::vector<TemplatedPointsListBase::PointType>, std::vector<TemplatedPointsListBase::OrientationType>>;
 
 } // namespace Piston
 

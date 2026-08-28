@@ -109,8 +109,10 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 			uint32_t vertex_offset = mpCurvesContainer->getCurveVertexOffset(i);
 			PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(i);
 
+			auto* pOutPoints = points.points();
+
 			for(size_t j = 0; j < curve_data_ptr.first; ++j) {
-				points[vertex_offset++] = curve_bind_pos + m * (*(curve_data_ptr.second + j));
+				pOutPoints[vertex_offset++] = curve_bind_pos + m * (*(curve_data_ptr.second + j));
 			}
 		}
 	};

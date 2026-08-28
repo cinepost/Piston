@@ -7,8 +7,7 @@ namespace Piston {
 
 static const size_t kMinEntries = 4; // 1 frame ofo current deformed curve points, 2 more frames for worst case motoin blur and 1 frame for velocities.
 
-template<typename T>
-PxrPointsLRUCache<T>::PxrPointsLRUCache(const size_t max_mem_size_bytes): mMaxMemSizeBytes(max_mem_size_bytes), mCurrentMemSizeBytes(0), mShrinkLock(false), mMinEntries(kMinEntries) {
+PxrPointsLRUCache::PxrPointsLRUCache(const size_t max_mem_size_bytes): mMaxMemSizeBytes(max_mem_size_bytes), mCurrentMemSizeBytes(0), mShrinkLock(false), mMinEntries(kMinEntries) {
 	LOG_INF << "PxrPointsLRUCache with " << std::string(stringifyMemSize(mMaxMemSizeBytes)) << " memory cap created.";
 }
 
@@ -30,10 +29,10 @@ size_t PxrPointsLRUCache::getMemSize() const {
 	return mCurrentMemSizeBytes;
 }
 
-PointsList* PxrPointsLRUCache::put(const CompositeKey& key, size_t points_count, bool init_to_zero) {
+PointsList* PxrPointsLRUCache::put(const CompositeKey& key, size_t points_count, bool with_orientations, bool init_to_zero) {
 	assert(points_count > 0);
 
-	PointsList points(points_count);
+	PointsList points(points_count, with_orientations);
 
 	if(init_to_zero) points.fillWithZero();
 
@@ -143,6 +142,3 @@ std::string PxrPointsLRUCache::getMemUsageString() const {
 }
 	
 } // namespace Piston
-
-template class Piston::PxrPointsLRUCache<Piston::PointsList>;
-template class Piston::PxrPointsLRUCache<Piston::InstanceList>;

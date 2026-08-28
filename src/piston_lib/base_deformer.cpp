@@ -269,11 +269,6 @@ void BaseDeformer::clearLRUCaches() {
 		pPointsLRUCache->removeByName(uniqueName());
 		pPointsLRUCache->removeByName(velocityKeyName());
 	}
-
-	if(auto* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrInstanceLRUCachePtr()) {
-		pPointsLRUCache->removeByName(uniqueName());
-		pPointsLRUCache->removeByName(velocityKeyName());
-	}
 }
 
 void BaseDeformer::showDebugGeometry(bool state) {

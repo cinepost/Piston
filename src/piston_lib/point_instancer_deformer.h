@@ -6,7 +6,6 @@
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 #include "geometry_tools.h"
-#include "instance_list.h"
 #include "instancer_container.h"
 #include "point_instancer_deformer_data.h"
 

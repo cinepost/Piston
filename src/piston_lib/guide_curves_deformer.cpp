@@ -178,6 +178,8 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointSurfaceBinds();
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		auto* pOutPoints = points.points();
+
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			assert(bind.point_id < points.size());
@@ -185,7 +187,7 @@ bool GuideCurvesDeformer::moveSkinBoundPoints(bool multi_threaded, PointsList& p
 			const PhantomTrimesh::TriFace& skin_face = pSkinPhantomTrimesh->getFace(bind.face_id);
 			const pxr::GfVec3f face_normal = pSkinMeshContainer->getFaceLiveNormal(skin_face);
 			auto pos = pSkinMeshContainer->getInterpolatedLivePosition(skin_face, bind.u, bind.v) + face_normal * bind.dist;
-			points[bind.point_id] = pos * bind.weight + points[bind.point_id] * (1.f - bind.weight);
+			pOutPoints[bind.point_id] = pos * bind.weight + pOutPoints[bind.point_id] * (1.f - bind.weight);
 		}
 	};
 
@@ -211,6 +213,8 @@ bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& 
 		uint8_t segment_id;
 		pxr::GfVec3f vec;
 
+		auto* pOutPoints = points.points();
+
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
@@ -227,7 +231,7 @@ bool GuideCurvesDeformer::deformImpl_AngleMode(bool multi_threaded, PointsList& 
 
 			const pxr::GfMatrix3f m = rotateAlign(rest_segment_vector_n, live_segment_vector_n);
 
-			points[i] = guides_live_points[guide_segment_start_vtx] + (m * vec);
+			pOutPoints[i] = guides_live_points[guide_segment_start_vtx] + (m * vec);
 		}
 	};
 
@@ -264,22 +268,23 @@ bool GuideCurvesDeformer::deformImpl_LHSMode(bool multi_threaded, PointsList& po
 		const auto* pGuideCurvesContainer = mpGuideCurvesContainer.get();
 		const auto& positions = pGuideCurvesContainer->getLiveCurvePoints();
 
+		auto* pOutPoints = points.points();
+
 		for(size_t i = start; i < end; ++i) {
 			assert(i < pointBinds.size());
 
 			const auto& bind = pointBinds[i];
-			points[i] = {0.0f, 0.0f, 0.0f};
+			pOutPoints[i] = {0.0f, 0.0f, 0.0f};
 
 			if(bind.isValid()) {
-				points[i] += positions[bind.v[0] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[0];
-				points[i] += positions[bind.v[1] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[1];
+				pOutPoints[i] += positions[bind.v[0] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[0];
+				pOutPoints[i] += positions[bind.v[1] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[1];
 
-				points[i] += positions[bind.v[2] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[1])] * bind.w[2];
-				points[i] += positions[bind.v[3] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[1])] * bind.w[3];
+				pOutPoints[i] += positions[bind.v[2] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[1])] * bind.w[2];
+				pOutPoints[i] += positions[bind.v[3] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[1])] * bind.w[3];
 				
-				points[i] += positions[bind.v[4] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[2])] * bind.w[4];
-				points[i] += positions[bind.v[5] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[2])] * bind.w[5];
-
+				pOutPoints[i] += positions[bind.v[4] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[2])] * bind.w[4];
+				pOutPoints[i] += positions[bind.v[5] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[2])] * bind.w[5];
 			}
 		}
 	};
@@ -316,6 +321,8 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 	}
 	
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		auto* pOutPoints = points.points();
+
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(bind.encoded_id == PointBindData::kInvalid) continue;
@@ -326,7 +333,7 @@ bool GuideCurvesDeformer::deformImpl_NTBMode(bool multi_threaded, PointsList& po
 			assert(frame_id < live_guide_frames.size());
 			const std::array<float, 3>& ntbCoord = bind.getData();
 
-			points[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * ntbCoord;
+			pOutPoints[i] = guides_live_points[frame_id] + live_guide_frames[frame_id] * ntbCoord;
 		}
 	};
 
@@ -359,28 +366,30 @@ bool GuideCurvesDeformer::deformImpl_BlendNTBMode(bool multi_threaded, PointsLis
 	}
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		auto* pOutPoints = points.points();
+
 		for(size_t i = start; i < end; ++i) {
 			const auto& bind = pointBinds[i];
 			if(!bind.isValid()) continue;
 
-			points[i] = {0.0f, 0.0f, 0.f};
+			pOutPoints[i] = {0.0f, 0.0f, 0.f};
 
 			// first guide
 			uint32_t frame_id_0 = pGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[0]) + bind.v[0];
 			
-			points[i] += (guides_live_points[frame_id_0] + live_guide_frames[frame_id_0] * bind.coords[0]) * bind.w[0];
+			pOutPoints[i] += (guides_live_points[frame_id_0] + live_guide_frames[frame_id_0] * bind.coords[0]) * bind.w[0];
 
 			// second guide
 			if(bind.guide_id[1] == GuideCurvesDeformerData::BlendedNTBData::kInvalidCurveID) continue;
 			uint32_t frame_id_1 = pGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[1]) + bind.v[1];
 
-			points[i] += (guides_live_points[frame_id_1] + live_guide_frames[frame_id_1] * bind.coords[1]) * bind.w[1];
+			pOutPoints[i] += (guides_live_points[frame_id_1] + live_guide_frames[frame_id_1] * bind.coords[1]) * bind.w[1];
 
 			// third guide
 			if(bind.guide_id[2] == GuideCurvesDeformerData::BlendedNTBData::kInvalidCurveID) continue;
 			uint32_t frame_id_2 = pGuideCurvesContainer->getCurveVertexOffset(bind.guide_id[2]) + bind.v[2];
 
-			points[i] += (guides_live_points[frame_id_2] + live_guide_frames[frame_id_2] * bind.coords[2]) * bind.w[2];
+			pOutPoints[i] += (guides_live_points[frame_id_2] + live_guide_frames[frame_id_2] * bind.coords[2]) * bind.w[2];
 		}
 	};
 
@@ -408,6 +417,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 	const auto& pointBinds = mpGuideCurvesDeformerData->getPointBinds();
 	auto func = [&](const std::size_t start, const std::size_t end) {
 
+		auto* pOutPoints = points.points();
 		float u, v, w, x;
 
 		for(size_t i = start; i < end; ++i) {
@@ -424,7 +434,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 					bind.getData(u, v, w);
 					x = 1.f - (u + v + w);
 				}
-				points[i] = mpDeformerMeshContainer->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, u, v, w, x);
+				pOutPoints[i] = mpDeformerMeshContainer->getPointPositionFromBarycentricTetrahedronLiveCoords(tetra, u, v, w, x);
 			} else {
 				// bound to triface
 				TODO(precalculate skin live face normals first for SPACE mode !!!)
@@ -432,7 +442,7 @@ bool GuideCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& 
 				const auto& face = pPhantomTrimesh->getFace(bind.encoded_id.mode_space.element_id);
 				const pxr::GfVec3f face_normal = mpDeformerMeshContainer->getFaceLiveNormal(face);
 				bind.getData(u, v, w);
-				points[i] = mpDeformerMeshContainer->getInterpolatedLivePosition(face, u, v) + (face_normal * w);
+				pOutPoints[i] = mpDeformerMeshContainer->getInterpolatedLivePosition(face, u, v) + (face_normal * w);
 			}
 		}
 	};
@@ -2135,7 +2145,7 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 			// vector from curve point to frame
 			const auto& pointBinds = mpGuideCurvesDeformerData->getBlendNTBPointBinds();
 			
-			const auto& deformed_points = pDeformedPoints->getVtArray();
+			const auto& deformed_points = pDeformedPoints->getPointsVtArray();
 
 			for(size_t i = 0; i < pointBinds.size(); ++i) {
 				const auto& bind = pointBinds[i];
