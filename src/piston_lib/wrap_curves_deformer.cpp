@@ -62,7 +62,7 @@ bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	assert(mpAdjacencyData);
 	assert(mpDeformerMeshContainer);
 
-	buildVertexNormals(mpAdjacencyData->getAdjacency(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
+	buildVertexNormals(mpAdjacencyData->getAdjacencyFinal(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
 
 	bool result = false;
 	switch(mpWrapCurvesDeformerData->getBindMode()) {

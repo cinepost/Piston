@@ -52,8 +52,8 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 		 * @return something
 		 *
 		 */	
-		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false) override;
-		virtual bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false) override;
+		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
+		virtual bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
 
 	private:
 		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
@@ -61,7 +61,12 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mCurvesGeoPrimHandle; }
+
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) = 0;
 
 	protected:
 		UsdPrimHandle 					mCurvesGeoPrimHandle;

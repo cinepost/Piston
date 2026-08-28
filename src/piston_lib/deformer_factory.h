@@ -6,6 +6,8 @@
 #include "fast_curves_deformer.h"
 #include "wrap_curves_deformer.h"
 #include "guide_curves_deformer.h"
+#include "points_list.h"
+#include "instance_list.h"
 #include "pxr_points_lru_cache.h"
 #include "os.h"
 #include "simple_profiler.h"
@@ -59,7 +61,8 @@ class CurvesDeformerFactory {
 
 	    static void clear();
 
-	    PxrPointsLRUCache* getPxrPointsLRUCachePtr();
+	    PxrPointsLRUCache<PointsList>* getPxrPointsLRUCachePtr();
+	    PxrPointsLRUCache<InstanceList>* getPxrInstanceLRUCachePtr();
 
 	    const DeformersMap& getDeformers() const { return mDeformers; }
 
@@ -71,7 +74,8 @@ class CurvesDeformerFactory {
 
 	private:
 		DeformersMap mDeformers;
-		PxrPointsLRUCache::UniquePtr mpPxrPointsLRUCache;
+		PxrPointsLRUCache<PointsList>::UniquePtr mpPxrPointsLRUCache;
+		PxrPointsLRUCache<InstanceList>::UniquePtr mpPxrInstanceLRUCache;
 
 		// Mutex to ensure thread safety
     	static std::mutex mMutex;

@@ -3,7 +3,6 @@
 
 #include "framework.h"
 #include "common.h"
-#include "points_list.h"
 
 #include <pxr/usd/usd/timeCode.h>
 #include <pxr/base/gf/matrix3f.h>
@@ -19,7 +18,7 @@ namespace Piston {
 
 class CPxrPointsLRUCacheShrinkLock;
 
-class PxrPointsLRUCache {
+class PxrPointsLRUCacheBase {
 	public:
 		struct CompositeKey {
 			std::string name;
@@ -38,17 +37,37 @@ class PxrPointsLRUCache {
 			};
 		};
 
-		typedef typename std::pair<CompositeKey, PointsList> key_value_pair_t;
+	protected:
+		virtual void reduceMemUsage(const size_t mem_size_bytes) = 0;
+
+		void shrink_lock() { mShrinkLock = true; }
+		void shrink_unlock() { mShrinkLock = false; reduceMemUsage(mMaxMemSizeBytes);}
+
+		std::atomic<bool> mShrinkLock;
+		mutable std::mutex mMutex;
+
+		size_t mMaxMemSizeBytes;
+		static size_t sMaxMemSizeBytes;
+
+		friend class PxrPointsLRUCacheShrinkLock;
+};
+
+
+template<typename T>
+class PxrPointsLRUCache: public PxrPointsLRUCacheBase {
+	public:
+		using CompositeKey = PxrPointsLRUCacheBase::CompositeKey;
+		typedef typename std::pair<CompositeKey, T> key_value_pair_t;
 		typedef typename std::list<key_value_pair_t>::iterator list_iterator_t;
 
-		using UniquePtr = std::unique_ptr<PxrPointsLRUCache>;
+		using UniquePtr = std::unique_ptr<PxrPointsLRUCache<T>>;
 		static UniquePtr create(const size_t max_mem_size_bytes);
 
 	public:
 
-		PointsList* put(const CompositeKey& key, size_t points_count, bool init_to_zero = false);
-		PointsList* put(const CompositeKey& key, PointsList&& points);
-		const PointsList* get(const CompositeKey& key) const;
+		T* put(const CompositeKey& key, size_t points_count, bool init_to_zero = false);
+		T* put(const CompositeKey& key, T&& points);
+		const T* get(const CompositeKey& key) const;
 
 		bool exists(const CompositeKey& key) const {
 			return mCacheItemsMap.find(key) != mCacheItemsMap.end();
@@ -74,55 +93,45 @@ class PxrPointsLRUCache {
 	private:
 		static constexpr size_t kInvalidUsedMemSize = std::numeric_limits<size_t>::max();
 
-
 		PxrPointsLRUCache(const size_t max_mem_size_bytes);
 	
-		void reduceMemUsage(const size_t mem_size_bytes);
+		virtual void reduceMemUsage(const size_t mem_size_bytes) override final;
 
 	private:
 		mutable std::list<key_value_pair_t> mCacheItemsList;
 		std::unordered_map<CompositeKey, list_iterator_t, CompositeKey::Hasher> mCacheItemsMap;
 		
-		size_t mMaxMemSizeBytes;
 		mutable size_t mCurrentMemSizeBytes;
 
 		size_t mMinEntries;
-
-		void shrink_lock() { mShrinkLock = true; }
-		void shrink_unlock() { mShrinkLock = false; reduceMemUsage(mMaxMemSizeBytes); }
-
-		std::atomic<bool> mShrinkLock;
-		mutable std::mutex mMutex;
-
-		friend class PxrPointsLRUCacheShrinkLock;
 };
 
 class PxrPointsLRUCacheShrinkLock{
-public:
-    PxrPointsLRUCacheShrinkLock(PxrPointsLRUCache* m) : mValid(false), mMtx(*m) {
-    	if(m) {
-    		mValid = true;
-    		mMtx.shrink_lock();
-    	}
-    }
+	public:
+		PxrPointsLRUCacheShrinkLock(PxrPointsLRUCacheBase* m) : mValid(false), mMtx(*m) {
+			if(m) {
+				mValid = true;
+				mMtx.shrink_lock();
+			}
+		}
 
-    PxrPointsLRUCacheShrinkLock(PxrPointsLRUCache & m) : mValid(true), mMtx(m){
-        mMtx.shrink_lock();
-    }
-    ~PxrPointsLRUCacheShrinkLock(){
-        if(mValid){
-        	mMtx.shrink_unlock();
-    	}
-    }
+		PxrPointsLRUCacheShrinkLock(PxrPointsLRUCacheBase & m) : mValid(true), mMtx(m){
+		    mMtx.shrink_lock();
+		}
+		~PxrPointsLRUCacheShrinkLock(){
+		    if(mValid){
+				mMtx.shrink_unlock();
+			}
+		}
 
-    bool isValid() const { return mValid; }
+		bool isValid() const { return mValid; }
 
-private:
-	bool mValid;
-    PxrPointsLRUCache & mMtx;
+	private:
+		bool mValid;
+		PxrPointsLRUCacheBase& mMtx;
 };
 
-inline std::string to_string(const Piston::PxrPointsLRUCache::CompositeKey& key) {
+inline std::string to_string(const Piston::PxrPointsLRUCacheBase::CompositeKey& key) {
 	return key.name + ":" + std::to_string(key.time.GetValue());
 }
 

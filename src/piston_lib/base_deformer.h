@@ -3,7 +3,6 @@
 
 #include "framework.h"
 #include "common.h"
-#include "points_list.h"
 #include "curves_container.h"
 #include "mesh_container.h"
 #include "debug_drawing.h"
@@ -122,10 +121,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		BaseDeformer(const Type type, const std::string& name);
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) = 0;
-
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-
 		virtual void invalidateData(DeformerDataCache& cache) = 0;
 
 		virtual const UsdPrimHandle& getOutputPrimHandle() const = 0;
@@ -165,16 +160,9 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 		std::mutex      mPrmMutex;
 
-		// we use these containers to store deformed points data when LRU cache is disabled
-		std::unique_ptr<PointsList> mpDeformedPointsList;
-		std::unique_ptr<PointsList> mpDeformedPointsListStep;
-		std::unique_ptr<PointsList> mpTempVelocitiesList;
-
 	protected:
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
-
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {};
 		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
 
 		bool canProduceOutputTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {

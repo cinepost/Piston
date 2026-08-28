@@ -63,6 +63,24 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 void to_json(json& j, const PointInstancerDeformerData::PointBindData& bind);
 void from_json(const json& j, PointInstancerDeformerData::PointBindData& bind);
 
+inline std::string to_string(const PointInstancerDeformerData::BindMode& mode) {
+	std::string str;
+	switch(mode) {
+		case PointInstancerDeformerData::BindMode::SIMPLE:
+			return "SIMPLE";
+		default:
+			return "VOLUME";
+	}
+}
+
+inline void from_string(const std::string& str, PointInstancerDeformerData::BindMode& mode) {
+	if(str == "SIMPLE") {
+		mode = PointInstancerDeformerData::BindMode::SIMPLE;
+	} else {
+		mode = PointInstancerDeformerData::BindMode::VOLUME;	
+	}
+}
+
 } // namespace Piston
 
 #endif // PISTON_LIB_POINT_INSTANCER_DEFORMER_DATA_H_

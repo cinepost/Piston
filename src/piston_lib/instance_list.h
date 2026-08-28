@@ -1,7 +1,8 @@
-#ifndef PISTON_LIB_POINTS_LIST_H_
-#define PISTON_LIB_POINTS_LIST_H_
+#ifndef PISTON_LIB_INSTANCE_LIST_H_
+#define PISTON_LIB_INSTANCE_LIST_H_
 
 #include "framework.h"
+#include "points_list.h"
 
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
@@ -20,15 +21,11 @@
 
 namespace Piston {
 
-struct TemplatedPointsListBase {
-    using PointType = pxr::GfVec3f;
-};
-
 template <typename T>
-class TemplatedPointsList : public TemplatedPointsListBase {
+class TemplatedInstanceList : public TemplatedPointsListBase {
 	public:
-		TemplatedPointsList(size_t size);
-		TemplatedPointsList(Piston::TemplatedPointsList<T>&& other);
+		TemplatedInstanceList(size_t size);
+		TemplatedInstanceList(Piston::TemplatedInstanceList<T>&& other);
 
 		size_t size() const;
 
@@ -47,7 +44,7 @@ class TemplatedPointsList : public TemplatedPointsListBase {
 		size_t sizeInBytes() const { return mSizeInBytes; }
 
 	private:
-		TemplatedPointsList();
+		TemplatedInstanceList();
 
 		static void OnArrayDetached(pxr::Vt_ArrayForeignDataSource* source) {
 			// Callback triggered by USD if the internal reference drops to 0
@@ -64,8 +61,8 @@ class TemplatedPointsList : public TemplatedPointsListBase {
 		mutable size_t mSizeInBytes;
 };
 
-using PointsList = TemplatedPointsList<std::vector<TemplatedPointsListBase::PointType>>;
+using InstanceList = TemplatedInstanceList<std::vector<TemplatedPointsListBase::PointType>>;
 
 } // namespace Piston
 
-#endif // PISTON_LIB_POINTS_LIST_H_
+#endif // PISTON_LIB_INSTANCE_LIST_H_

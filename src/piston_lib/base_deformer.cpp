@@ -265,7 +265,12 @@ void BaseDeformer::makeDirty() {
 }
 
 void BaseDeformer::clearLRUCaches() {
-	if(PxrPointsLRUCache* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr()) {
+	if(auto* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrPointsLRUCachePtr()) {
+		pPointsLRUCache->removeByName(uniqueName());
+		pPointsLRUCache->removeByName(velocityKeyName());
+	}
+
+	if(auto* pPointsLRUCache = CurvesDeformerFactory::getInstance().getPxrInstanceLRUCachePtr()) {
 		pPointsLRUCache->removeByName(uniqueName());
 		pPointsLRUCache->removeByName(velocityKeyName());
 	}

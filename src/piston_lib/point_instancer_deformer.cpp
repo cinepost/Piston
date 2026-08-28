@@ -42,17 +42,17 @@ void PointInstancerDeformer::invalidateData(DeformerDataCache& cache) {
 	cache.invalidate(mpPointInstancerDeformerData);
 }
 
-bool PointInstancerDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("PointInstancerDeformer::deformImpl");
-	return __deform__(points, false, time_code);
+bool PointInstancerDeformer::deform_dbg(pxr::UsdTimeCode time_code, bool ignoreVelocities) {	
+	return deform(time_code, false, ignoreVelocities);
 }
 
-bool PointInstancerDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("PointInstancerDeformer::deformMtImpl");
-	return __deform__(points, true, time_code);
-}
+bool PointInstancerDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded, bool ignoreVelocities) {
+	PROFILE("PointInstancerDeformer::deform");
 
-bool PointInstancerDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
+	assert(mpPointInstancerDeformerData && mpPointInstancerDeformerData->isValid());
+	assert(mpAdjacencyData);
+	assert(mpDeformerMeshContainer);
+
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
@@ -60,21 +60,17 @@ bool PointInstancerDeformer::__deform__(PointsList& points, bool multi_threaded,
 		return false;
 	}
 
-	assert(points.size() == mpPointInstancerDeformerData->getPointBinds().size());
-	assert(mpAdjacencyData);
-	assert(mpDeformerMeshContainer);
+	buildVertexNormals(mpAdjacencyData->getAdjacencyFinal(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
 
-	buildVertexNormals(mpAdjacencyData->getAdjacency(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
+	if(mShowDebugGeometry) {
+		drawDebugSubdivDeformerGeometry(time_code);
+	}
 
 	bool result = false;
 
 	assert(false);
 	
 	return result;
-}
-
-static inline bool saturate(bool a) {
-	return a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
 }
 
 bool PointInstancerDeformer::writeJsonDataToPrimImpl() const {
@@ -95,7 +91,7 @@ bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 	}
 
 	// Data validity was checked in BaseDeformer::buildDeformerDataImpl()
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	const auto* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
@@ -109,61 +105,22 @@ bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 		if(!getReadJsonDataState() || !mInstancerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpPointInstancerDeformerData.get())) {
 			// Build deformer data in place if no json data present or not needed
 
-			// First triangulate using simple "fan" triangulation
-			const uint32_t src_mesh_face_count = pAdjacency->getFaceCount();
-
-			for(uint32_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
-				const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
-				
-				if(face_vertex_count < 3 ) {
-					DLOG_ERR << "Source mesh polygon " << face_id << " is invalid !!!";
-					continue;
-				}
-				
-				const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
-
-				switch(face_vertex_count) {
-					case 3:
-						pPhantomTrimesh->getOrCreateFaceID(
-							pAdjacency->getFaceVertex(face_id, 0), 
-							pAdjacency->getFaceVertex(face_id, 1),
-							pAdjacency->getFaceVertex(face_id, 2)
-						);
-						break;
-					default:
-						for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
-							pPhantomTrimesh->getOrCreateFaceID(
-								pAdjacency->getFaceVertex(face_id, 0), 
-								pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
-								pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
-							);
-						}
-						break;
-				}
-			}
-
-			const size_t tri_face_count = pPhantomTrimesh->getFaceCount();
-
-			DLOG_DBG << src_mesh_face_count << " source mesh faces triangulated to " << tri_face_count << " triangles.";
-
 			std::vector<pxr::GfVec3f> rest_vertex_normals;
 			buildVertexNormals(pAdjacency, pPhantomTrimesh, rest_vertex_normals, mpDeformerMeshContainer->getRestPositions(), (multi_threaded ? &mPool : nullptr));
 			mLiveVertexNormals.resize(rest_vertex_normals.size());
 
 			// Bind curve points
-			DLOG_DBG << "Binding " << mpInstacerContainer->getPointsCount() << " instancer points.";	
+			DLOG_DBG << "Binding " << mpInstancerContainer->getInstanceCount() << " instancer points.";	
 
 			bool result = false;
 			auto threads_timer = Timer();
 			threads_timer.start();
 
 			// Build bind data
-			switch(mpWrapCurvesDeformerData->getBindMode()) {
-				case BindMode::SPACE:
-					result = buildDeformerData_SpaceMode(multi_threaded, rest_vertex_normals, rest_time_code);
-					break;
+			switch(mpPointInstancerDeformerData->getBindMode()) {
+				case BindMode::SIMPLE:
 				default:
-					result = buildDeformerData_DistMode(multi_threaded, rest_vertex_normals, rest_time_code);
+					result = buildDeformerData_SimpleMode(multi_threaded, rest_vertex_normals, rest_time_code);
 					break;
 			}
 
@@ -187,6 +144,10 @@ bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 	}
 
 	return mpPointInstancerDeformerData->isValid();
+}
+
+bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
+	return false;
 }
 
 PointInstancerDeformer::~PointInstancerDeformer() {

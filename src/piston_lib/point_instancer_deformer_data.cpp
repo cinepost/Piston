@@ -1,4 +1,4 @@
-#include "point_instatncer_deformer_data.h"
+#include "point_instancer_deformer_data.h"
 #include "pxr_json.h"
 #include "logging.h"
 
@@ -11,7 +11,7 @@ PointInstancerDeformerData::PointInstancerDeformerData(): mBindMode(BindMode::SI
 
 };
 
-void setBindMode(BindMode mode) {
+void PointInstancerDeformerData::setBindMode(BindMode mode) {
 	if(mBindMode == mode) return;
 	mBindMode = mode;
 	clear();
@@ -60,7 +60,8 @@ bool PointInstancerDeformerData::readFromJSON(const json& j) {
 
 	mIsValid = false;
 
-	const BindMode bind_mode = from_string(j[kJMode].template get<std::string>());
+	BindMode bind_mode = BindMode::SIMPLE;
+	from_string(j[kJMode].template get<std::string>(), bind_mode);
 
 	if(bind_mode != mBindMode) {
 		LOG_ERR << typeName() << " json data bind mode mismatch !";

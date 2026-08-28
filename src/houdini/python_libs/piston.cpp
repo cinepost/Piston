@@ -14,6 +14,7 @@ namespace boost = hboost;
 
 #include "../../piston_lib/common.h"
 #include "../../piston_lib/global_config.h"
+#include "../../piston_lib/base_deformer.h"
 #include "../../piston_lib/base_curves_deformer.h"
 #include "../../piston_lib/base_mesh_curves_deformer.h"
 #include "../../piston_lib/fast_curves_deformer.h"
@@ -63,10 +64,9 @@ boost::python::list get_deformers_map_items(Piston::CurvesDeformerFactory::Defor
     return items;
 }
 
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_writeJsonDataToPrim_overloads, Piston::BaseDeformer::writeJsonDataToPrim, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_dbg_overloads, Piston::BaseCurvesDeformer::deform_dbg, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_writeJsonDataToPrim_overloads, Piston::BaseCurvesDeformer::writeJsonDataToPrim, 0, 1)
-
 
 BOOST_PYTHON_MODULE(_piston) {
 	using namespace boost::python;
@@ -118,51 +118,54 @@ BOOST_PYTHON_MODULE(_piston) {
 	class_<CurvesDeformerFactory::DeformersMap>("DeformersMap")
         .def(map_indexing_suite<CurvesDeformerFactory::DeformersMap, true>()) // true as the second template argument for NoProxy
         .def("items", &get_deformers_map_items) 
-        .def("__iter__", iterator<CurvesDeformerFactory::DeformersMap>()); 
+        .def("__iter__", iterator<CurvesDeformerFactory::DeformersMap>())
     ;
 
-	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, boost::noncopyable>("BaseCurvesDeformer",  no_init)
-		//.def("setDeformerGeoPrim", &BaseCurvesDeformer::setDeformerGeoPrim, "@DocString(setDeformerGeoPrim)")
+    class_<BaseDeformer, BaseDeformer::SharedPtr, boost::noncopyable>("BaseDeformer", no_init)
+		.def("setDeformerGeoPrim", static_cast<void (BaseDeformer::*)(const pxr::UsdPrim&)>(&BaseDeformer::setDeformerGeoPrim), "@DocString(setDeformerGeoPrim)")
+		.def("setDeformerGeoPrim", static_cast<void (BaseDeformer::*)(const BaseDeformer::SharedPtr&)>(&BaseDeformer::setDeformerGeoPrim))
 
-		.def("setDeformerGeoPrim", static_cast<void (BaseCurvesDeformer::*)(const pxr::UsdPrim&)>(&BaseCurvesDeformer::setDeformerGeoPrim), "@DocString(setDeformerGeoPrim)")
-		.def("setDeformerGeoPrim", static_cast<void (BaseCurvesDeformer::*)(const BaseCurvesDeformer::SharedPtr&)>(&BaseCurvesDeformer::setDeformerGeoPrim))
+		.def("setDeformerRestAttrName", &BaseDeformer::setDeformerRestAttrName)
+		.def("getDeformerRestAttrName", &BaseDeformer::getDeformerRestAttrName, return_value_policy<copy_const_reference>())
 
+		.def("setDeformerSubdivLevel", &BaseDeformer::setDeformerSubdivLevel)
+		.def("getDeformerSubdivLevel", &BaseDeformer::getDeformerSubdivLevel)
+
+		.def("setSkinPrimAttrName", &BaseDeformer::setSkinPrimAttrName)
+		.def("getSkinPrimAttrName", &BaseDeformer::getSkinPrimAttrName, return_value_policy<copy_const_reference>())
+
+		.def("setInstancingState", &BaseDeformer::setInstancingState)
+		.def("getInstancingState", &BaseDeformer::getInstancingState)
+
+		.def("setPointsCacheUsageState", &BaseDeformer::setPointsCacheUsageState)
+		.def("getPointsCacheUsageState", &BaseDeformer::getPointsCacheUsageState)
+
+		.def("setDataPrimPath", &BaseDeformer::setDataPrimPath)
+		.def("getDataPrimPath", &BaseDeformer::getDataPrimPath, return_value_policy<copy_const_reference>())
+
+		.def("setMotionBlurState", &BaseDeformer::setMotionBlurState)
+		.def("getMotionBlurState", &BaseDeformer::getMotionBlurState)
+
+
+		.def("showDebugGeometry", &BaseDeformer::showDebugGeometry)
+		.def("setDebugGeometryMultiplier", &BaseDeformer::setDebugGeometryMultiplier)
+		
+		.def("setVelocityAttrName", &BaseDeformer::setVelocityAttrName)
+		.def("getVelocityAttrName", &BaseDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
+
+		.def("setReadJsonDataFromPrim", &BaseDeformer::setReadJsonDataFromPrim)
+		.def("writeJsonDataToPrim", &BaseDeformer::writeJsonDataToPrim, BaseDeformer_writeJsonDataToPrim_overloads(args("time_code")))
+
+	;
+
+	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, bases<BaseDeformer>, boost::noncopyable>("BaseCurvesDeformer",  no_init)
 		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim, "@DocString(setCurvesGeoPrim)")
 
-		.def("setDeformerRestAttrName", &BaseCurvesDeformer::setDeformerRestAttrName)
-		.def("getDeformerRestAttrName", &BaseCurvesDeformer::getDeformerRestAttrName, return_value_policy<copy_const_reference>())
 		.def("setCurvesRestAttrName", &BaseCurvesDeformer::setCurvesRestAttrName)
 		.def("getCurvesRestAttrName", &BaseCurvesDeformer::getCurvesRestAttrName, return_value_policy<copy_const_reference>())
 
-		.def("setVelocityAttrName", &BaseCurvesDeformer::setVelocityAttrName)
-		.def("getVelocityAttrName", &BaseCurvesDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
-
-		.def("setSkinPrimAttrName", &BaseCurvesDeformer::setSkinPrimAttrName)
-		.def("getSkinPrimAttrName", &BaseCurvesDeformer::getSkinPrimAttrName, return_value_policy<copy_const_reference>())
-
-		.def("setMotionBlurState", &BaseCurvesDeformer::setMotionBlurState)
-		.def("getMotionBlurState", &BaseCurvesDeformer::getMotionBlurState)
-
-		.def("setDataPrimPath", &BaseCurvesDeformer::setDataPrimPath)
-		.def("getDataPrimPath", &BaseCurvesDeformer::getDataPrimPath, return_value_policy<copy_const_reference>())
-
-		.def("setPointsCacheUsageState", &BaseCurvesDeformer::setPointsCacheUsageState)
-		.def("getPointsCacheUsageState", &BaseCurvesDeformer::getPointsCacheUsageState)
-
-		.def("setInstancingState", &BaseCurvesDeformer::setInstancingState)
-		.def("getInstancingState", &BaseCurvesDeformer::getInstancingState)
-
-		.def("setDeformerSubdivLevel", &BaseCurvesDeformer::setDeformerSubdivLevel)
-		.def("getDeformerSubdivLevel", &BaseCurvesDeformer::getDeformerSubdivLevel)
-
 		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
 		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_dbg_overloads(args("time_code")))
-
-		.def("setReadJsonDataFromPrim", &BaseCurvesDeformer::setReadJsonDataFromPrim)
-		.def("writeJsonDataToPrim", &BaseCurvesDeformer::writeJsonDataToPrim, BaseCurvesDeformer_writeJsonDataToPrim_overloads(args("time_code")))
-
-		.def("showDebugGeometry", &BaseCurvesDeformer::showDebugGeometry)
-		.def("setDebugGeometryMultiplier", &BaseCurvesDeformer::setDebugGeometryMultiplier)
 
 		.def("__repr__", &BaseCurvesDeformer::repr)
 		.def("toString", &BaseCurvesDeformer::toString, return_value_policy<copy_const_reference>())

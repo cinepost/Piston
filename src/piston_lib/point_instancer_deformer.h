@@ -6,6 +6,7 @@
 #include "adjacency.h"
 #include "phantom_trimesh.h"
 #include "geometry_tools.h"
+#include "instance_list.h"
 #include "instancer_container.h"
 #include "point_instancer_deformer_data.h"
 
@@ -37,19 +38,16 @@ class PointInstancerDeformer :public BaseDeformer, public inherit_shared_from_th
 	protected:
 		PointInstancerDeformer(const std::string& name);
 
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
 		virtual void invalidateData(DeformerDataCache& cache) override;
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mInstancerGeoPrimHandle; }
 
 	private:
-		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
-
 		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		bool buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		virtual bool writeJsonDataToPrimImpl() const;
 
 		BindMode                                    mBindMode;

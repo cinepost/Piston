@@ -114,21 +114,42 @@ void CurvesDeformerFactory::clear() {
 	if(factory.mpPxrPointsLRUCache) {
 		factory.mpPxrPointsLRUCache->clear();
 	}
+
+	if(factory.mpPxrInstanceLRUCache) {
+		factory.mpPxrInstanceLRUCache->clear();
+	}
 }
 
-PxrPointsLRUCache*  CurvesDeformerFactory::getPxrPointsLRUCachePtr() {
+PxrPointsLRUCache<PointsList>* CurvesDeformerFactory::getPxrPointsLRUCachePtr() {
 	const bool cache_enabled = CurvesDeformerFactory::getPointsCacheUsageState();
 
-	PxrPointsLRUCache* p_cache = nullptr;
+	PxrPointsLRUCache<PointsList>* p_cache = nullptr;
 	{
 		const std::lock_guard<std::mutex> lock(mMutex); 
 	
 		if(cache_enabled && !mpPxrPointsLRUCache) {
-			mpPxrPointsLRUCache = PxrPointsLRUCache::create(kDefaultPxrPointsLRUCacheMaxSize);
+			mpPxrPointsLRUCache = PxrPointsLRUCache<PointsList>::create(kDefaultPxrPointsLRUCacheMaxSize);
 		} else if(!cache_enabled && mpPxrPointsLRUCache ) {
 			mpPxrPointsLRUCache = nullptr;
 		}
 		p_cache = mpPxrPointsLRUCache.get(); 
+	}
+	return p_cache;
+}
+
+PxrPointsLRUCache<InstanceList>* CurvesDeformerFactory::getPxrInstanceLRUCachePtr() {
+	const bool cache_enabled = CurvesDeformerFactory::getPointsCacheUsageState();
+
+	PxrPointsLRUCache<InstanceList>* p_cache = nullptr;
+	{
+		const std::lock_guard<std::mutex> lock(mMutex); 
+	
+		if(cache_enabled && !mpPxrInstanceLRUCache) {
+			mpPxrInstanceLRUCache = PxrPointsLRUCache<InstanceList>::create(kDefaultPxrPointsLRUCacheMaxSize);
+		} else if(!cache_enabled && mpPxrInstanceLRUCache ) {
+			mpPxrInstanceLRUCache = nullptr;
+		}
+		p_cache = mpPxrInstanceLRUCache.get(); 
 	}
 	return p_cache;
 }
