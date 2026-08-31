@@ -107,17 +107,6 @@ uint8_t GuideCurvesDeformer::getSkinGeoSubdivLevel() const {
 	return mGuidesSkinGeoPrimHandle.getSubdivLevel();
 }
 
-
-bool GuideCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("GuideCurvesDeformer::deformImpl");
-	return __deform__(points, false, time_code);
-}
-
-bool GuideCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("GuideCurvesDeformer::deformMtImpl");
-	return __deform__(points, true, time_code);
-}
-
 bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
 		DLOG_ERR << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !";
@@ -719,6 +708,11 @@ bool GuideCurvesDeformer::guideIndicesNeeded() const {
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	LOG_DBG << "GuideCurvesDeformer::buildDeformerDataImpl";
+	if(!BaseCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
+		return false;
+	}
+
 	if(!mpGuideCurvesContainer) {
 		mpGuideCurvesContainer = GuideCurvesContainer::create();
 	}

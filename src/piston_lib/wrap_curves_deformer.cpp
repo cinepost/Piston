@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <optional>
 
-BS::synced_stream sync_out;
 
 namespace Piston {
 
@@ -37,17 +36,6 @@ void WrapCurvesDeformer::invalidateData(DeformerDataCache& cache) {
 	BaseMeshCurvesDeformer::invalidateData(cache);
 	//if(mpWrapCurvesDeformerData && mpWrapCurvesDeformerData->isValid()) cache.invalidate<WrapCurvesDeformerData>({&mDeformerGeoPrimHandle, &mCurvesGeoPrimHandle});
 	cache.invalidate(mpWrapCurvesDeformerData);
-}
-
-
-bool WrapCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("WrapCurvesDeformer::deformImpl");
-	return __deform__(points, false, time_code);
-}
-
-bool WrapCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("WrapCurvesDeformer::deformMtImpl");
-	return __deform__(points, true, time_code);
 }
 
 bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
@@ -274,6 +262,8 @@ bool WrapCurvesDeformer::writeJsonDataToPrimImpl() const {
 }
 
 bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	LOG_DBG << "WrapCurvesDeformer::buildDeformerDataImpl";
+	
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
 	}

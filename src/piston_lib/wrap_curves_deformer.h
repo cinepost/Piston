@@ -31,16 +31,22 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		~WrapCurvesDeformer();
 
 		static SharedPtr create(const std::string& name);
-		virtual const std::string& toString() const override;
+		virtual const std::string& toString() const override final;
 		void setBindMode(BindMode mode);
 		BindMode getBindMode() const;
 
 	protected:
 		WrapCurvesDeformer(const std::string& name);
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
-		virtual void invalidateData(DeformerDataCache& cache) override;
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final  {
+			PROFILE("WrapCurvesDeformer::deformImpl");
+			return __deform__(points, false, time_code);
+		}
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
+			PROFILE("WrapCurvesDeformer::deformMtImpl");
+			return __deform__(points, true, time_code);
+		}
+		virtual void invalidateData(DeformerDataCache& cache) override final;
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override final;
 
 		bool deformImpl_SpaceMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_DistMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
@@ -48,8 +54,8 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
-		virtual bool writeJsonDataToPrimImpl() const;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override final;
+		virtual bool writeJsonDataToPrimImpl() const override final;
 		
 		bool buildDeformerData_SpaceMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
 		bool buildDeformerData_DistMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);

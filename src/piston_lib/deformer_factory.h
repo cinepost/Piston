@@ -6,6 +6,7 @@
 #include "fast_curves_deformer.h"
 #include "wrap_curves_deformer.h"
 #include "guide_curves_deformer.h"
+#include "point_instancer_deformer.h"
 #include "points_list.h"
 #include "pxr_points_lru_cache.h"
 #include "os.h"
@@ -54,6 +55,7 @@ class CurvesDeformerFactory {
 	    static FastCurvesDeformer::SharedPtr getFastDeformer(const std::string& name);
 	    static WrapCurvesDeformer::SharedPtr getWrapDeformer(const std::string& name);
 	    static GuideCurvesDeformer::SharedPtr getGuidesDeformer(const std::string& name);
+	    static PointInstancerDeformer::SharedPtr getPointInstancerDeformer(const std::string& name);
 
 	    static void setPointsCacheUsageState(bool state);
 		static bool getPointsCacheUsageState();

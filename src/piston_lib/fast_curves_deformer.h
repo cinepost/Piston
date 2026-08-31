@@ -37,17 +37,23 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 
 	protected:
 		FastCurvesDeformer(const std::string& name);
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
+			PROFILE("FastCurvesDeformer::deformImpl");
+			return __deform__(points, false, time_code);
+		}
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final{
+			PROFILE("FastCurvesDeformer::deformMtImpl");
+			return __deform__(points, true, time_code);
+		}
 
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override;
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override final;
 
 		virtual void invalidateData(DeformerDataCache& cache) override;
 
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override final;
 		virtual bool writeJsonDataToPrimImpl() const;
 
 		bool buildCurvesBindingData(pxr::UsdTimeCode rest_time_code, bool multi_threaded);

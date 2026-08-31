@@ -20,6 +20,7 @@ namespace boost = hboost;
 #include "../../piston_lib/fast_curves_deformer.h"
 #include "../../piston_lib/wrap_curves_deformer.h"
 #include "../../piston_lib/guide_curves_deformer.h"
+#include "../../piston_lib/point_instancer_deformer.h"
 #include "../../piston_lib/deformer_factory.h"
 #include "../../piston_lib/logging.h"
 #include "../../piston_lib/deformer_stats.h"
@@ -65,8 +66,8 @@ boost::python::list get_deformers_map_items(Piston::CurvesDeformerFactory::Defor
 }
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_writeJsonDataToPrim_overloads, Piston::BaseDeformer::writeJsonDataToPrim, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_overloads, Piston::BaseCurvesDeformer::deform, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseCurvesDeformer_deform_dbg_overloads, Piston::BaseCurvesDeformer::deform_dbg, 0, 1)
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_deform_overloads, Piston::BaseDeformer::deform, 0, 1)
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_deform_dbg_overloads, Piston::BaseDeformer::deform_dbg, 0, 1)
 
 BOOST_PYTHON_MODULE(_piston) {
 	using namespace boost::python;
@@ -101,7 +102,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("getFastDeformer", &CurvesDeformerFactory::getFastDeformer)
 		.def("getWrapDeformer", &CurvesDeformerFactory::getWrapDeformer)
 		.def("getGuidesDeformer", &CurvesDeformerFactory::getGuidesDeformer)
-
+		.def("getPointInstancerDeformer", &CurvesDeformerFactory::getPointInstancerDeformer)
 
 		.def("setPointsCacheUsageState", &CurvesDeformerFactory::setPointsCacheUsageState)
 		.staticmethod("setPointsCacheUsageState")
@@ -146,6 +147,8 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setMotionBlurState", &BaseDeformer::setMotionBlurState)
 		.def("getMotionBlurState", &BaseDeformer::getMotionBlurState)
 
+		.def("deform", &BaseDeformer::deform, BaseDeformer_deform_overloads(args("time_code")))
+		.def("deform_dbg", &BaseDeformer::deform_dbg, BaseDeformer_deform_dbg_overloads(args("time_code")))
 
 		.def("showDebugGeometry", &BaseDeformer::showDebugGeometry)
 		.def("setDebugGeometryMultiplier", &BaseDeformer::setDebugGeometryMultiplier)
@@ -155,17 +158,14 @@ BOOST_PYTHON_MODULE(_piston) {
 
 		.def("setReadJsonDataFromPrim", &BaseDeformer::setReadJsonDataFromPrim)
 		.def("writeJsonDataToPrim", &BaseDeformer::writeJsonDataToPrim, BaseDeformer_writeJsonDataToPrim_overloads(args("time_code")))
-
 	;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, bases<BaseDeformer>, boost::noncopyable>("BaseCurvesDeformer",  no_init)
 		.def("setCurvesGeoPrim", &BaseCurvesDeformer::setCurvesGeoPrim, "@DocString(setCurvesGeoPrim)")
+		.def("getCurvesGeoPrim", &BaseCurvesDeformer::getCurvesGeoPrim, return_value_policy<copy_const_reference>())
 
 		.def("setCurvesRestAttrName", &BaseCurvesDeformer::setCurvesRestAttrName)
 		.def("getCurvesRestAttrName", &BaseCurvesDeformer::getCurvesRestAttrName, return_value_policy<copy_const_reference>())
-
-		.def("deform", &BaseCurvesDeformer::deform, BaseCurvesDeformer_deform_overloads(args("time_code")))
-		.def("deform_dbg", &BaseCurvesDeformer::deform_dbg, BaseCurvesDeformer_deform_dbg_overloads(args("time_code")))
 
 		.def("__repr__", &BaseCurvesDeformer::repr)
 		.def("toString", &BaseCurvesDeformer::toString, return_value_policy<copy_const_reference>())
@@ -188,6 +188,18 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setBindMode", &WrapCurvesDeformer::setBindMode)
 		.def("getBindMode", &WrapCurvesDeformer::getBindMode)
 		.def("toString", &WrapCurvesDeformer::toString, return_value_policy<copy_const_reference>())
+	;
+
+	class_<PointInstancerDeformer, PointInstancerDeformer::SharedPtr, bases<BaseDeformer>, boost::noncopyable>("PointInstancerDeformer", no_init)
+		.def("create", &PointInstancerDeformer::create)
+		.staticmethod("create")
+		.def("setInstancerGeoPrim", &PointInstancerDeformer::setInstancerGeoPrim, "@DocString(setInstancerGeoPrim)")
+		.def("getInstancerGeoPrim", &PointInstancerDeformer::getInstancerGeoPrim, return_value_policy<copy_const_reference>())
+
+		.def("setInstancerRestAttrName", &PointInstancerDeformer::setInstancerRestAttrName)
+		.def("getInstancerRestAttrName", &PointInstancerDeformer::getInstancerRestAttrName, return_value_policy<copy_const_reference>())
+
+		.def("toString", &PointInstancerDeformer::toString, return_value_policy<copy_const_reference>())
 	;
 
 	class_<GuideCurvesDeformer, GuideCurvesDeformer::SharedPtr, bases<BaseCurvesDeformer>, boost::noncopyable>("GuideCurvesDeformer", no_init)
@@ -259,8 +271,12 @@ BOOST_PYTHON_MODULE(_piston) {
 	def("setLogLevel", _setLogLevel);
 	def("runTests", &Tests::runTests);	
 
+	implicitly_convertible<BaseCurvesDeformer::SharedPtr, BaseDeformer::SharedPtr>();
+
 	implicitly_convertible<BaseMeshCurvesDeformer::SharedPtr, BaseCurvesDeformer::SharedPtr>();
 	implicitly_convertible<FastCurvesDeformer::SharedPtr, BaseMeshCurvesDeformer::SharedPtr>();
 	implicitly_convertible<WrapCurvesDeformer::SharedPtr, BaseMeshCurvesDeformer::SharedPtr>();
 	implicitly_convertible<GuideCurvesDeformer::SharedPtr, BaseCurvesDeformer::SharedPtr>();
+
+	implicitly_convertible<PointInstancerDeformer::SharedPtr, BaseDeformer::SharedPtr>();
 }

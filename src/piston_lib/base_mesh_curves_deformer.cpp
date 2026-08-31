@@ -32,6 +32,11 @@ bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 }
 
 bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	LOG_DBG << "BaseMeshCurvesDeformer::buildDeformerDataImpl";
+	if(!BaseCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
+		return false;
+	}
+
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 
 	bool adjacency_data_created = true;

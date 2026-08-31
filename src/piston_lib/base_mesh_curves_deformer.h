@@ -25,15 +25,15 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 	protected:
 		BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type type, const std::string& name);
 
-		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim);
+		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
 		
 	protected:
 		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpAdjacencyData;
 		std::shared_ptr<SerializablePhantomTrimesh>				mpPhantomTrimeshData;
 		
 	protected:
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
-		virtual bool writeJsonDataToPrimImpl() const;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override;
+		virtual bool writeJsonDataToPrimImpl() const override;
 
 		virtual void invalidateData(DeformerDataCache& cache) override;
 };

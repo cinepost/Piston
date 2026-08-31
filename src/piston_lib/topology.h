@@ -13,14 +13,17 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/basisCurves.h>
+#include <pxr/usd/usdGeom/pointInstancer.h>
 
 namespace Piston {
 
 pxr::HdMeshTopology computeMeshTopology(const pxr::UsdGeomMesh& mesh, pxr::UsdTimeCode time);
 pxr::HdBasisCurvesTopology computeCurvesTopology(const pxr::UsdGeomBasisCurves& curves, pxr::UsdTimeCode time);
+pxr::HdInstancerTopology computeInstancesTopology(const pxr::UsdGeomPointInstancer& instancer, pxr::UsdTimeCode time);
 
 size_t computeMeshTopologyHash(const pxr::UsdGeomMesh& mesh, const pxr::HdMeshTopology& topology);
 size_t computeCurvesTopologyHash(const pxr::UsdGeomBasisCurves& curves, const pxr::HdBasisCurvesTopology& topology);
+size_t computeInstancesTopologyHash(const pxr::UsdGeomPointInstancer& curves, const pxr::UsdGeomPointInstancer& topology);
 
 bool isSameTopology(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r, pxr::UsdTimeCode time_code);
 bool isSameTopology(const UsdPrimHandle& handle, const pxr::UsdPrim& prim, pxr::UsdTimeCode time_code);

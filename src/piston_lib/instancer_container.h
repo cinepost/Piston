@@ -26,8 +26,7 @@ class InstancerContainer : public std::enable_shared_from_this<InstancerContaine
 	public:
 		static UniquePtr create();
 
-		bool init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode reference_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt = nullptr, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt = nullptr);
-
+		bool init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt = nullptr, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt = nullptr);
 		bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force);
 
 		size_t getInstanceCount() const { return mInstanceCount; }

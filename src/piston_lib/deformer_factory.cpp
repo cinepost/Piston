@@ -53,6 +53,10 @@ GuideCurvesDeformer::SharedPtr CurvesDeformerFactory::getGuidesDeformer(const st
 	return std::dynamic_pointer_cast<GuideCurvesDeformer>(getInstance().getDeformer(BaseDeformer::Type::GUIDES, name));
 }
 
+PointInstancerDeformer::SharedPtr CurvesDeformerFactory::getPointInstancerDeformer(const std::string& name) {
+	return std::dynamic_pointer_cast<PointInstancerDeformer>(getInstance().getDeformer(BaseDeformer::Type::POINT_INSTANCER, name));
+}
+
 BaseDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseDeformer::Type type, const std::string& name) {
 	const CurvesDeformerFactory::Key key = {type, name};
 	std::lock_guard<std::mutex> lock(mMutex);
@@ -63,6 +67,12 @@ BaseDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseDeformer::Type ty
 	}
 
 	switch(type) {
+		case BaseDeformer::Type::POINT_INSTANCER: 
+		{
+			auto result = mDeformers.emplace(key, PointInstancerDeformer::create(name));
+			if(result.second) return result.first->second;
+			throw std::runtime_error("Error creating PointInstancerDeformer !");
+		}
 		case BaseDeformer::Type::WRAP: 
 		{
 			auto result = mDeformers.emplace(key, WrapCurvesDeformer::create(name));

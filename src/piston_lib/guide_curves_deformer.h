@@ -39,7 +39,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		~GuideCurvesDeformer();
 
 		static SharedPtr create(const std::string& name);
-		virtual const std::string& toString() const override;
+		virtual const std::string& toString() const override final;
 
 		void setBindMode(BindMode mode);
 		BindMode getBindMode() const;
@@ -67,15 +67,21 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 	protected:
 		GuideCurvesDeformer(const std::string& name);
 
-		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override;
+		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
 
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
+			PROFILE("GuideCurvesDeformer::deformImpl");
+			return __deform__(points, false, time_code);
+		}
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
+			PROFILE("GuideCurvesDeformer::deformMtImpl");
+			return __deform__(points, true, time_code);
+		}
 
-		virtual void invalidateData(DeformerDataCache& cache) override;
+		virtual void invalidateData(DeformerDataCache& cache) override final;
 
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override;
-		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) override;
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override final;
+		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) override final;
 
 	private:
 		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
@@ -107,8 +113,8 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		bool guideIndicesNeeded() const;
 
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
-		virtual bool writeJsonDataToPrimImpl() const;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override final;
+		virtual bool writeJsonDataToPrimImpl() const override final;
 
 		std::shared_ptr<GuideCurvesDeformerData>   				mpGuideCurvesDeformerData;
 		GuideCurvesContainer::UniquePtr 						mpGuideCurvesContainer;

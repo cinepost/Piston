@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <optional>
 
-BS::synced_stream sync_out;
 
 namespace Piston {
 
@@ -37,44 +36,92 @@ bool PointInstancerDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim
 	return isMeshGeoPrim(geoPrim);
 }
 
+void PointInstancerDeformer::setInstancerGeoPrim(const pxr::UsdPrim& prim) {
+	if(!prim.IsValid() || mInstancerGeoPrimHandle == prim) return;
+
+	if(!isPointInstancerGeoPrim(prim)) {
+		DLOG_ERR << "Instancer geometry prim is not \"pxr::UsdGeomPointInstancer\"!";
+		return;
+	}
+
+	if(mDeformerGeoPrimHandle == prim) {
+		DLOG_ERR << "Can't use the same prim " << mDeformerGeoPrimHandle << " for deformer and Instancer geometry !!!";
+		return;
+	}
+
+	auto new_handle = UsdPrimHandle(prim);
+	const bool same_topology = mInstancerGeoPrimHandle.isValid() ? isSameTopology(mInstancerGeoPrimHandle, new_handle, getRestTimeCode()) : false;
+
+	mInstancerGeoPrimHandle = std::move(new_handle);
+	if(!same_topology) {
+		makeDirty();
+	}
+
+	DLOG_DBG << "Instancer geometry prim is set to: " << mInstancerGeoPrimHandle;
+}
+
+const pxr::UsdPrim& PointInstancerDeformer::getInstancerGeoPrim() const {
+	return mInstancerGeoPrimHandle.getPrim();
+}
+
+void PointInstancerDeformer::setInstancerRestAttrName(const std::string& name) {
+	if(mInstancerGeoPrimHandle.getRestAttrName() == name) return;
+	mInstancerGeoPrimHandle.setRestAttrName(name);
+	makeDirty();
+
+	DLOG_DBG << "Deformer instancer rest attribute name is set to: " <<  name;
+}
+
 void PointInstancerDeformer::invalidateData(DeformerDataCache& cache) {
-	BaseDeformer::invalidateData(cache);
+	cache.invalidate(mpAdjacencyData);
+	cache.invalidate(mpPhantomTrimeshData);
 	cache.invalidate(mpPointInstancerDeformerData);
 }
 
-bool PointInstancerDeformer::deform_dbg(pxr::UsdTimeCode time_code, bool ignoreVelocities) {	
-	return deform(time_code, false, ignoreVelocities);
+size_t PointInstancerDeformer::getDeformedPointsCount() const {
+	LOG_DBG << "PointInstancerDeformer::getDeformedPointsCount";
+	assert(mpInstancerContainer);
+
+	LOG_DBG << "PointInstancerDeformer::getDeformedPointsCount" << mpInstancerContainer->getInstanceCount();
+	return mpInstancerContainer->getInstanceCount();
 }
 
-bool PointInstancerDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded, bool ignoreVelocities) {
-	PROFILE("PointInstancerDeformer::deform");
+bool PointInstancerDeformer::outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) {
+	assert(pPointsList);
 
-	assert(mpPointInstancerDeformerData && mpPointInstancerDeformerData->isValid());
-	assert(mpAdjacencyData);
-	assert(mpDeformerMeshContainer);
+	pxr::UsdGeomPointInstancer instancer(mInstancerGeoPrimHandle.getPrim());
+	pxr::UsdAttribute attr_p = instancer.GetPositionsAttr();
 
-	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-
-	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid()) {
+	if(!attr_p || !attr_p.Set(pPointsList->getPointsVtArray(), time_code)) {
 		return false;
 	}
 
-	buildVertexNormals(mpAdjacencyData->getAdjacencyFinal(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
+	return true;
+}
 
-	if(mShowDebugGeometry) {
-		drawDebugSubdivDeformerGeometry(time_code);
+bool PointInstancerDeformer::outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) {
+	assert(pVelocitiesList);
+
+	pxr::UsdGeomPointInstancer instancer(mInstancerGeoPrimHandle.getPrim());
+	pxr::UsdAttribute attr_v = instancer.GetVelocitiesAttr();
+
+	if(!attr_v || !attr_v.Set(pVelocitiesList->getPointsVtArray(), time_code)) {
+		return false;	
 	}
 
-	bool result = false;
-
-	assert(false);
-	
-	return result;
+	return true;
 }
 
 bool PointInstancerDeformer::writeJsonDataToPrimImpl() const {
-	if(!BaseDeformer::writeJsonDataToPrimImpl()) {
+	LOG_DBG << "PointInstancerDeformer::buildDeformerDataImpl";
+
+	if(mpAdjacencyData && !mDeformerGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpAdjacencyData.get())) {
+		DLOG_ERR << "Error writing " << mpAdjacencyData->typeName() << " deformer data to json !";
+		return false;
+	}
+
+	if(mpPhantomTrimeshData && !mInstancerGeoPrimHandle.writeDataToBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
+		DLOG_ERR << "Error writing " << mpPhantomTrimeshData->typeName() << " curves data to json !";
 		return false;
 	}
 
@@ -85,16 +132,92 @@ bool PointInstancerDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
+bool PointInstancerDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
+	DLOG_DBG << "PointInstancerDeformer::__deform__";
+
+	assert(mpInstancerContainer);
+	assert(mpPointInstancerDeformerData);
+
+	const auto& rest_positions = mpInstancerContainer->getRestInstancePoints();
+
+	DLOG_DBG << "Points count " << points.size();
+	DLOG_DBG << "Instances container instances count " << mpInstancerContainer->getInstanceCount();
+	DLOG_DBG << "Instances count " << rest_positions.size();
+
+	assert(points.size() == rest_positions.size());
+
+	auto* pOutPoints = points.points();
+
+	for(size_t i = 0; i < points.size(); ++i) {
+		pOutPoints[i] = rest_positions[i] + pxr::GfVec3f(static_cast<float>(time_code.GetValue()), 0.0, 0.0);
+	}
+
+	return true;
+}
+
 bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	if(!BaseDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
+	DLOG_DBG << "PointInstancerDeformer::buildDeformerDataImpl";
+
+	if(!mInstancerGeoPrimHandle) {
+		DLOG_ERR << "No instancer UsdPrim is set !!!";
 		return false;
 	}
 
-	// Data validity was checked in BaseDeformer::buildDeformerDataImpl()
+	if(!mpInstancerContainer) {
+		mpInstancerContainer = InstancerContainer::create();
+		if(!mpInstancerContainer) {
+			DLOG_ERR << "Error creating instancer container for prim " << mInstancerGeoPrimHandle << " !";
+			return false;
+		}
+	} 
+	
+	if(!mpInstancerContainer->init(mInstancerGeoPrimHandle, rest_time_code)) {
+		DLOG_ERR << "Error initializing instancer container for prim " << mInstancerGeoPrimHandle << " !";
+		return false;
+	}
+
+	// 
+	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
+
+	bool adjacency_data_created = true;
+	if(!mpAdjacencyData) {
+		mpAdjacencyData = dataCache.getOrCreateData<SerializableUsdGeomMeshFaceAdjacency>(this, mDeformerGeoPrimHandle, rest_time_code, adjacency_data_created);
+	}
+
+	// Get primitive adjacency json data if present
+	if(adjacency_data_created || !getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpAdjacencyData.get())) {
+		// Build in place if no json data present or not needed
+		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
+			DLOG_ERR << "Error building mesh adjacency data!";
+			return false;
+		}
+	}
+
+	if(!mpAdjacencyData || !mpAdjacencyData->getAdjacency() || !mpAdjacencyData->getAdjacency()->isValid()) {
+		DLOG_ERR << "No valid mesh adjacency data!";
+		return false;
+	}
+
+	bool trimesh_data_created = true;
+	if(!mpPhantomTrimeshData) {
+		mpPhantomTrimeshData = dataCache.getOrCreateData<SerializablePhantomTrimesh>(this, {&mDeformerGeoPrimHandle, &mInstancerGeoPrimHandle}, rest_time_code, trimesh_data_created);
+	}
+
+	// Get phantom mesh json data if present
+	if(trimesh_data_created || !getReadJsonDataState() || !mInstancerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpPhantomTrimeshData.get())) {
+		// Build in place if no json data present or not needed
+		if(!mpPhantomTrimeshData->buildInPlace(mDeformerGeoPrimHandle)) {
+			DLOG_ERR << "Error building phantom mesh data!";
+			return false;
+		}
+	}
+
+	assert(mpAdjacencyData);
 	const auto* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
+	
+	assert(mpPhantomTrimeshData);
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
-	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
 	bool deformer_data_created;
 	if(!mpPointInstancerDeformerData) {
 		mpPointInstancerDeformerData = dataCache.getOrCreateData<PointInstancerDeformerData>(this, {&mDeformerGeoPrimHandle, &mInstancerGeoPrimHandle}, rest_time_code, deformer_data_created);
@@ -138,7 +261,7 @@ bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 				DLOG_TRC << "PointInstancerDeformer::buildDeformerDataImpl() finished in " << threads_timer.toString();
 			}
 
-			mpPointInstancerDeformerData->setValid(true);
+			mpPointInstancerDeformerData->setValid(result);
 		}
 		mpPhantomTrimeshData->setValid(mpPointInstancerDeformerData->isValid());
 	}
@@ -147,7 +270,11 @@ bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 }
 
 bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
-	return false;
+	return true;
+}
+
+void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
+
 }
 
 PointInstancerDeformer::~PointInstancerDeformer() {

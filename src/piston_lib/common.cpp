@@ -412,6 +412,10 @@ const Topology& UsdPrimHandle::getTopology(pxr::UsdTimeCode time_code) const {
 			const auto topology = computeCurvesTopology(pxr::UsdGeomBasisCurves(_prim), time_code);
 			const size_t topology_hash = topology.ComputeHash();
 			mpTopology = std::make_unique<Topology>(topology_hash, std::move(topology));
+		} else if(isPointInstancerGeoPrim()) {
+			const auto topology = computeInstancesTopology(pxr::UsdGeomPointInstancer(_prim), time_code);
+			const size_t topology_hash = topology.ComputeHash();
+			mpTopology = std::make_unique<Topology>(topology_hash, std::move(topology));
 		} else {
 			assert(false);
 			LOG_FTL << "Unsupported usd primitive type: " <<  _prim.GetTypeName().GetText();

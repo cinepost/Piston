@@ -42,17 +42,6 @@ void FastCurvesDeformer::invalidateData(DeformerDataCache& cache) {
 	cache.invalidate(mpFastCurvesDeformerData);
 }
 
-
-bool FastCurvesDeformer::deformImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("FastCurvesDeformer::deformImpl");
-	return __deform__(points, false, time_code);
-}
-
-bool FastCurvesDeformer::deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) {
-	PROFILE("FastCurvesDeformer::deformMtImpl");
-	return __deform__(points, true, time_code);
-}
-
 bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	assert(mpPhantomTrimeshData);
 	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
@@ -197,6 +186,8 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 }
 
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	LOG_DBG << "FastCurvesDeformer::buildDeformerDataImpl";
+	
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
 	}

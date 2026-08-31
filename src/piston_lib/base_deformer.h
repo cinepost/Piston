@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "common.h"
+#include "points_list.h"
 #include "curves_container.h"
 #include "mesh_container.h"
 #include "debug_drawing.h"
@@ -24,6 +25,7 @@
 
 
 namespace Piston {
+
 
 namespace {
 	const std::string kVelocitiAttrName = "velocities";
@@ -97,8 +99,8 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		 * @return something
 		 *
 		 */	
-		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false) = 0;
-		virtual bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false) = 0;
+		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
+		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
 
 		const std::string& getName() const { return mName; }
 
@@ -119,6 +121,13 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 	protected:
 		BaseDeformer(const Type type, const std::string& name);
+
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+
+		virtual size_t getDeformedPointsCount() const = 0; 
+		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) = 0;
+		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) = 0;
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) = 0;
 		virtual void invalidateData(DeformerDataCache& cache) = 0;
@@ -161,7 +170,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		std::mutex      mPrmMutex;
 
 	protected:
-		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
 
@@ -175,11 +183,12 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		MotionBlurDirection motionBlurDirection() const { return mMotionBlurDirection; }
 		bool calcMotionVectors() const { return mCalcMotionVectors; }
 
-	protected:
+		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) = 0;
 
 	private:
-		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
-
+		bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
+		
 		static std::atomic_uint32_t current_id;
 
 		bool mCalcMotionVectors = false;
@@ -191,6 +200,11 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		bool mWriteJsonDeformerData = false;
 
 		DebugGeo::UniquePtr mpSubdivDebugGeo;
+
+		// we use these containers to store deformed points data when LRU cache is disabled
+		std::unique_ptr<PointsList> 	mpDeformedPointsList;
+		std::unique_ptr<PointsList> 	mpDeformedPointsListStep;
+		std::unique_ptr<PointsList> 	mpTempVelocitiesList;
 
 		friend class UsdPrimHandle;
 };

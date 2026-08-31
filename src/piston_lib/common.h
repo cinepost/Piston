@@ -29,8 +29,68 @@ using json = nlohmann::json;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// Custom class injection as if it exists in <pxr/imaging/hd/instancerTopology.h>
+struct HdInstancerTopology {
+    pxr::SdfPathVector prototypePaths;
+    std::vector<pxr::VtIntArray> indexArraysPerPrototype;
+
+    bool operator==(const HdInstancerTopology& other) const {
+        if (prototypePaths.size() != other.prototypePaths.size() ||
+            indexArraysPerPrototype.size() != other.indexArraysPerPrototype.size()) {
+            return false;
+        }
+        
+        return std::tie(prototypePaths, indexArraysPerPrototype) ==
+               std::tie(other.prototypePaths, other.indexArraysPerPrototype);
+    }
+
+    bool operator!=(const HdInstancerTopology& other) const {
+        return !(*this == other);
+    }
+
+    bool operator<(const HdInstancerTopology& other) const {
+        if (prototypePaths < other.prototypePaths) return true;
+        if (other.prototypePaths < prototypePaths) return false;
+
+        if (indexArraysPerPrototype.size() < other.indexArraysPerPrototype.size()) return true;
+        if (other.indexArraysPerPrototype.size() < indexArraysPerPrototype.size()) return false;
+
+        for (size_t i = 0; i < indexArraysPerPrototype.size(); ++i) {
+            const auto& lhsArray = indexArraysPerPrototype[i];
+            const auto& rhsArray = other.indexArraysPerPrototype[i];
+
+            if (std::lexicographical_compare(lhsArray.begin(), lhsArray.end(), rhsArray.begin(), rhsArray.end())) {
+                return true;
+            }
+            if (std::lexicographical_compare(rhsArray.begin(), rhsArray.end(), lhsArray.begin(), lhsArray.end())) {
+                return false;
+            }
+        }
+
+        return false; // Objects are completely identical
+    }
+
+    size_t ComputeHash() const {
+        size_t hashValue = 0;
+
+        for (const auto& path : prototypePaths) {
+            hashValue = pxr::TfHash::Combine(hashValue, path.GetHash());
+        }
+
+        for (const auto& indexArray : indexArraysPerPrototype) {
+            hashValue = pxr::TfHash::Combine(hashValue, indexArray.size());
+            
+            for (int index : indexArray) {
+                hashValue = pxr::TfHash::Combine(hashValue, index);
+            }
+        }
+
+        return hashValue;
+    }
+};
+
 bool operator<(const pxr::HdMeshTopology& lhs, const pxr::HdMeshTopology& rhs);
-bool operator<(const HdBasisCurvesTopology& lhs, const HdBasisCurvesTopology& rhs);
+bool operator<(const pxr::HdBasisCurvesTopology& lhs, const pxr::HdBasisCurvesTopology& rhs);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
@@ -40,7 +100,7 @@ static const std::string kDefaultRestPositionAttrName = "";
 
 class BaseDeformer;
 
-using PxrTopologyVariant = std::variant<pxr::HdMeshTopology, pxr::HdBasisCurvesTopology>;
+using PxrTopologyVariant = std::variant<pxr::HdMeshTopology, pxr::HdBasisCurvesTopology, pxr::HdInstancerTopology>;
 
 struct Topology {
 	size_t             topology_hash;

@@ -14,7 +14,7 @@ InstancerContainer::UniquePtr InstancerContainer::create() {
 	return InstancerContainer::UniquePtr(new InstancerContainer());
 }
 
-bool InstancerContainer::init(const UsdPrimHandle& prim_handle, const std::string& rest_attr_name, pxr::UsdTimeCode rest_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt) {
+bool InstancerContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code, const pxr::VtArray<pxr::GfVec3f>* pRestPointsDataExt, const pxr::VtArray<pxr::GfVec3f>* pLivePointsDataExt) {
 	mIsInitialized = false;
 
     if(!prim_handle.isPointInstancerGeoPrim()) {
@@ -34,9 +34,10 @@ bool InstancerContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 	}
 
     // Get rest curve points
-    if(rest_attr_name.empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(rest_attr_name, mRestInstancePoints, rest_time_code)) {
-        if(!prim_handle.fetchAttributeValues<pxr::GfVec3f>("positions", mRestInstancePoints, rest_time_code)) {
-            LOG_ERR << "Error getting instance positions from " << prim_handle.getName() << " !";
+    if(prim_handle.getRestAttrName().empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(prim_handle.getRestAttrName(), mRestInstancePoints, rest_time_code)) {
+
+    	if(!instancer.GetPositionsAttr().Get(&mRestInstancePoints, rest_time_code)) {
+            LOG_ERR << "Error getting instance rest positions from " << prim_handle.getName() << " !";
             return false;
         }
     }
@@ -58,8 +59,9 @@ bool InstancerContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	}
 
 	// Curve live point positions
-	if(!prim_handle.fetchAttributeValues<pxr::GfVec3f>("positions", mLiveInstancePoints, time_code)) {
-		LOG_ERR << "Error getting instance positions from " << prim_handle << " !";
+	auto instancer = pxr::UsdGeomPointInstancer(prim_handle.getPrim());
+	if(!instancer.GetPositionsAttr().Get(&mLiveInstancePoints, time_code)) {
+		LOG_ERR << "Error getting instance live positions from " << prim_handle << " !";
 		return false;
 	}
 

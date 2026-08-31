@@ -33,12 +33,28 @@ pxr::HdBasisCurvesTopology computeCurvesTopology(const pxr::UsdGeomBasisCurves& 
     return pxr::HdBasisCurvesTopology(type, basis, wrap, curveVertexCounts, curveIndices);
 }
 
-size_t computeMeshTopologyHash(const pxr::UsdGeomMesh& mesh, const pxr::HdMeshTopology& topology) {
-    return topology.ComputeHash();
-}
+pxr::HdInstancerTopology computeInstancesTopology(const pxr::UsdGeomPointInstancer& instancer, pxr::UsdTimeCode time) {
+    pxr::VtArray<int> protoIndices;
+    instancer.GetProtoIndicesAttr().Get(&protoIndices, time);
 
-size_t computeCurvesTopologyHash(const pxr::UsdGeomBasisCurves& curves, const pxr::HdBasisCurvesTopology& topology) {
-    return topology.ComputeHash();
+    pxr::SdfPathVector prototypePaths;
+    instancer.GetPrototypesRel().GetTargets(&prototypePaths);
+
+    std::vector<bool> mask = instancer.ComputeMaskAtTime(time);
+    std::vector<pxr::VtIntArray> indexArraysPerPrototype(prototypePaths.size());
+
+    for (int instanceId = 0; instanceId < static_cast<int>(protoIndices.size()); ++instanceId) {
+        if (!mask.empty() && !mask[instanceId]) {
+            continue;
+        }
+
+        int protoId = protoIndices[instanceId];
+        if (protoId >= 0 && static_cast<size_t>(protoId) < prototypePaths.size()) {
+            indexArraysPerPrototype[protoId].push_back(instanceId);
+        }
+    }
+
+    return { prototypePaths, indexArraysPerPrototype };
 }
 
 bool isSameTopology(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r, pxr::UsdTimeCode time_code) {
@@ -50,6 +66,8 @@ bool isSameTopology(const pxr::UsdPrim& prim_l, const pxr::UsdPrim& prim_r, pxr:
         return computeMeshTopology(pxr::UsdGeomMesh(prim_r), time_code) == computeMeshTopology(pxr::UsdGeomMesh(prim_l), time_code);
     } else if(isBasisCurvesGeoPrim(prim_r)) {
         return computeCurvesTopology(pxr::UsdGeomBasisCurves(prim_r), time_code) == computeCurvesTopology(pxr::UsdGeomBasisCurves(prim_l), time_code);
+    } else if(isPointInstancerGeoPrim(prim_r)) {
+        return computeInstancesTopology(pxr::UsdGeomPointInstancer(prim_r), time_code) == computeInstancesTopology(pxr::UsdGeomPointInstancer(prim_l), time_code);
     }
 
     return false;
@@ -73,6 +91,10 @@ bool isSameTopology(const UsdPrimHandle& handle, const pxr::UsdPrim& prim, pxr::
         prim_topology_variant = std::move(topology);
     } else if(isBasisCurvesGeoPrim(prim)) {
         const auto topology = computeCurvesTopology(pxr::UsdGeomBasisCurves(prim), time_code);
+        prim_topology_hash = topology.ComputeHash();
+        prim_topology_variant = std::move(topology);
+    } else if(isPointInstancerGeoPrim(prim)) {
+        const auto topology = computeInstancesTopology(pxr::UsdGeomPointInstancer(prim), time_code);
         prim_topology_hash = topology.ComputeHash();
         prim_topology_variant = std::move(topology);
     }

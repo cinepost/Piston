@@ -45,37 +45,22 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 		void setCurvesRestAttrName(const std::string& name);
 		const std::string& getCurvesRestAttrName() const { return mCurvesGeoPrimHandle.getRestAttrName(); }
 
-		// DocString: deform
-		/**
-		 * @brief Sets the Pixar USD curves primitive that will undergo deformation.
-		 * @param prim The USD curves primitive to be deformed.
-		 * @return something
-		 *
-		 */	
-		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
-		virtual bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
-
-	private:
-		virtual bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false) override final;
 
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mCurvesGeoPrimHandle; }
 
-		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) = 0;
+		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override;
+
+		virtual size_t getDeformedPointsCount() const override final; 
+		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) override final;
+		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) override final;
 
 	protected:
 		UsdPrimHandle 					mCurvesGeoPrimHandle;
 		PxrCurvesContainer::UniquePtr 	mpCurvesContainer;
-
-		// we use these containers to store deformed points data when LRU cache is disabled
-		std::unique_ptr<PointsList> 	mpDeformedPointsList;
-		std::unique_ptr<PointsList> 	mpDeformedPointsListStep;
-		std::unique_ptr<PointsList> 	mpTempVelocitiesList;
 };
 
 } // namespace Piston

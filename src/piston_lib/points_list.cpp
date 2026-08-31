@@ -31,7 +31,7 @@ TemplatedPointsList<T, O>::TemplatedPointsList(size_t size, bool with_orientatio
 	if(with_orientations) {
 		if constexpr (std::is_same_v<O, std::vector<OrientationType>>) {
 			mOrientations.resize(mPoints.size());
-			mOrientationsVtArray  = pxr::VtArray<PointType>(&mOrientationsForeignDataSource, mPoints.data(), mPoints.size(), true /* addRef */);
+			mOrientationsVtArray = pxr::VtArray<OrientationType>(&mOrientationsForeignDataSource, mOrientations.data(), mOrientations.size(), true /* addRef */);
 		} else {
 			mOrientationsVtArray.resize(mPointsVtArray.size());
 		}
@@ -52,7 +52,7 @@ TemplatedPointsList<T, O>::TemplatedPointsList(Piston::TemplatedPointsList<T, O>
 
 	if constexpr (std::is_same_v<O, std::vector<OrientationType>>) {
 		mOrientations = std::move(other.mOrientations);
-		mOrientationsVtArray = pxr::VtArray<PointType>(&mOrientationsForeignDataSource, mPoints.data(), mPoints.size(), true /* addRef */);
+		mOrientationsVtArray = pxr::VtArray<OrientationType>(&mOrientationsForeignDataSource, mOrientations.data(), mOrientations.size(), true /* addRef */);
 	} else {
 		mOrientationsVtArray = std::move(other.mOrientationsVtArray);
 	}
@@ -155,6 +155,6 @@ void TemplatedPointsList<T, O>::calcSizeInBytes() const {
 }
 
 template class Piston::TemplatedPointsList<pxr::VtArray<Piston::TemplatedPointsListBase::PointType>, pxr::VtArray<Piston::TemplatedPointsListBase::OrientationType>>;
-template class Piston::TemplatedPointsList<std::vector<Piston::TemplatedPointsListBase::PointType>,pxr::VtArray<Piston::TemplatedPointsListBase::OrientationType>>;
+template class Piston::TemplatedPointsList<std::vector<Piston::TemplatedPointsListBase::PointType>, std::vector<Piston::TemplatedPointsListBase::OrientationType>>;
 
 } // namespace Piston
