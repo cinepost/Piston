@@ -15,19 +15,57 @@ class PointInstancerDeformer;
 
 class PointInstancerDeformerData : public SerializableDeformerDataBase {
 	public:
+		static const uint8_t kNeighborsDefault = 4; // 3 or 4. Used in simple Multi-Point Proxinity mode
 		enum class BindMode: uint8_t { 
 			SIMPLE, 
-			VOLUME
+			MPPP
 		};
 
 		struct PointBindData {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
 			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
+			pxr::GfVec3f local_pos;
 			uint32_t face_id;
-			float u, v, dist;
-			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
+			uint8_t  edge_id;
+			PointBindData(): face_id(kInvalidFaceID) {};
 
 			inline bool isValid() const { return face_id != kInvalidFaceID; }
+		};
+
+		// Multi-Point Proximity
+		struct BindSample {
+    		uint32_t		meshVertexIndex;
+    		float 			weight;
+    		pxr::GfVec3f 	localOffset; // local-space offset
+		};
+
+		struct MPPPointBindings {
+			std::vector<BindSample> 	mSamples; 		// Instancer points count * mStride
+			const size_t 				mStride; 		// Constant (e.g., 3 or 4)
+			size_t                      mSize;
+
+			MPPPointBindings(size_t stride): mStride(std::min((size_t)1, stride)), mSize(0) {
+				assert(mStride > 0 && mStride < 9);
+			}
+
+			MPPPointBindings(): MPPPointBindings(kNeighborsDefault) {}
+
+			size_t size() const { return mSize; }
+
+			void clear() { 
+				mSamples.clear();
+				mSize = 0;
+			}
+
+			void resize(size_t new_size) {
+				assert(new_size > 0);
+
+				if(mSize == new_size) return;
+				mSize = new_size;
+				mSamples.resize(mSize * mStride);
+			}
+
+			size_t getStride() const { return mStride; }
 		};
 
 		void setBindMode(BindMode mode);
@@ -55,6 +93,8 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 		BindMode                                mBindMode;
 
 		std::vector<PointBindData>              mPointBinds;
+		MPPPointBindings                        mMPPPointBindings;
+
 		bool 									mIsValid;
 
 		friend class PointInstancerDeformer;
@@ -69,7 +109,7 @@ inline std::string to_string(const PointInstancerDeformerData::BindMode& mode) {
 		case PointInstancerDeformerData::BindMode::SIMPLE:
 			return "SIMPLE";
 		default:
-			return "VOLUME";
+			return "MPPP";
 	}
 }
 
@@ -77,7 +117,7 @@ inline void from_string(const std::string& str, PointInstancerDeformerData::Bind
 	if(str == "SIMPLE") {
 		mode = PointInstancerDeformerData::BindMode::SIMPLE;
 	} else {
-		mode = PointInstancerDeformerData::BindMode::VOLUME;	
+		mode = PointInstancerDeformerData::BindMode::MPPP;	
 	}
 }
 

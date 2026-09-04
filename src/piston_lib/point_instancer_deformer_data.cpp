@@ -29,13 +29,17 @@ size_t PointInstancerDeformerData::calcHash() const {
 
 	for(const auto& bind: mPointBinds) {
 		std::size_t raw_bits;
-		double _tmp = bind.u + bind.v + bind.dist;
+		double _tmp = static_cast<double>(bind.local_pos[0] + bind.local_pos[1] + bind.local_pos[2]) + static_cast<double>(bind.face_id + bind.edge_id);
 
     	std::memcpy(&raw_bits, &_tmp, sizeof(double));
 		hash += static_cast<size_t>(bind.face_id) + raw_bits;
 	}
 
-	hash += mPointBinds.size();
+	if(mBindMode == BindMode::SIMPLE) {
+		hash += mPointBinds.size();
+	} else {
+		hash += mMPPPointBindings.size();
+	}
 
 	return hash;
 }
@@ -96,14 +100,17 @@ const SerializableDeformerDataBase::DataVersion& PointInstancerDeformerData::jso
 }
 
 void to_json(json& j, const PointInstancerDeformerData::PointBindData& bind) {
-	j = {bind.face_id, bind.u, bind.v, bind.dist};
+	j = {bind.local_pos[0], bind.local_pos[1], bind.local_pos[2], bind.face_id, bind.edge_id};
 }
 
 void from_json(const json& j, PointInstancerDeformerData::PointBindData& bind) {
-	bind.face_id = j.at(0).template get<uint32_t>();
-	bind.u = j.at(1).template get<float>();
-	bind.v = j.at(2).template get<float>();
-	bind.dist = j.at(3).template get<float>();
+	
+	bind.local_pos[0] = j.at(0).template get<float>();
+	bind.local_pos[1] = j.at(1).template get<float>();
+	bind.local_pos[2] = j.at(2).template get<float>();
+	
+	bind.face_id = j.at(3).template get<uint32_t>();
+	bind.edge_id = j.at(4).template get<float>();
 }
 
 } // namespace Piston

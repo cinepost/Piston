@@ -104,17 +104,23 @@ const TemplatedPointsListBase::PointType* TemplatedPointsList<T, O>::points() co
 template <typename T, typename O>
 TemplatedPointsListBase::OrientationType* TemplatedPointsList<T, O>::orientations() {
 	if constexpr (std::is_same_v<O, std::vector<OrientationType>>) {
+		if(mOrientations.size() == 0) return nullptr;
 		return mOrientations.data();
 	} else {
+		if(mOrientationsVtArray.size() == 0) return nullptr;
 		return mOrientationsVtArray.data();
 	}
 }
 
 template <typename T, typename O>
-const TemplatedPointsListBase::OrientationType* TemplatedPointsList<T, O>::orientations() const { 
+const TemplatedPointsListBase::OrientationType* TemplatedPointsList<T, O>::orientations() const {
+	static const TemplatedPointsListBase::OrientationType* sNull = nullptr;
+
 	if constexpr (std::is_same_v<O, std::vector<OrientationType>>) {
+		if(mOrientations.size() == 0) return sNull;
 		return mOrientations.data();
 	} else {
+		if(mOrientationsVtArray.size() == 0) return sNull;
 		return mOrientationsVtArray.AsConst().data();
 	}
 }

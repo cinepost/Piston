@@ -35,6 +35,8 @@ class InstancerContainer : public std::enable_shared_from_this<InstancerContaine
 		const pxr::VtArray<pxr::GfVec3f>& getRestInstancePoints() const { return mRestInstancePoints.AsConst(); }
 		const pxr::VtArray<pxr::GfVec3f>& getLiveInstancePoints() const { return mLiveInstancePoints.AsConst(); }
 
+		const pxr::VtArray<pxr::GfQuath>& getRestOrientations() const { return mRestOrientations.AsConst(); }
+
 
 	protected:
 		InstancerContainer();
@@ -45,6 +47,8 @@ class InstancerContainer : public std::enable_shared_from_this<InstancerContaine
 
 		pxr::VtArray<pxr::GfVec3f>              mRestInstancePoints;
 		pxr::VtArray<pxr::GfVec3f>              mLiveInstancePoints;
+
+		pxr::VtArray<pxr::GfQuath>              mRestOrientations;
 
 		pxr::UsdTimeCode 						mLastUpdateTimeCode;
 };

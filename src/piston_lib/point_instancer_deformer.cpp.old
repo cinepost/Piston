@@ -112,7 +112,7 @@ bool PointInstancerDeformer::outputDeformedPoints(const PointsList* pPointsList,
 	pxr::UsdAttribute attr_o = instancer.GetOrientationsAttr();
 	const auto& orientations = pPointsList->getOrientationsVtArray();
 	if(attr_o && orientations.size() == pPointsList->size()) {
-		//attr_o.Set(orientations, time_code);
+		attr_o.Set(orientations, time_code);
 	}
 
 	return true;
@@ -151,101 +151,30 @@ bool PointInstancerDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
-bool PointInstancerDeformer::__deform__(PointsList& points_list, bool multi_threaded, pxr::UsdTimeCode time_code) {
+bool PointInstancerDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
 	DLOG_DBG << "PointInstancerDeformer::__deform__";
 
 	assert(mpInstancerContainer);
 	assert(mpDeformerMeshContainer);
 	assert(mpPointInstancerDeformerData);
 
-	assert(points_list.size() == mpInstancerContainer->getInstanceCount());
+	const auto& rest_positions = mpInstancerContainer->getRestInstancePoints();
 
-	DLOG_DBG << "Points count " << points_list.size();
+	DLOG_DBG << "Points count " << points.size();
 	DLOG_DBG << "Instances container instances count " << mpInstancerContainer->getInstanceCount();
+	DLOG_DBG << "Instances count " << rest_positions.size();
 
-	if(mpPointInstancerDeformerData->getBindMode() == PointInstancerDeformerData::BindMode::SIMPLE) {
-		return __deform__simple__(points_list, multi_threaded, time_code);
-	} else {
-		return __deform__mppp__(points_list, multi_threaded, time_code);
-	}
-}
+	assert(points.size() == rest_positions.size());
 
-bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool multi_threaded, pxr::UsdTimeCode time_code) {
-	DLOG_DBG << "PointInstancerDeformer::__deform__simple__";
-
-	assert(mpInstancerContainer);
-	assert(mpPhantomTrimeshData && mpPhantomTrimeshData->isValid());
-	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
-
-	const MeshContainer::ContainerType& mesh_live_positions = mpDeformerMeshContainer->getLivePositions();
-
-	const auto& bindings = mpPointInstancerDeformerData->mPointBinds;
-	assert(points_list.size() == bindings.size());
-
-	const auto& instancer_rest_orientations = mpInstancerContainer->getRestOrientations();
-
-	auto* pOutPoints = points_list.points();
-	auto* pOutOrientations = points_list.orientations();
-
-	for(size_t i = 0; i < points_list.size(); ++i) {
-		const auto& binding = bindings[i];
-		assert(binding.face_id != PointInstancerDeformerData::PointBindData::kInvalidFaceID);
-
-		const PhantomTrimesh::TriFace& face = pPhantomTrimesh->getFace(binding.face_id);
-		const pxr::GfVec3f& p0 = mesh_live_positions[face.indices[0]];
-		const pxr::GfVec3f& p1 = mesh_live_positions[face.indices[1]];
-		const pxr::GfVec3f& p2 = mesh_live_positions[face.indices[2]];
-
-		pxr::GfVec3f edge01 = p1 - p0;
-    	pxr::GfVec3f edge02 = p2 - p0;
-    	pxr::GfVec3f normal = pxr::GfCross(edge01, edge02).GetNormalized();
-
-    	pxr::GfMatrix4f localToWorld;
-
-    	if (binding.edge_id < 0) {
-	        // Rebuild full skew matrix to follow stretching/shearing internally
-	        localToWorld.SetRow(0, pxr::GfVec4f(edge01[0], edge01[1], edge01[2], 0.0f));
-	        localToWorld.SetRow(1, pxr::GfVec4f(edge02[0], edge02[1], edge02[2], 0.0f));
-	        localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
-	        localToWorld.SetRow(3, pxr::GfVec4f(p0[0], p0[1], p0[2], 1.0f));
-	    } else {
-	        // Rebuild edge-locked orthonormal matrix
-	        pxr::GfVec3f origin, axisX;
-	        if (binding.edge_id == 0) {
-	            origin = p0; axisX = edge01;
-	        } else if (binding.edge_id == 1) {
-	            origin = p1; axisX = p2 - p1;
-	        } else {
-	            origin = p2; axisX = p0 - p2;
-	        }
-
-	        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
-
-	        localToWorld.SetRow(0, pxr::GfVec4f(axisX[0], axisX[1], axisX[2], 0.0f));
-	        localToWorld.SetRow(1, pxr::GfVec4f(normalY[0], normalY[1], normalY[2], 0.0f));
-	        localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
-	        localToWorld.SetRow(3, pxr::GfVec4f(origin[0], origin[1], origin[2], 1.0f));
-	    }
-
-		pOutPoints[i] = localToWorld.Transform(binding.local_pos);
-	};
-
-	return true;
-}
-
-bool PointInstancerDeformer::__deform__mppp__(PointsList& points_list, bool multi_threaded, pxr::UsdTimeCode time_code) {
-	DLOG_DBG << "PointInstancerDeformer::__deform__mppp__";
-
-	const auto& bindings = mpPointInstancerDeformerData->mMPPPointBindings;
-	assert(points_list.size() == bindings.size());
+	auto& bindings = mpPointInstancerDeformerData->mMPPPointBindings;
+	assert(points.size() == bindings.size());
 
 	const MeshContainer::ContainerType& mesh_live_positions = mpDeformerMeshContainer->getLivePositions();
 
 	const size_t stride = bindings.getStride(); // neighbors per bind
 
-	auto* pOutPoints = points_list.points();
-	auto* pOutOrientations = points_list.orientations();
+	auto* pOutPoints = points.points();
+	auto* pOutOrientations = points.orientations();
 
 	assert(mpAdjacencyData);
 	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
@@ -254,14 +183,9 @@ bool PointInstancerDeformer::__deform__mppp__(PointsList& points_list, bool mult
 	mLiveVertexNormals.resize(pAdjacency->getVertexCount());
 	buildVertexNormals(pAdjacency, nullptr, mLiveVertexNormals, mesh_live_positions, (multi_threaded ? &mPool : nullptr));
 
-	const auto& instancer_rest_orientations = mpInstancerContainer->getRestOrientations();
-
-	evaluateBaseMeshLiveFrames(pAdjacency, mLiveVertexNormals);
-	assert(mLiveVertexNormals.size() == mesh_live_positions.size());
-
-	for(size_t i = 0; i < points_list.size(); ++i) {
-		pxr::GfVec3f blendedPos(0.0f);
-        pxr::GfQuatf blendedQuat(0.0f, 0.0f, 0.0f, 0.0f);
+	for(size_t i = 0; i < points.size(); ++i) {
+		pxr::GfVec3f deformedPos(0.0f);
+        pxr::GfVec3f blendedNormal(0.0f);
         size_t flatIndexStart = i * stride;
 
 		// Sequence reading from a single block of contiguous memory
@@ -270,29 +194,78 @@ bool PointInstancerDeformer::__deform__mppp__(PointsList& points_list, bool mult
             size_t mIdx = sample.meshVertexIndex;
             float w = sample.weight;
 
-            // Direct index array lookup
-            const pxr::GfQuatf& activeSurfaceAlign = mDeformerMeshLiveFrames[mIdx];
+            pxr::GfVec3f targetWorldPos = mesh_live_positions[mIdx] + sample.localOffset;
+            deformedPos += targetWorldPos * w;
 
-            // Reconstruct precise world position relative to the moving mesh contour
-            pxr::GfVec3f worldOffset = activeSurfaceAlign.Transform(sample.localOffset);
-            blendedPos += (mesh_live_positions[mIdx] + worldOffset) * w;
-        
-            // Reconstruct absolute instance orientations
-            pxr::GfQuatf neighborInstanceOrient = activeSurfaceAlign * instancer_rest_orientations[i];
-            
-			// Linear quaternion blending accumulator with double-hemisphere alignment
-            if (pxr::GfDot(neighborInstanceOrient, blendedQuat) < 0.0f) {
-                blendedQuat -= neighborInstanceOrient * w;
-            } else {
-                blendedQuat += neighborInstanceOrient * w;
+            if (mLiveVertexNormals.size() > mIdx) {
+                blendedNormal += mLiveVertexNormals[mIdx] * w;
             }
         }
+        blendedNormal.Normalize();
 
-		pOutPoints[i] = blendedPos;
+		pOutPoints[i] = deformedPos;
 
 		if(pOutOrientations) {
+
+			// Retrieve the stable tangent guide vector saved during the capture phase
+			pxr::GfVec3f tangentGuide = bindings.mLocalTangentGuides[i];
+
+			// Project the guide vector onto the new normal to find the overlapping component
+			float dotProduct = pxr::GfDot(tangentGuide, blendedNormal);
+
+			// Subtract the overlapping component to make the vector perfectly orthogonal (perpendicular)
+			pxr::GfVec3f orthogonalTangent = tangentGuide - (blendedNormal * dotProduct);
+
+			// Handle an extreme edge-case: If the normal deformed so radically that it aligns perfectly 
+			// with the guide vector, the orthogonal vector will collapse to zero length. 
+			pxr::GfVec3f animatedTangent;
+			if (orthogonalTangent.GetLengthSq() < 1e-6f) {
+			    // Generate an alternative fallback direction if it collapses
+			    pxr::GfVec3f fallbackDir = (std::abs(blendedNormal[1]) < 0.9f) ? pxr::GfVec3f(0, 1, 0) : pxr::GfVec3f(1, 0, 0);
+			    animatedTangent = pxr::GfCross(fallbackDir, blendedNormal).GetNormalized();
+			} else {
+			    // Otherwise, normalize the freshly adjusted tangent
+			    animatedTangent = orthogonalTangent.GetNormalized();
+			}
+
+			// Compute the final bitangent using a cross product to lock down the 3rd axis
+			pxr::GfVec3f animatedBitangent = pxr::GfCross(blendedNormal, animatedTangent).GetNormalized();
+
+
+			// Rebuild your animated orientation matrix frame
+			pxr::GfMatrix3f currentRotationMatrix;
+			currentRotationMatrix.SetRow(0, animatedTangent);
+			currentRotationMatrix.SetRow(1, blendedNormal);
+			currentRotationMatrix.SetRow(2, animatedBitangent);
+
+			// Extract the double-precision backend quaternion
+			pxr::GfQuaternion currentDoubleQuat = currentRotationMatrix.GetTranspose().ExtractRotationQuaternion();
+
+			// Explicitly construct the single-precision version to safely run inline multiplications
+			pxr::GfQuatf currentSurfaceAlign(
+			    static_cast<float>(currentDoubleQuat.GetReal()), 
+			    pxr::GfVec3f(currentDoubleQuat.GetImaginary())
+			);
+
+			// Unpack your cached half-precision binding offset, compose, and safely normalize out scale drift
+			pxr::GfQuatf relativeOffsetF(bindings.mLocalOrientations[i]);
+			pxr::GfQuatf deformedQuat = currentSurfaceAlign * relativeOffsetF;
+
+/*
+			// Active frame alignment math
+			pxr::GfQuaternion currentDoubleQuat = pxr::GfRotation(pxr::GfVec3d(0, 1, 0), pxr::GfVec3d(blendedNormal)).GetQuaternion();
+       		pxr::GfQuatf currentSurfaceAlign(static_cast<float>(currentDoubleQuat.GetReal()), pxr::GfVec3f(currentDoubleQuat.GetImaginary()));
+
+       		// Unpack your cached half-precision orientation binding to full float
+        	pxr::GfQuatf relativeOffsetF(bindings.mLocalOrientations[i]);
+        	pxr::GfQuatf deformedQuat = currentSurfaceAlign * relativeOffsetF;
+
+        	// Normalize while in full precision to discard rounding scale artifacts
+        	pxr::GfQuatf unitQuatF = deformedQuat.GetNormalized();
+
+*/
         	// Store orientation compressed down to GfQuath
-        	pOutOrientations[i] = pxr::GfQuath(blendedQuat.GetNormalized());
+        	pOutOrientations[i] = pxr::GfQuath(deformedQuat.GetNormalized());
 		}
 	}
 
@@ -386,10 +359,8 @@ bool PointInstancerDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 			// Build bind data
 			switch(mpPointInstancerDeformerData->getBindMode()) {
 				case BindMode::SIMPLE:
-					result = buildDeformerData_SimpleMode(multi_threaded, rest_vertex_normals, rest_time_code);
-					break;
 				default:
-					result = buildDeformerData_MPPPMode(multi_threaded, rest_vertex_normals, rest_time_code);
+					result = buildDeformerData_SimpleMode(multi_threaded, rest_vertex_normals, rest_time_code);
 					break;
 			}
 
@@ -448,9 +419,10 @@ void PointInstancerDeformer::evaluateBaseMeshLiveFrames(const UsdGeomMeshFaceAdj
 
     mDeformerMeshLiveFrames.resize(mDeformerMeshRestFrames.size());
 
-    for (size_t i = 0; i < mesh_live_positions.size(); ++i) {
+    for (size_t i = 0; i < animatedMeshPositions.size(); ++i) {
         const pxr::GfVec3f& normal = live_vertex_normals[i];
-       
+        normal.Normalize();
+
         // Retrieve the locked reference direction from Phase 1
         const pxr::GfVec3f& cachedTangent = mDeformerMeshRestFrames[i].tangentGuide;
 
@@ -470,10 +442,9 @@ void PointInstancerDeformer::evaluateBaseMeshLiveFrames(const UsdGeomMeshFaceAdj
     }
 }
 
-bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
+bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
 	assert(mpPointInstancerDeformerData);
 	assert(mpDeformerMeshContainer);
-	assert(mpPhantomTrimeshData);
 	assert(mpInstancerContainer);
 
 	const auto instances_count = mpInstancerContainer->getInstanceCount();
@@ -500,7 +471,7 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
-			LOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
+			LOG_TRC << "Binding curves from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
 
 		const auto kNeighbors = mpPointInstancerDeformerData->mMPPPointBindings.getStride();
@@ -515,161 +486,72 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 			pKDtree->findKNearestNeighbours(instPos, kNeighbors, closest_deformer_points);
 
 			// Weights
-			float totalWeight = 0.0f;
 	        std::vector<float> rawWeights(kNeighbors);
+	        float totalWeight = 0.0f;
 	        for (size_t n = 0; n < kNeighbors; ++n) {
 	            float dist_squared = std::max(closest_deformer_points[n].second, 1e-5f);
 	            rawWeights[n] = 1.0f / dist_squared;
 	            totalWeight += rawWeights[n];
 	        }
 
-	        // Populate flat lookup tables
+	        GfQuatf surfaceAlign = baseRotationMatrix.GetTranspose().ExtractRotationQuaternion().GetNormalized();
+
+
+	        // Write directly into the contiguous vector segment
+	        pxr::GfVec3f blendedNormal(0.0f);
 	        for (size_t n = 0; n < kNeighbors; ++n) {
 	            size_t mIdx = closest_deformer_points[n].first;
 	            float normWeight = rawWeights[n] / totalWeight;
 
-	            // Instantly grab precomputed alignment frames
-	            const pxr::GfQuatf& surfaceAlign = mDeformerMeshRestFrames[mIdx].alignmentQuat;
-
 	            pxr::GfVec3f worldOffset = instPos - mesh_rest_positions[mIdx];
-	            pxr::GfVec3f localOffset = surfaceAlign.GetInverse().Transform(worldOffset);
+				pxr::GfVec3f localOffset = surfaceAlign.GetInverse().Transform(worldOffset);
 
-	            bindings.mSamples[flatIndexStart + n] = { mIdx, normWeight, localOffset };
+	            // Direct contiguous memory assignment
+	            bindings.mSamples[flatIndexStart + n] = {
+	                mIdx, 
+	                normWeight, 
+	                instPos - mesh_rest_positions[mIdx]
+	            };
+
+	            assert(mIdx < rest_vertex_normals.size());
+	            if (rest_vertex_normals.size() > mIdx) {
+	                blendedNormal += rest_vertex_normals[mIdx] * normWeight;
+	            }
 	        }
-		}
-	};
+	        blendedNormal.Normalize();
 
-	DLOG_INF << "Binding instances using MPPP method.";
-    
-    if(multi_threaded) {
-    	BS::multi_future<void> blocks = mPool.submit_blocks(0, instances_count, func);
-		blocks.wait();
-	} else {
-		func(0, instances_count);
-	}
+	        if(has_orientations) {
+		        // Establish an unambiguous reference vector (e.g., World Forward, or Right if aligned)
+				pxr::GfVec3f referenceDir(0.0f, 0.0f, 1.0f);
+				if (std::abs(pxr::GfDot(blendedNormal, referenceDir)) > 0.9f) {
+	    			referenceDir = pxr::GfVec3f(1.0f, 0.0f, 0.0f); // Guard against parallel vectors
+				}
 
-	return true;
-}
+				// Derive stable, perpendicular orthogonal vectors (Gram-Schmidt orthogonalization)
+				pxr::GfVec3f tangent = pxr::GfCross(referenceDir, blendedNormal).GetNormalized();
+				pxr::GfVec3f bitangent = pxr::GfCross(blendedNormal, tangent).GetNormalized();
 
-bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
-	const auto instances_count = mpInstancerContainer->getInstanceCount();
-	const auto& instancer_rest_positions = mpInstancerContainer->getRestInstancePoints();
+				// Construct a clean 3x3 orientation matrix from this basis
+				pxr::GfMatrix3f baseRotationMatrix;
+				baseRotationMatrix.SetRow(0, tangent);
+				baseRotationMatrix.SetRow(1, blendedNormal);
+				baseRotationMatrix.SetRow(2, bitangent);
 
-	std::vector<PointBindData>& bindings = mpPointInstancerDeformerData->mPointBinds;
-	bindings.resize(instances_count);
+				pxr::GfQuaternion extractedDoubleQuat = baseRotationMatrix.GetTranspose().ExtractRotationQuaternion();
+				pxr::GfQuatf surfaceAlign(static_cast<float>(extractedDoubleQuat.GetReal()), pxr::GfVec3f(extractedDoubleQuat.GetImaginary()));
 
-	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
 
-	// Build kdtree
-	const MeshContainer::ContainerType& mesh_rest_positions = mpDeformerMeshContainer->getRestPositions();
-	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDtree = std::make_unique<neighbour_search::KDTree<float, 3>>(mesh_rest_positions, false /* no threads */);
+				// Compute and cache properties safely
+				pxr::GfQuatf relativeOffsetF = surfaceAlign.GetInverse() * instancer_rest_orientations[i];
+				bindings.mLocalOrientations[i] = pxr::GfQuath(relativeOffsetF);
 
-	auto func = [&](const std::size_t start, const std::size_t end) {
-    	if(multi_threaded) {
-			LOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
-		}
-
-		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
-	
-		for(size_t i = start; i < end; ++i) {
-			PointInstancerDeformerData::PointBindData& binding = bindings[i];
-			const pxr::GfVec3f& instPos = instancer_rest_positions[i];
-
-			auto candidate = pKDtree->findNearestNeighbour(instPos);
-			pKDtree->findKNearestNeighbours(instPos, 3, closest_deformer_points);
-
-			const neighbour_search::KDTree<float, 3>::ReturnType nearest_mesh_candidate = pKDtree->findNearestNeighbour(instPos);
-		
-			auto v0 = closest_deformer_points[0].first;
-			auto v1 = closest_deformer_points[1].first;
-			auto v2 = closest_deformer_points[2].first;
-
-			binding.face_id = pPhantomTrimesh->getOrCreateFaceID(v0, v1, v2);
-
-			const pxr::GfVec3f& p0 = mesh_rest_positions[v0];
-			const pxr::GfVec3f& p1 = mesh_rest_positions[v1];
-			const pxr::GfVec3f& p2 = mesh_rest_positions[v2];
-
-			pxr::GfVec3f edge01 = p1 - p0;
-    		pxr::GfVec3f edge02 = p2 - p0;
-    		pxr::GfVec3f normal = pxr::GfCross(edge01, edge02).GetNormalized();
-
-    		float planeDist = pxr::GfDot(instPos - p0, normal);
-    		pxr::GfVec3f planePoint = instPos - (normal * planeDist);
-
-    		// barycentric test
-			pxr::GfVec3f c0 = planePoint - p0;
-		    float d00 = pxr::GfDot(edge01, edge01);
-		    float d01 = pxr::GfDot(edge01, edge02);
-		    float d11 = pxr::GfDot(edge02, edge02);
-		    float d20 = pxr::GfDot(c0, edge01);
-		    float d21 = pxr::GfDot(c0, edge02);
-		    float denom = d00 * d11 - d01 * d01;
-
-		    float v = 0.0f, w = 0.0f;
-		    if (std::abs(denom) > 1e-6f) {
-		        v = (d11 * d20 - d01 * d21) / denom;
-		        w = (d00 * d21 - d01 * d20) / denom;
-		    }
-		    float u = 1.0f - v - w;
-
-			if (u >= 0.0f && v >= 0.0f && w >= 0.0f) {
-		        // point projected inside triangle
-		        binding.edge_id = -1;
-
-		        // Build a skew-capable matrix where X and Y are raw edge vectors
-		        pxr::GfMatrix4f localToWorld;
-		        localToWorld.SetRow(0, pxr::GfVec4f(edge01[0], edge01[1], edge01[2], 0.0f));
-				localToWorld.SetRow(1, pxr::GfVec4f(edge02[0], edge02[1], edge02[2], 0.0f));
-				localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
-				localToWorld.SetRow(3, pxr::GfVec4f(p0[0],     p0[1],     p0[2],     1.0f));
-
-		        binding.local_pos = localToWorld.GetInverse().Transform(instPos);
-		    
-		    } else {
-			    // point projected outside
-			    auto closestPointOnSegment = [](const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b, float& t) {
-			        pxr::GfVec3f ab = b - a;
-			        float lenSq = pxr::GfDot(ab, ab);
-			        t = (lenSq > 1e-6f) ? pxr::GfDot(p - a, ab) / lenSq : 0.0f;
-			        t = std::max(0.0f, std::min(1.0f, t));
-			        return a + t * ab;
-			    };
-
-			    float t0, t1, t2;
-			    pxr::GfVec3f cp0 = closestPointOnSegment(planePoint, p0, p1, t0);
-			    pxr::GfVec3f cp1 = closestPointOnSegment(planePoint, p1, p2, t1);
-			    pxr::GfVec3f cp2 = closestPointOnSegment(planePoint, p2, p0, t2);
-
-			    float sqdist0 = lengthSquared(planePoint - cp0);
-			    float sqdist1 = lengthSquared(planePoint - cp1);
-			    float sqdist2 = lengthSquared(planePoint - cp2);
-
-			    pxr::GfVec3f origin, axisX;
-			    if (sqdist0 <= sqdist1 && sqdist0 <= sqdist2) {
-			        binding.edge_id = 0; origin = p0; axisX = edge01;    // Edge 01
-			    } else if (sqdist1 <= sqdist0 && sqdist1 <= sqdist2) {
-			        binding.edge_id = 1; origin = p1; axisX = p2 - p1;   // Edge 12
-			    } else {
-			        binding.edge_id = 2; origin = p2; axisX = p0 - p2;   // Edge 20
-			    }
-
-			    // Rigid Orthonormal Frame relative to the active edge
-			    pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
-			    
-			    pxr::GfMatrix4f localToWorld;
-			    localToWorld.SetRow(0, pxr::GfVec4f(axisX[0], axisX[1], axisX[2], 0.0f));     // Scales along the active edge
-			    localToWorld.SetRow(1, pxr::GfVec4f(normalY[0], normalY[1], normalY[2], 0.0f));   // Rigid absolute outward distance
-			    localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));    // Rigid absolute plane distance
-			    localToWorld.SetRow(3, pxr::GfVec4f(origin[0], origin[1], origin[2], 1.0f));
-
-			    binding.local_pos = localToWorld.GetInverse().Transform(instPos);
+				// Cache the local tangent guide vector for Phase 2 use
+				bindings.mLocalTangentGuides[i] = tangent;
 			}
 		}
 	};
 
-	DLOG_INF << "Binding instances using Simple method.";
+	DLOG_INF << "Binding instances using SPACE method.";
     
     if(multi_threaded) {
     	BS::multi_future<void> blocks = mPool.submit_blocks(0, instances_count, func);
@@ -677,8 +559,6 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 	} else {
 		func(0, instances_count);
 	}
-
-	mpPhantomTrimeshData->setValid(true);
 
 	return true;
 }

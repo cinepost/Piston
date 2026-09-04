@@ -185,10 +185,19 @@ template <typename T>
 void buildVertexNormals(const UsdGeomMeshFaceAdjacency* pAdjacency, const PhantomTrimesh* pTrimesh, std::vector<pxr::GfVec3f>& vertex_normals, const T& pt_positions, BS::thread_pool<BS::tp::none>* pThreadPool) {
     static_assert(std::is_same_v<T, std::vector<pxr::GfVec3f>> || std::is_same_v<T, pxr::VtArray<pxr::GfVec3f>>, "Only std::vector<pxr::GfVec3f> and pxr::VtArray<pxr::GfVec3f> types are permitted!");    
     assert(pAdjacency);
-    assert(pTrimesh);
 
     vertex_normals.resize(pAdjacency->getVertexCount());
-    const std::vector<PhantomTrimesh::PxrIndexType>& vertices = pTrimesh->getVertices();
+    std::vector<PhantomTrimesh::PxrIndexType> vertices;
+
+    if(pTrimesh && pTrimesh->getVertices().size() > 0) {
+        vertices = pTrimesh->getVertices();
+    } else {
+        const auto mesh_vertex_count = pAdjacency->getVertexCount();
+        vertices.resize(mesh_vertex_count);
+        for(auto i = 0; i < mesh_vertex_count; ++i) {
+            vertices[i] = i;
+        }
+    }
     
     auto func = [&](const std::size_t vertex_index) {
         pxr::GfVec3f vn = {0.f, 0.f, 0.f};

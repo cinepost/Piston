@@ -68,25 +68,43 @@ class PointInstancerDeformer :public BaseDeformer, public inherit_shared_from_th
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) override final;
 
 	private:
-		bool __deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code);
+		bool __deform__(PointsList& points_list, bool multi_threaded, pxr::UsdTimeCode time_code);
+		bool __deform__simple__(PointsList& points_list, bool multi_threaded, pxr::UsdTimeCode time_code);
+		bool __deform__mppp__(PointsList& points_list, bool multi_threaded, pxr::UsdTimeCode time_code);
 
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) override final;
+		
 		bool buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);
+		bool buildDeformerData_MPPPMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code);	
+
+		virtual bool deformerOutputsOrientations() const override final;
 		virtual bool writeJsonDataToPrimImpl() const override final;
+
+	private:
+		struct MeshVertexFrame {
+    		pxr::GfQuatf alignmentQuat; // The orientation of this vertex frame
+    		pxr::GfVec3f tangentGuide;  // Persistent direction lock to prevent flipping during animation
+		};
+
+		void captureBaseMeshRestFrames(const UsdGeomMeshFaceAdjacency* pAdjacency, const std::vector<pxr::GfVec3f>& rest_vertex_normals);
+		void evaluateBaseMeshLiveFrames(const UsdGeomMeshFaceAdjacency* pAdjacency, const std::vector<pxr::GfVec3f>& live_vertex_normals);
 
 		BindMode                                    mBindMode;
 
 		UsdPrimHandle 								mInstancerGeoPrimHandle;
 
 		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpAdjacencyData;
-		std::shared_ptr<SerializablePhantomTrimesh>				mpPhantomTrimeshData;
+		std::shared_ptr<SerializablePhantomTrimesh>	mpPhantomTrimeshData;
 
-		InstancerContainer::UniquePtr                           mpInstancerContainer;
+		InstancerContainer::UniquePtr               mpInstancerContainer;
 
 		std::shared_ptr<PointInstancerDeformerData> mpPointInstancerDeformerData;
 
 		std::vector<pxr::GfVec3f> 					mLiveVertexNormals;
 		std::vector<pxr::GfVec3f> 					mLiveTriFaceNormals;
+
+		std::vector<MeshVertexFrame>                mDeformerMeshRestFrames;
+		std::vector<pxr::GfQuatf>                	mDeformerMeshLiveFrames;
 
 		std::vector<pxr::GfMatrix3f>            	mTmpFaceNTBMatrices;
 		std::vector<pxr::GfVec3f>               	mTmpCurvesLocalAnimVectors;

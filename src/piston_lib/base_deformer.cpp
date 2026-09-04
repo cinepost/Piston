@@ -171,7 +171,7 @@ bool BaseDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded, bool 
 		DLOG_TRC << "Deforming curves at " << key.time;
 
 		if(!points) {
-			points = std::make_unique<PointsList>(points_count);
+			points = std::make_unique<PointsList>(points_count, deformerOutputsOrientations());
 		} else {
 			points->resize(points_count);
 		}
@@ -197,7 +197,7 @@ bool BaseDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded, bool 
 			return p_points_list_ptr;
 		}
 
-		PointsList* p_new_points_list = pPointsLRUCache->put(key, points_count);
+		PointsList* p_new_points_list = pPointsLRUCache->put(key, points_count, deformerOutputsOrientations());
 		if (deformPoints(multi_threaded, *p_new_points_list, key.time)) {
 			return (const PointsList*)p_new_points_list;
 		}

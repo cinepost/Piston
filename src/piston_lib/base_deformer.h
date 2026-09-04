@@ -186,6 +186,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) = 0;
 
 	private:
+		virtual bool deformerOutputsOrientations() const { return false; }
 		bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
 		

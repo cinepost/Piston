@@ -33,13 +33,20 @@ bool InstancerContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 		return false;
 	}
 
-    // Get rest curve points
+    // Get rest instance point positions
     if(prim_handle.getRestAttrName().empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(prim_handle.getRestAttrName(), mRestInstancePoints, rest_time_code)) {
 
     	if(!instancer.GetPositionsAttr().Get(&mRestInstancePoints, rest_time_code)) {
             LOG_ERR << "Error getting instance rest positions from " << prim_handle.getName() << " !";
             return false;
         }
+    }
+
+    // Try to get instance orientations
+    instancer.GetOrientationsAttr().Get(&mRestOrientations, rest_time_code);
+    if(mRestInstancePoints.size() != mRestInstancePoints.size()) {
+    	LOG_WRN << prim_handle << " orientation attribute size mismatch!";
+    	mRestOrientations.clear();
     }
 
 	mLastUpdateTimeCode = rest_time_code;
