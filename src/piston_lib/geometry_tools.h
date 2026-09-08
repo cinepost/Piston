@@ -14,6 +14,8 @@
 #include <pxr/usd/usdGeom/mesh.h>
 
 #include <pxr/base/gf/matrix3f.h>
+#include <pxr/base/gf/vec3f.h>
+#include <pxr/base/gf/vec2f.h>
 
 
 namespace Piston {
@@ -64,6 +66,11 @@ struct NTBFrame {
 
 	pxr::GfVec3f n, t, b;
 };
+
+// Helper to calculate 2D cross product / determinant
+inline float cross2D(const pxr::GfVec2f& a, const pxr::GfVec2f& b) {
+    return a[0] * b[1] - a[1] * b[0];
+}
 
 inline void barycentrics_basic_clamp(float& u, float& v) {
     u = std::clamp(u, 0.0f, 1.0f);
@@ -145,6 +152,18 @@ inline float distanceSquared(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const
     
     return lengthSquared(p - closestPoint);
 }
+
+
+// Calculates the bilinear (u, v) coordinates of a point 'p' lying on a quad face. Returns (0,0) to (1,1) if inside the quad bounds.
+// epsilon Floating-point safety tolerance for the border check.
+// return True if the projected point lies INSIDE the quad boundaries; false if OUTSIDE.
+bool getQuadUV(const pxr::GfVec3f& p, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3, float& u, float& v, float epsilon = 1e-5f);
+
+
+// Calculates the bilinear (u, v) coordinates of a point 'pt' lying on a triangle face. Returns (0,0) to (1,1) if inside the triangle bounds.
+// epsilon Floating-point safety tolerance for the border check.
+// return True if the projected point lies INSIDE the quad boundaries; false if OUTSIDE.
+bool getTriUV(const pxr::GfVec3f& p, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, float& u, float& v, float epsilon = 1e-5f);
 
 inline float pointTriangleDistSquared(const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b, const pxr::GfVec3f& c) {
     const pxr::GfVec3f ab = b - a;

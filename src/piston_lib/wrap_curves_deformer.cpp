@@ -284,32 +284,32 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 			// Build deformer data in place if no json data present or not needed
 
 			// First triangulate using simple "fan" triangulation
-			const uint32_t src_mesh_face_count = pAdjacency->getFaceCount();
+			const uint32_t src_mesh_face_count = pAdjacency->getPrimCount();
 
 			for(uint32_t face_id = 0; face_id < src_mesh_face_count; ++face_id) {
-				const uint32_t face_vertex_count = pAdjacency->getFaceVertexCount(face_id);
+				const uint32_t face_vertex_count = pAdjacency->getPrimVertexCount(face_id);
 				
 				if(face_vertex_count < 3 ) {
 					DLOG_ERR << "Source mesh polygon " << face_id << " is invalid !!!";
 					continue;
 				}
 				
-				const uint32_t face_vertex_offset = pAdjacency->getFaceVertexOffset(face_id);
+				const uint32_t face_vertex_offset = pAdjacency->getPrimVertexOffset(face_id);
 
 				switch(face_vertex_count) {
 					case 3:
 						pPhantomTrimesh->getOrCreateFaceID(
-							pAdjacency->getFaceVertex(face_id, 0), 
-							pAdjacency->getFaceVertex(face_id, 1),
-							pAdjacency->getFaceVertex(face_id, 2)
+							pAdjacency->getPrimVertex(face_id, 0), 
+							pAdjacency->getPrimVertex(face_id, 1),
+							pAdjacency->getPrimVertex(face_id, 2)
 						);
 						break;
 					default:
 						for(uint32_t ii = 1; ii < (face_vertex_count - 1); ++ii) {
 							pPhantomTrimesh->getOrCreateFaceID(
-								pAdjacency->getFaceVertex(face_id, 0), 
-								pAdjacency->getFaceVertex(face_id, ii % face_vertex_count),
-								pAdjacency->getFaceVertex(face_id, (ii + 1) % face_vertex_count)
+								pAdjacency->getPrimVertex(face_id, 0), 
+								pAdjacency->getPrimVertex(face_id, ii % face_vertex_count),
+								pAdjacency->getPrimVertex(face_id, (ii + 1) % face_vertex_count)
 							);
 						}
 						break;
@@ -404,7 +404,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 		has_pp_prim_indices = !getSkinPrimAttrName().empty() && 
 								mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
 							   	(skin_prim_indices.size() > 0) &&
-								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getPrimCount()), &err_log_stream);
 	}
 
 	DLOG_INF << "Binding curves using DIST method" << (has_pp_prim_indices ? " with per-point skin primitive indices." : ".");
@@ -470,18 +470,18 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
         			
 					if(prim_id != sInvalidPrimID) {
 						// bind using per point prim_id attr
-						const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
+						const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(prim_id);
 						assert(prim_vertex_count > 2);
 						if(prim_vertex_count == 3) {
 							bind.face_id = pPhantomTrimesh->getOrCreateFaceID(
-								pAdjacency->getFaceVertex(prim_id, 0), 
-								pAdjacency->getFaceVertex(prim_id, 1),
-								pAdjacency->getFaceVertex(prim_id, 2)
+								pAdjacency->getPrimVertex(prim_id, 0), 
+								pAdjacency->getPrimVertex(prim_id, 1),
+								pAdjacency->getPrimVertex(prim_id, 2)
 							);
 						} else {
 
 							for(size_t j = 0; j < prim_vertex_count; ++j) {
-								const auto vtx = pAdjacency->getFaceVertex(prim_id, j);
+								const auto vtx = pAdjacency->getPrimVertex(prim_id, j);
 								tmp_indexed_squared_distances[j] = { distanceSquared(curr_pt, mesh_rest_positions[vtx]), vtx };
 							}
 							
@@ -584,7 +584,7 @@ bool WrapCurvesDeformer::buildDeformerData_SpaceMode(bool multi_threaded, const 
 		has_pp_prim_indices = !getSkinPrimAttrName().empty() &&
 								mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
 								(skin_prim_indices.size() > 0) &&
-								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getFaceCount()), &err_log_stream);
+								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getPrimCount()), &err_log_stream);
 	}
 
 	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();

@@ -5,6 +5,8 @@
 #include <pxr/base/gf/math.h>
 
 #include <limits>
+#include <cmath>
+#include <algorithm>
 
 #define CHECK_PARALLEL
 
@@ -282,6 +284,183 @@ void buildRotationMinimizingFrames(const pxr::GfVec3f* pCurveRootPt, size_t curv
         it_next->b = pxr::GfGetNormalized(pxr::GfCross(tj,it_next->n), MIN_VECTOR_LENGTH_F);
     }
 }
+/*
+bool getQuadUV(const pxr::GfVec3f& pt, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3, float& u, float& v, float epsilon) {
+    // 1. Project 3D points onto a 2D plane to simplify math.
+    // We choose the plane of the first triangle (p0, p1, p2).
+    pxr::GfVec3f normal = pxr::GfCross(p1 - p0, p2 - p0).GetNormalized();
+    
+    // Create an orthonormal basis aligned with the quad surface
+    pxr::GfVec3f axisX = (p1 - p0).GetNormalized();
+    pxr::GfVec3f axisY = pxr::GfCross(normal, axisX).GetNormalized();
+
+    // Lambda to project 3D vector to 2D space
+    auto project2D = [&](const pxr::GfVec3f& p) {
+        pxr::GfVec3f localP = p - p0;
+        return pxr::GfVec2f(pxr::GfDot(localP, axisX), pxr::GfDot(localP, axisY));
+    };
+
+    pxr::GfVec2f q0 = project2D(p0); // Will be (0,0)
+    pxr::GfVec2f q1 = project2D(p1);
+    pxr::GfVec2f q2 = project2D(p2);
+    pxr::GfVec2f q3 = project2D(p3);
+    pxr::GfVec2f qPt = project2D(pt);
+
+    // 2. Solve bilinear coordinates on the 2D plane: qPt = (1-u)(1-v)q0 + u(1-v)q1 + uv*q2 + (1-u)v*q3
+    // This reduces to a quadratic equation: A*v^2 + B*v + C = 0
+    pxr::GfVec2f a = q0 - q1 + q2 - q3;
+    pxr::GfVec2f b = q1 - q0;
+    pxr::GfVec2f c = q3 - q0;
+    pxr::GfVec2f d = qPt - q0;
+
+    float A = cross2D(a, c);
+    float B = cross2D(a, d) + cross2D(b, c);
+    float C = cross2D(b, d);
+
+    u = 0.0f; v = 0.0f;
+
+    // Handle linear edge cases (if A is zero, the quad is a perfect parallelogram)
+    if (std::abs(A) < 1e-6f) {
+        if (std::abs(B) > 1e-6f) {
+            v = -C / B;
+        }
+    } else {
+        // Solve using quadratic formula
+        float discriminant = B * B - 4.0f * A * C;
+        if (discriminant >= 0.0f) {
+            float sqrtD = std::sqrt(discriminant);
+            float v1 = (-B + sqrtD) / (2.0f * A);
+            float v2 = (-B - sqrtD) / (2.0f * A);
+            
+            v = (v1 >= -0.001f && v1 <= 1.001f) ? v1 : v2;
+        }
+    }
+
+    // Secure clamp to ensure precision limits don't break subsequent steps
+    //v = std::max(0.0f, std::min(1.0f, v));
+
+    // 3. Now solve for U using our calculated V
+    pxr::GfVec2f denomU = b + a * v;
+    if (std::abs(denomU[0]) > std::abs(denomU[1])) {
+        if (std::abs(denomU[0]) > 1e-6f) u = (d[0] - c[0] * v) / denomU[0];
+    } else {
+        if (std::abs(denomU[1]) > 1e-6f) u = (d[1] - c[1] * v) / denomU[1];
+    }
+
+   return (u >= -epsilon && u <= 1.0f + epsilon) && (v >= -epsilon && v <= 1.0f + epsilon);
+}
+*/
+
+#include <pxr/base/gf/vec3f.h>
+#include <cmath>
+#include <algorithm>
+
+// Helper to calculate 2D cross product of 2D vectors
+float Cross2D(const pxr::GfVec2f& a, const pxr::GfVec2f& b) {
+    return a[0] * b[1] - a[1] * b[0];
+}
+
+// Projects a 3D point onto a 3D quad plane and returns parametric (u, v) coordinates.
+// Returns true if the projection was successful.
+bool getQuadUV(const pxr::GfVec3f& p, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3, float& u, float& v, float epsilon) {
+
+    // 1. Determine the best 2D projection plane to avoid degeneracy (handling 3D orientation)
+    pxr::GfVec3f normal = pxr::GfCross(p1 - p0, p3 - p0).GetNormalized();
+    float absX = std::abs(normal[0]);
+    float absY = std::abs(normal[1]);
+    float absZ = std::abs(normal[2]);
+
+    int idx0 = 0, idx1 = 1;
+    if (absX > absY && absX > absZ) {
+        idx0 = 1; idx1 = 2; // Project to YZ plane
+    } else if (absY > absX && absY > absZ) {
+        idx0 = 0; idx1 = 2; // Project to XZ plane
+    } else {
+        idx0 = 0; idx1 = 1; // Project to XY plane
+    }
+
+    // 2. Convert 3D points to 2D project coordinates
+    pxr::GfVec2f q(p[idx0], p[idx1]);
+    pxr::GfVec2f q0(p0[idx0], p0[idx1]);
+    pxr::GfVec2f q1(p1[idx0], p1[idx1]);
+    pxr::GfVec2f q2(p2[idx0], p2[idx1]);
+    pxr::GfVec2f q3(p3[idx0], p3[idx1]);
+
+    // 3. Set up the quadratic equation terms: A*v^2 + B*v + C = 0
+    pxr::GfVec2f e10 = q1 - q0;
+    pxr::GfVec2f e30 = q3 - q0;
+    pxr::GfVec2f e23 = q2 - q3;
+    pxr::GfVec2f eq0 = q - q0;
+
+    float A = cross2D(e10 - e23, e30); 
+    float B = cross2D(eq0, e10 - e23) + cross2D(e10, e30);
+    float C = cross2D(eq0, e10);
+
+    u = 0.0f;
+    v = 0.0f;
+
+    // 4. Solve for v
+    if (std::abs(A) < 1e-6f) {
+        // Linear case (the quad is a trapezoid or parallelogram in this projection)
+        if (std::abs(B) < 1e-6f) return false;
+        v = -C / B;
+    } else {
+        // Quadratic case
+        float det = B * B - 4.0f * A * C;
+        if (det < 0.0f) return false; // Point mapping mathematically fails
+        
+        float sqrtDet = std::sqrt(det);
+        float v1 = (-B + sqrtDet) / (2.0f * A);
+        float v2 = (-B - sqrtDet) / (2.0f * A);
+
+        // Pick the root closest to the [0, 1] range
+        float dist1 = std::min(std::abs(v1 - 0.5f), std::abs(v1));
+        float dist2 = std::min(std::abs(v2 - 0.5f), std::abs(v2));
+        v = (dist1 < dist2) ? v1 : v2;
+    }
+
+    // 5. Solve for u using the determined v
+    pxr::GfVec2f denomu = e10 + v * (e23 - e10);
+    if (std::abs(denomu[0]) > std::abs(denomu[1])) {
+        u = (eq0[0] - v * e30[0]) / denomu[0];
+    } else {
+        if (std::abs(denomu[1]) < 1e-6f) return false;
+        u = (eq0[1] - v * e30[1]) / denomu[1];
+    }
+
+    return (u >= -epsilon && u <= 1.0f + epsilon) && (v >= -epsilon && v <= 1.0f + epsilon);
+}
+
+
+bool getTriUV(const pxr::GfVec3f& pt, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, float& u, float& v, float epsilon) {
+    v = 0.0f; u = 0.0f;
+
+    pxr::GfVec3f e0 = p1 - p0;
+    pxr::GfVec3f e1 = p2 - p0;
+    pxr::GfVec3f vv = pt - p0;
+
+    float dot00 = pxr::GfDot(e0, e0);
+    float dot01 = pxr::GfDot(e0, e1);
+    float dot02 = pxr::GfDot(e0, vv);
+    float dot11 = pxr::GfDot(e1, e1);
+    float dot12 = pxr::GfDot(e1, vv);
+
+    float denom = (dot00 * dot11 - dot01 * dot01);
+
+    if (std::abs(denom) < 1e-6f) {
+        return false;
+    }
+
+    float invDenom = 1.0f / denom;
+    u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+    v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+    if (u < epsilon || v < epsilon || (u + v) > (1.0f + epsilon)) {
+        return false;
+    }
+
+    return true;
+};
 
 template <typename T>
 bool validatePrimIndices(const T& indices, size_t expected_attrib_count, LoggerStream* pLogger) {

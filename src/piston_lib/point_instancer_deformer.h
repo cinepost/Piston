@@ -108,6 +108,8 @@ class PointInstancerDeformer :public BaseDeformer, public inherit_shared_from_th
 
 		std::vector<pxr::GfMatrix3f>            	mTmpFaceNTBMatrices;
 		std::vector<pxr::GfVec3f>               	mTmpCurvesLocalAnimVectors;
+
+		DebugGeo::UniquePtr                         mpDebugGeo;
 };
 
 } // namespace Piston

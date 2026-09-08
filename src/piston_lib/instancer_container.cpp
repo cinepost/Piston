@@ -34,8 +34,18 @@ bool InstancerContainer::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode
 	}
 
     // Get rest instance point positions
-    if(prim_handle.getRestAttrName().empty() || !prim_handle.fetchAttributeValues<pxr::GfVec3f>(prim_handle.getRestAttrName(), mRestInstancePoints, rest_time_code)) {
+	bool rest_positions_sourced_from_rest_attr = false;
 
+	if(!prim_handle.getRestAttrName().empty()) {
+		// Try to read poitions using provided rest attribute name
+		rest_positions_sourced_from_rest_attr = prim_handle.fetchAttributeValues<pxr::GfVec3f>(prim_handle.getRestAttrName(), mRestInstancePoints, rest_time_code);
+		if(!rest_positions_sourced_from_rest_attr) {
+			LOG_ERR << "Error getting instance rest positions from attribute \"" << prim_handle.getRestAttrName() << "\" !"; 
+		}
+	}
+
+    if(!rest_positions_sourced_from_rest_attr) {
+    	// Try to read poitions at rest time code directly
     	if(!instancer.GetPositionsAttr().Get(&mRestInstancePoints, rest_time_code)) {
             LOG_ERR << "Error getting instance rest positions from " << prim_handle.getName() << " !";
             return false;

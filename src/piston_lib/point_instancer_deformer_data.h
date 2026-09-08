@@ -15,21 +15,28 @@ class PointInstancerDeformer;
 
 class PointInstancerDeformerData : public SerializableDeformerDataBase {
 	public:
-		static const uint8_t kNeighborsDefault = 4; // 3 or 4. Used in simple Multi-Point Proxinity mode
+		static const uint8_t kNeighborsDefault = 4; // 3 or 4. Used in simple Multi-Point Proximity mode
 		enum class BindMode: uint8_t { 
 			SIMPLE, 
 			MPPP
 		};
 
 		struct PointBindData {
-			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
+			static constexpr uint32_t kInvalidPointID = std::numeric_limits<uint32_t>::max();
 			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
-			pxr::GfVec3f local_pos;
-			uint32_t face_id;
-			uint8_t  edge_id;
-			PointBindData(): face_id(kInvalidFaceID) {};
+			uint32_t point_indices[4]{ kInvalidPointID, kInvalidPointID, kInvalidPointID, kInvalidPointID };
+			int8_t  edge_id = -1;
 
-			inline bool isValid() const { return face_id != kInvalidFaceID; }
+			pxr::GfVec3f localPos;
+			pxr::GfVec3f restNormal;
+			pxr::GfVec3f restTangent;
+			pxr::GfVec3f restBinormal;
+			float u = 0.0, v = 0.0; // used to reconstruct quad surface normal
+
+			PointBindData() = default; 
+
+			inline bool isValid() const { return point_indices[0] != kInvalidPointID; }
+			inline bool isQuadBound() const { return point_indices[3] != kInvalidPointID; }
 		};
 
 		// Multi-Point Proximity

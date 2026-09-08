@@ -203,45 +203,127 @@ bool UsdGeomMeshFaceAdjacency::isValid() const {
 	return mValid && !mCounts.empty() && !mOffsets.empty() && !mPrimData.empty(); 
 }
 
-uint32_t UsdGeomMeshFaceAdjacency::getNeighborsCount(uint32_t idx) const { 
-	assert(idx < mCounts.size());
-	return mCounts[idx]; 
+std::vector<uint32_t> UsdGeomMeshFaceAdjacency::getNeighborPrims(uint32_t common_point_idx) const {
+	std::vector<uint32_t> prim_indices;
+
+	const uint32_t neighbors_count = getNeighborsCount(common_point_idx);
+	if(neighbors_count > 0) {
+		prim_indices.resize(neighbors_count);
+		const uint32_t neighbors_offset = getNeighborsOffset(common_point_idx);
+
+		for(uint32_t i = 0; i < neighbors_count; ++i){
+			prim_indices[i] = getNeighborPrim(neighbors_offset + i);
+		}
+	}
+
+	return prim_indices;
 }
 
-uint32_t UsdGeomMeshFaceAdjacency::getNeighborsOffset(uint32_t idx) const {
-	assert(idx < mOffsets.size());
-	return mOffsets[idx]; 
+uint32_t UsdGeomMeshFaceAdjacency::findBestPrimFast(const pxr::GfVec3f target, uint32_t common_point_idx) const {
+	const uint32_t neighbors_count = getNeighborsCount(common_point_idx);
+	if(neighbors_count == 0) return kInvalidID;
+	const uint neighbors_offset = getNeighborsOffset(common_point_idx);
+	if(neighbors_count == 1) return getNeighborPrim(neighbors_offset);
+
+	std::vector<uint32_t> prim_indices(neighbors_count);
+
+	for(uint32_t i = 0; i <neighbors_count; ++i){
+		prim_indices[i] = getNeighborPrim(neighbors_offset + i);
+	}
+
+	auto min_it = std::min_element(prim_indices.begin(), prim_indices.end());
+    return *min_it;
+}
+////////////
+
+float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::GfVec3f& target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions, float weightDistance, float weightOrientation) const {
+    const uint32_t prim_vertex_count = getPrimVertexCount(prim_id);
+    assert(prim_vertex_count > 2);
+    if (prim_vertex_count < 3) return std::numeric_limits<float>::max(); // degenerate prim. 
+
+    assert(common_point_idx < positions.size());
+    const pxr::GfVec3f& commonPoint = positions[common_point_idx];
+
+   	// 1. Calculate Target Direction from the Common Apex
+   	pxr::GfVec3f targetDir = target - commonPoint;
+   	float targetDist = targetDir.Normalize(); // Normalizes in place, returns original length
+
+   	// 2. Compute Orientation (Average Direction of this Prim)
+    pxr::GfVec3f primAvgDir(0, 0, 0);
+    for (uint32_t i = 0; i < prim_vertex_count; ++i) {
+    	assert(getPrimVertex(prim_id, i) < positions.size());
+        pxr::GfVec3f dir = positions[getPrimVertex(prim_id, i)] - commonPoint;
+        dir.Normalize();
+        primAvgDir += dir;
+    }
+    primAvgDir.Normalize();
+
+    // Orientation Penalty: 1.0 means perfectly aligned, -1.0 means opposite direction
+    float dotAlignment = GfDot(targetDir, primAvgDir);
+    // Convert to a penalty where 0 is perfect alignment and 2 is worst
+    float orientationPenalty = 1.0f - dotAlignment;
+
+    // 3. Compute Shortest Distance to the Ray Edges radiating from the common point
+    float minEdgeDistance = std::numeric_limits<float>::max();
+    float totalEdgeDistance = 0.0f;
+    uint32_t edgeCount = 0;
+
+    for (uint32_t i = 0; i < prim_vertex_count; ++i) {
+    	assert(getPrimVertex(prim_id, i) < positions.size());
+        // Form a finite edge segment from the common apex to the perimeter boundary point
+        pxr::GfLineSeg edgeSegment(commonPoint, positions[getPrimVertex(prim_id, i)]);
+        pxr::GfVec3f closestPointOnEdge = pxr::GfVec3f(edgeSegment.FindClosestPoint(target));
+        float dist = (closestPointOnEdge - target).GetLength();
+
+        minEdgeDistance = std::min(minEdgeDistance, dist);
+        totalEdgeDistance += dist;
+        edgeCount++;
+    }
+
+    // Evaluate outer lip edges connecting consecutive outer perimeter vertices
+    for (size_t i = 0; i < prim_vertex_count; ++i) {
+        pxr::GfLineSeg outerLip(positions[getPrimVertex(prim_id, i)], positions[getPrimVertex(prim_id, (i + 1) % prim_vertex_count)]);
+        pxr::GfVec3f closestOnLip = pxr::GfVec3f(outerLip.FindClosestPoint(target));
+        float dist = (closestOnLip - target).GetLength();
+
+        minEdgeDistance = std::min(minEdgeDistance, dist);
+        totalEdgeDistance += dist;
+        edgeCount++;
+    }
+
+    float avgEdgeDistance = totalEdgeDistance / static_cast<float>(edgeCount);
+    std::cout << "Avg dist " << avgEdgeDistance << std::endl;
+
+    float blendedDistance = (minEdgeDistance * 0.4f) + (avgEdgeDistance * 0.6f);
+
+    // 4. Combine Metrics into a Single Score (Lower is better/closer)
+    // Adjust weights based on whether physical proximity or angular alignment matters more
+    float finalScore = (weightDistance * blendedDistance) + (weightOrientation * orientationPenalty * targetDist);
+    return finalScore;
 }
 
-uint32_t UsdGeomMeshFaceAdjacency::getNeighborPrim(uint32_t prim_offset) const {
-	assert(prim_offset < mPrimData.size());
-	return mPrimData[prim_offset];
-}
+///////////
+uint32_t UsdGeomMeshFaceAdjacency::findBestPrimOriented(const pxr::GfVec3f target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions) const {
+    uint32_t best_prim_id = kInvalidID;
+    float lowestScore = std::numeric_limits<float>::max();
 
-uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexOffset(uint32_t face_idx) const {
-	assert(face_idx < mSrcFaceVertexOffsets.size());
-	return mSrcFaceVertexOffsets[face_idx];
-}
+    std::cout << "Testing best of " << getNeighborsCount(common_point_idx) << " prims";
+    for(const uint32_t prim_id : getNeighborPrims(common_point_idx)) {
+    	std::cout << prim_id << " ";
+    }
+    std::cout << std::endl;
 
-uint32_t UsdGeomMeshFaceAdjacency::getFaceVertexCount(uint32_t face_idx) const {
-	if(face_idx >= mSrcFaceVertexCounts.size()) return 0;
-	return static_cast<uint32_t>(mSrcFaceVertexCounts[face_idx]);
-}
+    for (const uint32_t prim_id : getNeighborPrims(common_point_idx)) {
+        // Equal weighting for distance to boundary and orientation direction
+        float score = evaluatePrimMatch(prim_id, target, common_point_idx, positions, 0.6f, 0.4f);
+        
+        if (score < lowestScore) {
+            lowestScore = score;
+            best_prim_id = prim_id;
+        }
+    }
 
-UsdGeomMeshFaceAdjacency::PxrIndexType UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t vtx_idx) const {
-	assert(vtx_idx < mSrcFaceVertexIndices.size());
-	return mSrcFaceVertexIndices[vtx_idx];
-}
-
-UsdGeomMeshFaceAdjacency::PxrIndexType UsdGeomMeshFaceAdjacency::getFaceVertex(uint32_t face_idx, uint32_t local_vertex_index) const {
-	assert(face_idx < mSrcFaceVertexCounts.size());
-	assert(local_vertex_index < mSrcFaceVertexCounts[face_idx]);
-	return mSrcFaceVertexIndices[mSrcFaceVertexOffsets[face_idx] + local_vertex_index];
-}
-
-const std::pair<UsdGeomMeshFaceAdjacency::PxrIndexType, UsdGeomMeshFaceAdjacency::PxrIndexType>& UsdGeomMeshFaceAdjacency::getCornerVertexPair(uint32_t offset) const {
-	assert(offset < mCornerVertexData.size());
-	return mCornerVertexData[offset];
+    return best_prim_id;
 }
 
 std::string UsdGeomMeshFaceAdjacency::toString() const {

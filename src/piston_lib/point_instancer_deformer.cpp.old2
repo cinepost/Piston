@@ -188,8 +188,6 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 	auto* pOutPoints = points_list.points();
 	auto* pOutOrientations = points_list.orientations();
 
-	uint32_t projected_inside_count = 0;
-
 	for(size_t i = 0; i < points_list.size(); ++i) {
 		const auto& binding = bindings[i];
 		assert(binding.face_id != PointInstancerDeformerData::PointBindData::kInvalidFaceID);
@@ -204,14 +202,13 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
     	pxr::GfVec3f normal = pxr::GfCross(edge01, edge02).GetNormalized();
 
     	pxr::GfMatrix4f localToWorld;
-    	localToWorld.SetIdentity();
 
     	if (binding.edge_id < 0) {
 	        // Rebuild full skew matrix to follow stretching/shearing internally
-			localToWorld.SetRow3(0, edge01);
-			localToWorld.SetRow3(1, edge02);
-			localToWorld.SetRow3(2, normal);
-			localToWorld.SetRow3(3, p0);
+	        localToWorld.SetRow(0, pxr::GfVec4f(edge01[0], edge01[1], edge01[2], 0.0f));
+	        localToWorld.SetRow(1, pxr::GfVec4f(edge02[0], edge02[1], edge02[2], 0.0f));
+	        localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
+	        localToWorld.SetRow(3, pxr::GfVec4f(p0[0], p0[1], p0[2], 1.0f));
 	    } else {
 	        // Rebuild edge-locked orthonormal matrix
 	        pxr::GfVec3f origin, axisX;
@@ -225,10 +222,10 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 
 	        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
 
-			localToWorld.SetRow3(0, axisX);
-			localToWorld.SetRow3(1, normalY);
-			localToWorld.SetRow3(2, normal);
-			localToWorld.SetRow3(3, origin);
+	        localToWorld.SetRow(0, pxr::GfVec4f(axisX[0], axisX[1], axisX[2], 0.0f));
+	        localToWorld.SetRow(1, pxr::GfVec4f(normalY[0], normalY[1], normalY[2], 0.0f));
+	        localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
+	        localToWorld.SetRow(3, pxr::GfVec4f(origin[0], origin[1], origin[2], 1.0f));
 	    }
 
 		pOutPoints[i] = localToWorld.Transform(binding.local_pos);
@@ -561,59 +558,38 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 	std::vector<PointBindData>& bindings = mpPointInstancerDeformerData->mPointBinds;
 	bindings.resize(instances_count);
 
-	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
-	assert(pAdjacency);
-
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 	assert(pPhantomTrimesh);
 
 	// Build kdtree
 	const MeshContainer::ContainerType& mesh_rest_positions = mpDeformerMeshContainer->getRestPositions();
-
-	neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = neighbour_search::KDTree<float, 3>(mesh_rest_positions, multi_threaded);
-
-	const bool ignore_outside_test = true;
-
-	uint32_t projected_inside_count = 0;
+	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDtree = std::make_unique<neighbour_search::KDTree<float, 3>>(mesh_rest_positions, false /* no threads */);
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
-			DLOG_ERR << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
+			LOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
 
+		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
+	
 		for(size_t i = start; i < end; ++i) {
 			PointInstancerDeformerData::PointBindData& binding = bindings[i];
 			const pxr::GfVec3f& instPos = instancer_rest_positions[i];
 
-			const neighbour_search::KDTree<float, 3>::ReturnType nearest_point = deformer_restpoints_kdtree.findNearestNeighbour(instPos);
+			auto candidate = pKDtree->findNearestNeighbour(instPos);
+			pKDtree->findKNearestNeighbours(instPos, 3, closest_deformer_points);
 
-			const uint32_t prim_id = pAdjacency->findClosestPrimFast(instPos, nearest_point.first);
-			const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(prim_id);
+			const neighbour_search::KDTree<float, 3>::ReturnType nearest_mesh_candidate = pKDtree->findNearestNeighbour(instPos);
+		
+			auto v0 = closest_deformer_points[0].first;
+			auto v1 = closest_deformer_points[1].first;
+			auto v2 = closest_deformer_points[2].first;
 
-			if(prim_vertex_count < 3 || prim_vertex_count > 4) {
-				DLOG_ERR << "Unsupported deformer mesh prim " << prim_id << "! Should be quad or triangle."; 
-				continue;
-			}
+			binding.face_id = pPhantomTrimesh->getOrCreateFaceID(v0, v1, v2);
 
-			float u = 0.0, v = 0.0;
-
-			if(prim_vertex_count == 4) {
-				// Prim is quad
-				const pxr::GfVec3f& p0 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 0)];
-				const pxr::GfVec3f& p1 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 1)];
-				const pxr::GfVec3f& p2 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 2)];
-				const pxr::GfVec3f& p3 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 3)];
-
-				getQuadUV(instPos, p0, p1, p2, p3, u, v);
-				
-			} else {
-				// prim is triangle
-				const pxr::GfVec3f& p0 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 0)];
-				const pxr::GfVec3f& p1 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 1)];
-				const pxr::GfVec3f& p2 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 2)];
-
-				getTriUV(instPos, p0, p1, p2, u, v);
-			}
+			const pxr::GfVec3f& p0 = mesh_rest_positions[v0];
+			const pxr::GfVec3f& p1 = mesh_rest_positions[v1];
+			const pxr::GfVec3f& p2 = mesh_rest_positions[v2];
 
 			pxr::GfVec3f edge01 = p1 - p0;
     		pxr::GfVec3f edge02 = p2 - p0;
@@ -631,26 +607,23 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 		    float d21 = pxr::GfDot(c0, edge02);
 		    float denom = d00 * d11 - d01 * d01;
 
-		    v = 0.0f, w = 0.0f;
+		    float v = 0.0f, w = 0.0f;
 		    if (std::abs(denom) > 1e-6f) {
 		        v = (d11 * d20 - d01 * d21) / denom;
 		        w = (d00 * d21 - d01 * d20) / denom;
 		    }
+		    float u = 1.0f - v - w;
 
-		    u = 1.0f - v - w;
-			if ((u >= 0.0f && v >= 0.0f && w >= 0.0f) || ignore_outside_test) {
+			if (u >= 0.0f && v >= 0.0f && w >= 0.0f) {
 		        // point projected inside triangle
 		        binding.edge_id = -1;
 
-		        projected_inside_count++;
-
 		        // Build a skew-capable matrix where X and Y are raw edge vectors
 		        pxr::GfMatrix4f localToWorld;
-		        localToWorld.SetIdentity();
-		        localToWorld.SetRow3(0, edge01); // Row 0 = X basis vector
-		        localToWorld.SetRow3(1, edge02); // Row 1 = Y basis vector
-		        localToWorld.SetRow3(2, normal); // Row 2 = Z basis vector
-		        localToWorld.SetRow3(3, p0);     // Row 3 = Translation Origin
+		        localToWorld.SetRow(0, pxr::GfVec4f(edge01[0], edge01[1], edge01[2], 0.0f));
+				localToWorld.SetRow(1, pxr::GfVec4f(edge02[0], edge02[1], edge02[2], 0.0f));
+				localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
+				localToWorld.SetRow(3, pxr::GfVec4f(p0[0],     p0[1],     p0[2],     1.0f));
 
 		        binding.local_pos = localToWorld.GetInverse().Transform(instPos);
 		    
@@ -686,11 +659,10 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 			    pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
 			    
 			    pxr::GfMatrix4f localToWorld;
-				localToWorld.SetIdentity();
-				localToWorld.SetRow3(0, axisX);   // Row 0 = Scales dynamically with the edge length
-				localToWorld.SetRow3(1, normalY);  // Row 1 = Rigid absolute distance outward from edge
-				localToWorld.SetRow3(2, normal);   // Row 2 = Rigid absolute distance from face plane
-				localToWorld.SetRow3(3, origin);   // Row 3 = Translation Origin
+			    localToWorld.SetRow(0, pxr::GfVec4f(axisX[0], axisX[1], axisX[2], 0.0f));     // Scales along the active edge
+			    localToWorld.SetRow(1, pxr::GfVec4f(normalY[0], normalY[1], normalY[2], 0.0f));   // Rigid absolute outward distance
+			    localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));    // Rigid absolute plane distance
+			    localToWorld.SetRow(3, pxr::GfVec4f(origin[0], origin[1], origin[2], 1.0f));
 
 			    binding.local_pos = localToWorld.GetInverse().Transform(instPos);
 			}
@@ -706,89 +678,13 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 		func(0, instances_count);
 	}
 
-	std::cout << projected_inside_count << " points projected inside tri" << std::endl;
-
 	mpPhantomTrimeshData->setValid(true);
 
 	return true;
 }
 
 void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
-	assert(pDeformedPoints);
-	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
 
-	const auto& pointBinds = mpPointInstancerDeformerData->mPointBinds;
-	assert(pDeformedPoints->size() == pointBinds.size() && "PointInstancerDeformer::drawDebugGeometry(...) deformed points and bindings count mismatch!!!");
-
-	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
-	const MeshContainer::ContainerType& mesh_live_positions = pDeformerMeshContainer->getLivePositions();
-
-	if(!mpDebugGeo) {
-		mpDebugGeo = DebugGeo::create(getName());
-	} else {
-		mpDebugGeo->clear();
-	}
-
-	const MeshContainer::ContainerType& mesh_rest_positions = mpDeformerMeshContainer->getRestPositions();
-
-	for(const auto& pos: mesh_rest_positions) {
-		DebugGeo::Pt pt(pos);
-		pt.setColor({1.0, 0.0, 0.0});
-		pt.setWidth(0.05);
-		
-		//mpDebugGeo->addPoint(pt);
-	}
-
-	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
-	neighbour_search::KDTree<float, 3> deformer_kdtree = neighbour_search::KDTree<float, 3>(mesh_live_positions, false /* no threads */);
-
-	const auto* pOutPoints = pDeformedPoints->points();
-	const auto& instancer_rest_positions = mpInstancerContainer->getRestInstancePoints();
-
-
-	LOG_DBG << "Trimesh face count is " << pPhantomTrimesh->getFaceCount();
-
-	for(size_t i = 0; i < pointBinds.size(); ++i) {
-	//for(size_t i = 0; i < std::min(pointBinds.size(), 5zu); ++i) {
-
-		const PointInstancerDeformerData::PointBindData& binding = pointBinds[i];
-		const pxr::GfVec3f& pt = pOutPoints[i];
-
-		assert(binding.face_id != PhantomTrimesh::kInvalidTriFaceID);
-
-		const PhantomTrimesh::TriFace& face = pPhantomTrimesh->getFace(binding.face_id);
-		
-		const pxr::GfVec3f& face_p0 = mesh_live_positions[face.indices[0]];
-		const pxr::GfVec3f& face_p1 = mesh_live_positions[face.indices[1]];
-		const pxr::GfVec3f& face_p2 = mesh_live_positions[face.indices[2]];
-
-		pxr::GfVec3f face_center = (face_p0 + face_p1 + face_p2) / 3.0f;
-
-		DebugGeo::Line lC(pt, face_center);
-		lC.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
-		lC.setWidth(0.05);
-		mpDebugGeo->addLine(lC);
-
-		DebugGeo::Line lfA(face_p0, face_p1);
-		lfA.setColor({0.0, 0.0, 1.0});
-		lfA.setWidth(0.05);
-		mpDebugGeo->addLine(lfA);
-
-		DebugGeo::Line lfB(face_p1, face_p2);
-		lfB.setColor({0.0, 0.0, 1.0});
-		lfB.setWidth(0.05);
-		mpDebugGeo->addLine(lfB);
-
-		DebugGeo::Line lfC(face_p2, face_p0);
-		lfC.setColor({0.0, 0.0, 1.0});
-		lfC.setWidth(0.05);
-		mpDebugGeo->addLine(lfC);
-
-	}
-
-	mpDebugGeo->build("/debugLinks", mInstancerGeoPrimHandle.getStage());
 }
 
 PointInstancerDeformer::~PointInstancerDeformer() {

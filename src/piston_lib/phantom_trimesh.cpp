@@ -370,6 +370,14 @@ uint32_t PhantomTrimesh::getOrCreateFaceID(const std::array<PxrIndexType, 3>& a)
 	return getOrCreateFaceID(a[0], a[1], a[2]);
 }
 
+PhantomTrimesh::TriFace& PhantomTrimesh::getOrCreateFace(PxrIndexType a, PxrIndexType b, PxrIndexType c) {
+	return getFace(getOrCreateFaceID(a, b, c));
+}
+
+const PhantomTrimesh::TriFace& PhantomTrimesh::getOrCreateFace(PxrIndexType a, PxrIndexType b, PxrIndexType c) const {
+	return getOrCreateFace(a, b, c);
+}
+
 size_t PhantomTrimesh::calcHash() const {
 	size_t hash = 0;
 

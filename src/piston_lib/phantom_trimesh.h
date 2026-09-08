@@ -93,20 +93,26 @@ class PhantomTrimesh {
 		void setFaceFlag(const uint32_t face_id, const TriFace::Flags flag) { assert(face_id < mFaceFlags.size()); mFaceFlags[face_id] = flag; }
 
 		uint32_t getFaceIDByIndices(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
-		uint32_t getOrCreateFaceID(PxrIndexType a, PxrIndexType b, PxrIndexType c);
-		uint32_t getOrCreateFaceID(const std::array<PxrIndexType, 3>& a);
+		uint32_t getOrCreateFaceID(PxrIndexType a, PxrIndexType b, PxrIndexType c); // TODO: stop using it as indices got sorted upon creation !!!
+		uint32_t getOrCreateFaceID(const std::array<PxrIndexType, 3>& a);           // TODO: stop using it as indices got sorted upon creation !!!
+
+		TriFace& getOrCreateFace(PxrIndexType a, PxrIndexType b, PxrIndexType c);
+		const TriFace& getOrCreateFace(PxrIndexType a, PxrIndexType b, PxrIndexType c) const;
 
 		const std::vector<TriFace>& getFaces() const { return mFaces; }
-		const TriFace& getFace(const uint32_t id) const { 
+		
+		const TriFace& getFace(uint32_t id) const { 
+			return mFaces[id];
+		}
 
+		TriFace& getFace(uint32_t id) {
 			if(id >= mFaces.size()) {
 				LOG_ERR << "Id " << id << " faces " << mFaces.size();
 			}
-
-			assert(id < mFaces.size()); 
-
+			assert(id < mFaces.size());
 			return mFaces[id]; 
 		}
+
 		uint32_t getFaceCount() const { return static_cast<uint32_t>(mFaces.size()); }
 
 		const std::vector<PxrIndexType>& getVertices() const { return mVertices; }

@@ -494,7 +494,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		return false;
 	}
 
-	const int max_skin_prim_id = static_cast<int>(pSkinAdjacency->getFaceCount()) - 1;
+	const int max_skin_prim_id = static_cast<int>(pSkinAdjacency->getPrimCount()) - 1;
 
 	if(is_per_vertex_attr) {
 		auto err_log_stream = Logger::getInstance().getStream(LogLevel::FATAL);
@@ -522,8 +522,8 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 	auto bindPointToSkinPrim = [&] (const pxr::GfVec3f& pt, PointSurfaceBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_prim_boundaries, std::pair<float, uint32_t>* p_best_candidate = nullptr) {
 		static const float kFLT_MAX = std::numeric_limits<float>::max();
 
-		const uint32_t prim_vertex_count = pSkinAdjacency->getFaceVertexCount(prim_id);
-		const uint32_t prim_vertex_offset = pSkinAdjacency->getFaceVertexOffset(prim_id);
+		const uint32_t prim_vertex_count = pSkinAdjacency->getPrimVertexCount(prim_id);
+		const uint32_t prim_vertex_offset = pSkinAdjacency->getPrimVertexOffset(prim_id);
 
 				printf("bindPointToSkinPrim %u vertex count: %u vertex offset: %u \n", prim_id, prim_vertex_count, prim_vertex_offset);
 
@@ -536,7 +536,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 			if(_tmp_sq_distances.size() < prim_vertex_count) _tmp_sq_distances.resize(prim_vertex_count);
 
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
-				_tmp_sq_distances[j] = distanceSquared(pt, rest_positions[pSkinAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+				_tmp_sq_distances[j] = distanceSquared(pt, rest_positions[pSkinAdjacency->getPrimVertex(prim_vertex_offset + j)]);
 			}
 
 			std::vector<float>::iterator it = std::min_element(_tmp_sq_distances.begin(), _tmp_sq_distances.begin() + prim_vertex_count);
@@ -551,9 +551,9 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 				printf("getOrCreateFaceID %u %u %u \n", local_index, (local_index + i) % prim_vertex_count, (local_index + i + 1) % prim_vertex_count);
 
 				face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
-					pSkinAdjacency->getFaceVertex(prim_id, local_index), 
-					pSkinAdjacency->getFaceVertex(prim_id, (local_index + i) % prim_vertex_count),
-					pSkinAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
+					pSkinAdjacency->getPrimVertex(prim_id, local_index), 
+					pSkinAdjacency->getPrimVertex(prim_id, (local_index + i) % prim_vertex_count),
+					pSkinAdjacency->getPrimVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
 				);
 
 				if(pSkinMeshContainer->projectPoint(pt, pSkinPhantomTrimesh->getFace(face_id), u, v,dist)) {
@@ -568,9 +568,9 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 			// if ignore boundaries and we are still somewhere oustide
 			// ear triangle
 			face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
-				pSkinAdjacency->getFaceVertex(prim_id, (prim_vertex_count + local_index - 1) % prim_vertex_count), 
-				pSkinAdjacency->getFaceVertex(prim_id, local_index),
-				pSkinAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
+				pSkinAdjacency->getPrimVertex(prim_id, (prim_vertex_count + local_index - 1) % prim_vertex_count), 
+				pSkinAdjacency->getPrimVertex(prim_id, local_index),
+				pSkinAdjacency->getPrimVertex(prim_id, (local_index + 1) % prim_vertex_count)
 			);
 
 			if(ignore_prim_boundaries) {
@@ -586,9 +586,9 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 
 		} else {
 			face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
-				pSkinAdjacency->getFaceVertex(prim_id, 0), 
-				pSkinAdjacency->getFaceVertex(prim_id, 1),
-				pSkinAdjacency->getFaceVertex(prim_id, 2)
+				pSkinAdjacency->getPrimVertex(prim_id, 0), 
+				pSkinAdjacency->getPrimVertex(prim_id, 1),
+				pSkinAdjacency->getPrimVertex(prim_id, 2)
 			);
 
 			if(pSkinMeshContainer->projectPoint(pt, pSkinPhantomTrimesh->getFace(face_id), u, v, dist)) {
@@ -1075,17 +1075,17 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
 			const neighbour_search::KDTree<float, 3>* pKDTree;
 
 			const int skin_prim_id = skin_prim_indices[guide_id];
-			assert(skin_prim_id >= 0 && ((uint32_t)skin_prim_id < pSkinGeoAdjacency->getFaceCount()));
-			const uint32_t skin_prim_vtx_offset = pSkinGeoAdjacency->getFaceVertexOffset(skin_prim_id);
+			assert(skin_prim_id >= 0 && ((uint32_t)skin_prim_id < pSkinGeoAdjacency->getPrimCount()));
+			const uint32_t skin_prim_vtx_offset = pSkinGeoAdjacency->getPrimVertexOffset(skin_prim_id);
 
 			// build guide kdtree if needed
         	const std::lock_guard<std::mutex> lock(kdtrees_mutexes[guide_id]);
         	if(!kdtrees[guide_id]) {
-				const uint32_t skin_prim_vtx_count = pSkinGeoAdjacency->getFaceVertexCount(skin_prim_id);
+				const uint32_t skin_prim_vtx_count = pSkinGeoAdjacency->getPrimVertexCount(skin_prim_id);
 
 				pxr::VtArray<pxr::GfVec3f> prim_points;
 				for(uint32_t i = 0; i < skin_prim_vtx_count; ++i){
-					prim_points.push_back(skin_geo_rest_points[pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + i)]);
+					prim_points.push_back(skin_geo_rest_points[pSkinGeoAdjacency->getPrimVertex(skin_prim_vtx_offset + i)]);
 				}
 
         		kdtrees[guide_id] = std::make_unique<neighbour_search::KDTree<float, 3>>(prim_points, false /* no threads */);
@@ -1100,9 +1100,9 @@ bool GuideCurvesDeformer::buildGuideOrigins(bool multi_threaded) {
         			closest_deformer_points[2].first != closest_deformer_points[0].first
         	);
 
-        	const PhantomTrimesh::PxrIndexType a = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[0].first);
-        	const PhantomTrimesh::PxrIndexType b = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[1].first);
-        	const PhantomTrimesh::PxrIndexType c = pSkinGeoAdjacency->getFaceVertex(skin_prim_vtx_offset + closest_deformer_points[2].first);
+        	const PhantomTrimesh::PxrIndexType a = pSkinGeoAdjacency->getPrimVertex(skin_prim_vtx_offset + closest_deformer_points[0].first);
+        	const PhantomTrimesh::PxrIndexType b = pSkinGeoAdjacency->getPrimVertex(skin_prim_vtx_offset + closest_deformer_points[1].first);
+        	const PhantomTrimesh::PxrIndexType c = pSkinGeoAdjacency->getPrimVertex(skin_prim_vtx_offset + closest_deformer_points[2].first);
 
 			const uint32_t face_id = pSkinGeoPhantomTrimesh->getOrCreateFaceID(a, b, c);
 

@@ -471,18 +471,18 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 	const MeshContainer::ContainerType& rest_positions = pDeformerMeshContainer->getRestPositions();
 
 	auto bindCurveToPrim = [&] (uint32_t curve_index, CurveBindData& bind, uint32_t prim_id, std::vector<float>& _tmp_sq_distances, bool ignore_face_boundaries, std::pair<float, uint32_t>* p_best_candidate = nullptr) {
-		const uint32_t prim_vertex_count = pAdjacency->getFaceVertexCount(prim_id);
-		const uint32_t prim_vertex_offset = pAdjacency->getFaceVertexOffset(prim_id);
+		const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(prim_id);
+		const uint32_t prim_vertex_offset = pAdjacency->getPrimVertexOffset(prim_id);
 
 		auto calcSquaredDistances = [&]() {
 			_tmp_sq_distances.resize(prim_vertex_count);
 
 			for(size_t j = 0; j < prim_vertex_count; ++j) {
-				//_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)]);
+				//_tmp_sq_distances[j] = distanceSquared(mpCurvesContainer->getCurveRootPoint(curve_index), rest_positions[pAdjacency->getPrimVertex(prim_vertex_offset + j)]);
 
 				PxrCurvesContainer::CurveDataPtr curve_data_ptr = mpCurvesContainer->getCurveDataPtr(curve_index);
 				const auto& curve_root_pt = mpCurvesContainer->getCurveRootPoint(curve_index);
-				const auto& prim_pt = rest_positions[pAdjacency->getFaceVertex(prim_vertex_offset + j)];
+				const auto& prim_pt = rest_positions[pAdjacency->getPrimVertex(prim_vertex_offset + j)];
 				_tmp_sq_distances[j] = distanceSquared(curve_root_pt, prim_pt);
 					
 				for(uint32_t ptr_offset = 1; ptr_offset < static_cast<uint32_t>(curve_data_ptr.first); ++ptr_offset) {
@@ -505,9 +505,9 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
 				// try using fan method
 				uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
-					pAdjacency->getFaceVertex(prim_id, local_index), 
-					pAdjacency->getFaceVertex(prim_id, (local_index + i) % prim_vertex_count),
-					pAdjacency->getFaceVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
+					pAdjacency->getPrimVertex(prim_id, local_index), 
+					pAdjacency->getPrimVertex(prim_id, (local_index + i) % prim_vertex_count),
+					pAdjacency->getPrimVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
 				);
 
 				if(bindCurveToTriface(curve_index, face_id, bind, false /* respect face boundaries */)) {
@@ -518,9 +518,9 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			// if ignore boundaries and we are still somewhere oustide
 			// ear triangle
 			uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
-				pAdjacency->getFaceVertex(prim_id, (prim_vertex_count + local_index - 1) % prim_vertex_count), 
-				pAdjacency->getFaceVertex(prim_id, local_index),
-				pAdjacency->getFaceVertex(prim_id, (local_index + 1) % prim_vertex_count)
+				pAdjacency->getPrimVertex(prim_id, (prim_vertex_count + local_index - 1) % prim_vertex_count), 
+				pAdjacency->getPrimVertex(prim_id, local_index),
+				pAdjacency->getPrimVertex(prim_id, (local_index + 1) % prim_vertex_count)
 			);
 
 			if(ignore_face_boundaries) {
@@ -533,9 +533,9 @@ bool FastCurvesDeformer::buildCurvesBindingData(pxr::UsdTimeCode rest_time_code,
 			}
 		} else {
 			const uint32_t face_id = pPhantomTrimesh->getOrCreateFaceID(
-				pAdjacency->getFaceVertex(prim_id, 0), 
-				pAdjacency->getFaceVertex(prim_id, 1),
-				pAdjacency->getFaceVertex(prim_id, 2)
+				pAdjacency->getPrimVertex(prim_id, 0), 
+				pAdjacency->getPrimVertex(prim_id, 1),
+				pAdjacency->getPrimVertex(prim_id, 2)
 			);
 			
 			if(bindCurveToTriface(curve_index, face_id, bind, ignore_face_boundaries)) {

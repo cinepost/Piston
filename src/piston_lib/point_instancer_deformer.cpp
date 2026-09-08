@@ -174,9 +174,6 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 	DLOG_DBG << "PointInstancerDeformer::__deform__simple__";
 
 	assert(mpInstancerContainer);
-	assert(mpPhantomTrimeshData && mpPhantomTrimeshData->isValid());
-	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
 
 	const MeshContainer::ContainerType& mesh_live_positions = mpDeformerMeshContainer->getLivePositions();
 
@@ -188,47 +185,89 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 	auto* pOutPoints = points_list.points();
 	auto* pOutOrientations = points_list.orientations();
 
+	uint32_t projected_inside_count = 0;
+
 	for(size_t i = 0; i < points_list.size(); ++i) {
-		const auto& binding = bindings[i];
-		assert(binding.face_id != PointInstancerDeformerData::PointBindData::kInvalidFaceID);
+		const auto& bind = bindings[i];
+		assert(bind.isValid());
 
-		const PhantomTrimesh::TriFace& face = pPhantomTrimesh->getFace(binding.face_id);
-		const pxr::GfVec3f& p0 = mesh_live_positions[face.indices[0]];
-		const pxr::GfVec3f& p1 = mesh_live_positions[face.indices[1]];
-		const pxr::GfVec3f& p2 = mesh_live_positions[face.indices[2]];
+		const bool is_quad_bound = bind.isQuadBound();
 
-		pxr::GfVec3f edge01 = p1 - p0;
-    	pxr::GfVec3f edge02 = p2 - p0;
-    	pxr::GfVec3f normal = pxr::GfCross(edge01, edge02).GetNormalized();
+		static const pxr::GfVec3f& sZeroPoint({0.0, 0.0, 0.0}); // just for code logic
+		const pxr::GfVec3f& p0 = mesh_live_positions[bind.point_indices[0]];
+		const pxr::GfVec3f& p1 = mesh_live_positions[bind.point_indices[1]];
+		const pxr::GfVec3f& p2 = mesh_live_positions[bind.point_indices[2]];
+		const pxr::GfVec3f& p3 = is_quad_bound ? mesh_live_positions[bind.point_indices[3]] : sZeroPoint;
 
-    	pxr::GfMatrix4f localToWorld;
+		pxr::GfMatrix4f localToWorld;
+    	localToWorld.SetIdentity();
 
-    	if (binding.edge_id < 0) {
-	        // Rebuild full skew matrix to follow stretching/shearing internally
-	        localToWorld.SetRow(0, pxr::GfVec4f(edge01[0], edge01[1], edge01[2], 0.0f));
-	        localToWorld.SetRow(1, pxr::GfVec4f(edge02[0], edge02[1], edge02[2], 0.0f));
-	        localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
-	        localToWorld.SetRow(3, pxr::GfVec4f(p0[0], p0[1], p0[2], 1.0f));
-	    } else {
-	        // Rebuild edge-locked orthonormal matrix
+    	pxr::GfVec3f du, dv, normal;
+
+		if(is_quad_bound) {
+			// quad bound
+			du = (p3 - p0) * (1.0 - bind.v) + (p2 - p1) * bind.v;
+    		dv = (p1 - p0) * (1.0 - bind.u) + (p2 - p3) * bind.u;
+		} else {
+			// Triangle bound
+			du = p1 - p0;
+    		dv = p2 - p0;
+		}
+
+		normal = pxr::GfCross(du, dv).GetNormalized();
+
+		if (bind.edge_id < 0) {
+			// prim bound
+			localToWorld.SetRow3(0, du);
+			localToWorld.SetRow3(1, dv);
+			localToWorld.SetRow3(2, normal);
+
+			if(is_quad_bound) {
+				float w0 = (1.0f - bind.u) * (1.0f - bind.v);
+   				float w1 = bind.u * (1.0f - bind.v);
+   				float w2 = bind.u * bind.v;
+   				float w3 = (1.0f - bind.u) * bind.v;
+   				// Linearly combine the positions using the weights
+    			pxr::GfVec3f surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
+    			localToWorld.SetRow3(3, surfacePoint);
+    		} else {
+				localToWorld.SetRow3(3, p0);
+			}
+		} else {
+			// edge bound
+			// rebuild edge-locked orthonormal matrix
 	        pxr::GfVec3f origin, axisX;
-	        if (binding.edge_id == 0) {
-	            origin = p0; axisX = edge01;
-	        } else if (binding.edge_id == 1) {
-	            origin = p1; axisX = p2 - p1;
-	        } else {
-	            origin = p2; axisX = p0 - p2;
-	        }
+	        if(is_quad_bound) {
+	        	// quad
+		        if (bind.edge_id == 0) {
+		            origin = p0; axisX = p1 - p0;
+		        } else if (bind.edge_id == 1) {
+		            origin = p1; axisX = p2 - p1;
+		        } else if (bind.edge_id == 2) {
+		            origin = p2; axisX = p3 - p2;
+		        }else {
+		            origin = p3; axisX = p0 - p3;
+		        }
+		    } else {
+		    	// triangle
+		    	if (bind.edge_id == 0) {
+		            origin = p0; axisX = p1 - p0;
+		        } else if (bind.edge_id == 1) {
+		            origin = p1; axisX = p2 - p1;
+		        } else {
+		            origin = p2; axisX = p0 - p2;
+		        }
+		    }
 
 	        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
 
-	        localToWorld.SetRow(0, pxr::GfVec4f(axisX[0], axisX[1], axisX[2], 0.0f));
-	        localToWorld.SetRow(1, pxr::GfVec4f(normalY[0], normalY[1], normalY[2], 0.0f));
-	        localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
-	        localToWorld.SetRow(3, pxr::GfVec4f(origin[0], origin[1], origin[2], 1.0f));
-	    }
+			localToWorld.SetRow3(0, axisX);
+			localToWorld.SetRow3(1, normalY);
+			localToWorld.SetRow3(2, normal);
+			localToWorld.SetRow3(3, origin);
+		}
 
-		pOutPoints[i] = localToWorld.Transform(binding.local_pos);
+		pOutPoints[i] = localToWorld.Transform(bind.localPos);
 	};
 
 	return true;
@@ -558,77 +597,140 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 	std::vector<PointBindData>& bindings = mpPointInstancerDeformerData->mPointBinds;
 	bindings.resize(instances_count);
 
-	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
+	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
+	assert(pAdjacency);
 
 	// Build kdtree
 	const MeshContainer::ContainerType& mesh_rest_positions = mpDeformerMeshContainer->getRestPositions();
-	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDtree = std::make_unique<neighbour_search::KDTree<float, 3>>(mesh_rest_positions, false /* no threads */);
+
+	neighbour_search::KDTree<float, 3> deformer_restpoints_kdtree = neighbour_search::KDTree<float, 3>(mesh_rest_positions, multi_threaded);
+
+	const bool ignore_outside_test = false;
+
+	uint32_t projected_inside_count = 0;
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
-			LOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
+			DLOG_ERR << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
 
-		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
-	
 		for(size_t i = start; i < end; ++i) {
-			PointInstancerDeformerData::PointBindData& binding = bindings[i];
+			PointInstancerDeformerData::PointBindData& bind = bindings[i];
 			const pxr::GfVec3f& instPos = instancer_rest_positions[i];
 
-			auto candidate = pKDtree->findNearestNeighbour(instPos);
-			pKDtree->findKNearestNeighbours(instPos, 3, closest_deformer_points);
+			const neighbour_search::KDTree<float, 3>::ReturnType nearest_point = deformer_restpoints_kdtree.findNearestNeighbour(instPos);
+			uint32_t prim_id = UsdGeomMeshFaceAdjacency::kInvalidID;
 
-			const neighbour_search::KDTree<float, 3>::ReturnType nearest_mesh_candidate = pKDtree->findNearestNeighbour(instPos);
-		
-			auto v0 = closest_deformer_points[0].first;
-			auto v1 = closest_deformer_points[1].first;
-			auto v2 = closest_deformer_points[2].first;
+			// try to find prim we can project instance point on
+			std::vector<uint32_t> candidate_prim_indices = pAdjacency->getNeighborPrims(nearest_point.first);
+			for(uint32_t candidate_prim_id: candidate_prim_indices) {
+				const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(candidate_prim_id);
+				if(prim_vertex_count == 3) {
+					const pxr::GfVec3f& p0 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 0)];
+					const pxr::GfVec3f& p1 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 1)];
+					const pxr::GfVec3f& p2 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 2)];
+					if(getTriUV(instPos, p0, p1, p2, bind.u, bind.v)) {
+						prim_id = candidate_prim_id;
+						break;
+					}
+				} else if(prim_vertex_count == 4) {
+					const pxr::GfVec3f& p0 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 0)];
+					const pxr::GfVec3f& p1 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 1)];
+					const pxr::GfVec3f& p2 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 2)];
+					const pxr::GfVec3f& p3 = mesh_rest_positions[pAdjacency->getPrimVertex(candidate_prim_id, 3)];
+					if(getQuadUV(instPos, p0, p1, p2, p3, bind.u, bind.v)) {
+						prim_id = candidate_prim_id;
+						break;
+					}
+				} else {
+					DLOG_ERR << "Unsupported deformer mesh prim " << candidate_prim_id << " vertex count " << prim_vertex_count << "!";
+					continue;
+				}
+			}
 
-			binding.face_id = pPhantomTrimesh->getOrCreateFaceID(v0, v1, v2);
+			// if projection test failed we pick just best prim based on proximity and orientation
+			if(prim_id == UsdGeomMeshFaceAdjacency::kInvalidID) {
+				//prim_id = pAdjacency->findBestPrimFast(instPos, nearest_point.first);
+				prim_id = pAdjacency->findBestPrimOriented(instPos, nearest_point.first, mesh_rest_positions);
+			}
 
-			const pxr::GfVec3f& p0 = mesh_rest_positions[v0];
-			const pxr::GfVec3f& p1 = mesh_rest_positions[v1];
-			const pxr::GfVec3f& p2 = mesh_rest_positions[v2];
+			const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(prim_id);
 
-			pxr::GfVec3f edge01 = p1 - p0;
-    		pxr::GfVec3f edge02 = p2 - p0;
-    		pxr::GfVec3f normal = pxr::GfCross(edge01, edge02).GetNormalized();
+			if(prim_vertex_count < 3 || prim_vertex_count > 4) {
+				DLOG_ERR << "Unsupported deformer mesh prim " << prim_id << "! Should be quad or triangle."; 
+				continue;
+			}
 
-    		float planeDist = pxr::GfDot(instPos - p0, normal);
-    		pxr::GfVec3f planePoint = instPos - (normal * planeDist);
+			pxr::GfVec3f surfacePoint = instPos; // safety
+			pxr::GfVec3f du;
+			pxr::GfVec3f dv;
+
+			const bool is_quad = prim_vertex_count == 4;
+
+			bind.point_indices[0] = pAdjacency->getPrimVertex(prim_id, 0);
+			bind.point_indices[1] = pAdjacency->getPrimVertex(prim_id, 1);
+			bind.point_indices[2] = pAdjacency->getPrimVertex(prim_id, 2);
+			bind.point_indices[3] = is_quad ? pAdjacency->getPrimVertex(prim_id, 3) : PointInstancerDeformerData::PointBindData::kInvalidPointID;
+
+			static const pxr::GfVec3f& sZeroPoint({0.0, 0.0, 0.0}); // just for code logic
+			const pxr::GfVec3f& p0 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 0)];
+			const pxr::GfVec3f& p1 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 1)];
+			const pxr::GfVec3f& p2 = mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 2)];
+			const pxr::GfVec3f& p3 = is_quad ? mesh_rest_positions[pAdjacency->getPrimVertex(prim_id, 3)] : sZeroPoint;
+
+			bool is_projected_inside = false;
+
+			if(is_quad) {
+				// Prim is quad
+				is_projected_inside = getQuadUV(instPos, p0, p1, p2, p3, bind.u, bind.v);
+				du = (p3 - p0) * (1.0f - bind.v) + (p2 - p1) * bind.v;
+    			dv = (p1 - p0) * (1.0f - bind.u) + (p2 - p3) * bind.u;
+
+    			// Surface point
+    			float w0 = (1.0f - bind.u) * (1.0f - bind.v);
+    			float w1 = bind.u * (1.0f - bind.v);
+    			float w2 = bind.u * bind.v;
+    			float w3 = (1.0f - bind.u) * bind.v;
+   				surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
+    		} else {
+				// prim is triangle
+				is_projected_inside = getTriUV(instPos, p0, p1, p2, bind.u, bind.v);
+				du = p1 - p0; // edge01
+    			dv = p2 - p0; // edge02
+    			surfacePoint = p0;
+    		}
+
+			static const float eps = 1e-12;
+			pxr::GfVec3f raw_normal = pxr::GfCross(du, dv);
+
+			if (pxr::GfDot(du, du) <= eps || pxr::GfDot(raw_normal, raw_normal) <= eps) {
+				DLOG_ERR << "Degenerate surface frame on primitive " << prim_id << " for point " << i;
+				continue;
+			}
+
+			bind.restNormal = raw_normal.GetNormalized();
 
     		// barycentric test
-			pxr::GfVec3f c0 = planePoint - p0;
-		    float d00 = pxr::GfDot(edge01, edge01);
-		    float d01 = pxr::GfDot(edge01, edge02);
-		    float d11 = pxr::GfDot(edge02, edge02);
-		    float d20 = pxr::GfDot(c0, edge01);
-		    float d21 = pxr::GfDot(c0, edge02);
-		    float denom = d00 * d11 - d01 * d01;
+			if (is_projected_inside || ignore_outside_test) {
+		        // point projected inside primitive
+		        bind.edge_id = -1;
 
-		    float v = 0.0f, w = 0.0f;
-		    if (std::abs(denom) > 1e-6f) {
-		        v = (d11 * d20 - d01 * d21) / denom;
-		        w = (d00 * d21 - d01 * d20) / denom;
-		    }
-		    float u = 1.0f - v - w;
+		        projected_inside_count++;
 
-			if (u >= 0.0f && v >= 0.0f && w >= 0.0f) {
-		        // point projected inside triangle
-		        binding.edge_id = -1;
-
-		        // Build a skew-capable matrix where X and Y are raw edge vectors
+		        // build a skew-capable matrix where X and Y are raw edge vectors
 		        pxr::GfMatrix4f localToWorld;
-		        localToWorld.SetRow(0, pxr::GfVec4f(edge01[0], edge01[1], edge01[2], 0.0f));
-				localToWorld.SetRow(1, pxr::GfVec4f(edge02[0], edge02[1], edge02[2], 0.0f));
-				localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));
-				localToWorld.SetRow(3, pxr::GfVec4f(p0[0],     p0[1],     p0[2],     1.0f));
+		        localToWorld.SetIdentity();
+		        localToWorld.SetRow3(0, du); // Row 0 = X basis vector
+		        localToWorld.SetRow3(1, dv); // Row 1 = Y basis vector
+		        localToWorld.SetRow3(2, bind.restNormal); // Row 2 = Z basis vector
+		        localToWorld.SetRow3(3, surfacePoint); // Row 3 = Translation Origin
 
-		        binding.local_pos = localToWorld.GetInverse().Transform(instPos);
+		        bind.restTangent = du;
+		        bind.restBinormal = dv;
+		        bind.localPos = localToWorld.GetInverse().Transform(instPos);
 		    
 		    } else {
-			    // point projected outside
+			    // point projected outside primitive. bind to edge
 			    auto closestPointOnSegment = [](const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b, float& t) {
 			        pxr::GfVec3f ab = b - a;
 			        float lenSq = pxr::GfDot(ab, ab);
@@ -637,34 +739,68 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 			        return a + t * ab;
 			    };
 
-			    float t0, t1, t2;
-			    pxr::GfVec3f cp0 = closestPointOnSegment(planePoint, p0, p1, t0);
-			    pxr::GfVec3f cp1 = closestPointOnSegment(planePoint, p1, p2, t1);
-			    pxr::GfVec3f cp2 = closestPointOnSegment(planePoint, p2, p0, t2);
-
-			    float sqdist0 = lengthSquared(planePoint - cp0);
-			    float sqdist1 = lengthSquared(planePoint - cp1);
-			    float sqdist2 = lengthSquared(planePoint - cp2);
+			    float t0, t1, t2, t3;
+			    pxr::GfVec3f cp0, cp1, cp2, cp3;
+			    float sqdist0, sqdist1, sqdist2, sqdist3;
 
 			    pxr::GfVec3f origin, axisX;
-			    if (sqdist0 <= sqdist1 && sqdist0 <= sqdist2) {
-			        binding.edge_id = 0; origin = p0; axisX = edge01;    // Edge 01
-			    } else if (sqdist1 <= sqdist0 && sqdist1 <= sqdist2) {
-			        binding.edge_id = 1; origin = p1; axisX = p2 - p1;   // Edge 12
+
+			    if(is_quad) {
+			    	// Quad
+					cp0 = closestPointOnSegment(surfacePoint, p0, p1, t0);
+					cp1 = closestPointOnSegment(surfacePoint, p1, p2, t1);
+					cp2 = closestPointOnSegment(surfacePoint, p2, p3, t2);
+					cp3 = closestPointOnSegment(surfacePoint, p3, p0, t3);
+
+					sqdist0 = lengthSquared(surfacePoint - cp0);
+					sqdist1 = lengthSquared(surfacePoint - cp1);
+					sqdist2 = lengthSquared(surfacePoint - cp2);
+					sqdist3 = lengthSquared(surfacePoint - cp3);
+
+			    	if (sqdist0 <= sqdist1 && sqdist0 <= sqdist2 && sqdist0 <= sqdist3) {
+				        bind.edge_id = 0; origin = p0; axisX = p1 - p0;    // Edge 01
+				    } else if (sqdist1 <= sqdist0 && sqdist1 <= sqdist2 && sqdist1 <= sqdist3) {
+				        bind.edge_id = 1; origin = p1; axisX = p2 - p1;   // Edge 12
+				    } else if (sqdist2 <= sqdist0 && sqdist2 <= sqdist1 && sqdist2 <= sqdist3) {
+				        bind.edge_id = 2; origin = p2; axisX = p3 - p2;   // Edge 23
+				    } else {
+				        bind.edge_id = 3; origin = p3; axisX = p0 - p3;   // Edge 30
+				    }
 			    } else {
-			        binding.edge_id = 2; origin = p2; axisX = p0 - p2;   // Edge 20
-			    }
+			    	// Triangle
+			    	float planeDist = pxr::GfDot(instPos - p0, bind.restNormal);
+    				pxr::GfVec3f surfacePoint = instPos - (bind.restNormal * planeDist);
+
+					cp0 = closestPointOnSegment(surfacePoint, p0, p1, t0);
+					cp1 = closestPointOnSegment(surfacePoint, p1, p2, t1);
+					cp2 = closestPointOnSegment(surfacePoint, p2, p0, t2);
+
+					sqdist0 = lengthSquared(surfacePoint - cp0);
+					sqdist1 = lengthSquared(surfacePoint - cp1);
+					sqdist2 = lengthSquared(surfacePoint - cp2);
+
+				    if (sqdist0 <= sqdist1 && sqdist0 <= sqdist2) {
+				        bind.edge_id = 0; origin = p0; axisX = p1 - p0;   // Edge 01
+				    } else if (sqdist1 <= sqdist0 && sqdist1 <= sqdist2) {
+				        bind.edge_id = 1; origin = p1; axisX = p2 - p1;   // Edge 12
+				    } else {
+				        bind.edge_id = 2; origin = p2; axisX = p0 - p2;   // Edge 20
+				    }
+				}
 
 			    // Rigid Orthonormal Frame relative to the active edge
-			    pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
+			    pxr::GfVec3f normalY = pxr::GfCross(axisX, bind.restNormal).GetNormalized();
 			    
 			    pxr::GfMatrix4f localToWorld;
-			    localToWorld.SetRow(0, pxr::GfVec4f(axisX[0], axisX[1], axisX[2], 0.0f));     // Scales along the active edge
-			    localToWorld.SetRow(1, pxr::GfVec4f(normalY[0], normalY[1], normalY[2], 0.0f));   // Rigid absolute outward distance
-			    localToWorld.SetRow(2, pxr::GfVec4f(normal[0], normal[1], normal[2], 0.0f));    // Rigid absolute plane distance
-			    localToWorld.SetRow(3, pxr::GfVec4f(origin[0], origin[1], origin[2], 1.0f));
+				localToWorld.SetIdentity();
+				localToWorld.SetRow3(0, axisX);   // Row 0 = Scales dynamically with the edge length
+				localToWorld.SetRow3(1, normalY);  // Row 1 = Rigid absolute distance outward from edge
+				localToWorld.SetRow3(2, bind.restNormal);   // Row 2 = Rigid absolute distance from face plane
+				localToWorld.SetRow3(3, origin);   // Row 3 = Translation Origin
 
-			    binding.local_pos = localToWorld.GetInverse().Transform(instPos);
+				bind.restTangent = axisX;
+		        bind.restBinormal = normalY;
+			    bind.localPos = localToWorld.GetInverse().Transform(instPos);
 			}
 		}
 	};
@@ -678,13 +814,125 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 		func(0, instances_count);
 	}
 
+	std::cout << projected_inside_count << " points prim projected" << std::endl;
+
 	mpPhantomTrimeshData->setValid(true);
 
 	return true;
 }
 
 void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
+	assert(pDeformedPoints);
+	assert(mpPhantomTrimeshData);
+	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	assert(pPhantomTrimesh);
 
+	const auto& pointBinds = mpPointInstancerDeformerData->mPointBinds;
+	assert(pDeformedPoints->size() == pointBinds.size() && "PointInstancerDeformer::drawDebugGeometry(...) deformed points and bindings count mismatch!!!");
+
+	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+	const MeshContainer::ContainerType& mesh_live_positions = pDeformerMeshContainer->getLivePositions();
+
+	if(!mpDebugGeo) {
+		mpDebugGeo = DebugGeo::create(getName());
+	} else {
+		mpDebugGeo->clear();
+	}
+
+	const MeshContainer::ContainerType& mesh_rest_positions = mpDeformerMeshContainer->getRestPositions();
+
+	std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(3);
+	neighbour_search::KDTree<float, 3> deformer_kdtree = neighbour_search::KDTree<float, 3>(mesh_live_positions, false /* no threads */);
+
+	const auto* pOutPoints = pDeformedPoints->points();
+	const auto& instancer_rest_positions = mpInstancerContainer->getRestInstancePoints();
+
+
+	LOG_DBG << "Trimesh face count is " << pPhantomTrimesh->getFaceCount();
+
+	for(size_t i = 0; i < pointBinds.size(); ++i) {
+
+		const PointInstancerDeformerData::PointBindData& bind = pointBinds[i];
+		const pxr::GfVec3f& pt = pOutPoints[i];
+
+		assert(bind.isValid());
+		if(!bind.isValid()) continue;
+		
+		const pxr::GfVec3f& p0 = mesh_live_positions[bind.point_indices[0]];
+		const pxr::GfVec3f& p1 = mesh_live_positions[bind.point_indices[1]];
+		const pxr::GfVec3f& p2 = mesh_live_positions[bind.point_indices[2]];
+
+		const bool is_quad_bound = bind.isQuadBound();
+
+		if(bind.edge_id < 0) {
+			// Prim surface bound
+			DebugGeo::Line lp0(pt, p0);
+			lp0.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+			lp0.setWidth(0.01);
+			mpDebugGeo->addLine(lp0);
+
+			DebugGeo::Line lp1(pt, p1);
+			lp1.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+			lp1.setWidth(0.01);
+			mpDebugGeo->addLine(lp1);
+
+			DebugGeo::Line lp2(pt, p2);
+			lp2.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+			lp2.setWidth(0.01);
+			mpDebugGeo->addLine(lp2);
+
+
+			if(is_quad_bound) {
+				const pxr::GfVec3f& p3 = mesh_live_positions[bind.point_indices[3]];
+
+				DebugGeo::Line lp3(pt, p3);
+				lp3.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+				lp3.setWidth(0.01);
+				mpDebugGeo->addLine(lp3);
+			}
+
+		} else {
+			// Prim edge bound
+			const uint32_t edges_count = is_quad_bound ? 4 : 3;
+			const pxr::GfVec3f& edge_pA = mesh_live_positions[bind.point_indices[bind.edge_id]];
+			const pxr::GfVec3f& edge_pB = mesh_live_positions[bind.point_indices[(bind.edge_id + 1) % edges_count]];
+
+			DebugGeo::Line lE(edge_pA, edge_pB);
+			lE.setColor({0.0, 0.0, 1.0}, {0.0, 0.0, 1.0});
+			lE.setWidth(0.02);
+			mpDebugGeo->addLine(lE);
+
+			DebugGeo::Line lpE(pt, (edge_pA + edge_pB) * 0.5);
+			lpE.setColor({1.0, 0.0, 1.0}, {0.0, 0.0, 1.0});
+			lpE.setWidth(0.02);
+			mpDebugGeo->addLine(lpE);
+		}
+/*
+		pxr::GfVec3f face_center = (face_p0 + face_p1 + face_p2) / 3.0f;
+
+		DebugGeo::Line lC(pt, face_center);
+		lC.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+		lC.setWidth(0.05);
+		mpDebugGeo->addLine(lC);
+
+		DebugGeo::Line lfA(face_p0, face_p1);
+		lfA.setColor({0.0, 0.0, 1.0});
+		lfA.setWidth(0.05);
+		mpDebugGeo->addLine(lfA);
+
+		DebugGeo::Line lfB(face_p1, face_p2);
+		lfB.setColor({0.0, 0.0, 1.0});
+		lfB.setWidth(0.05);
+		mpDebugGeo->addLine(lfB);
+
+		DebugGeo::Line lfC(face_p2, face_p0);
+		lfC.setColor({0.0, 0.0, 1.0});
+		lfC.setWidth(0.05);
+		mpDebugGeo->addLine(lfC);
+*/
+	}
+
+	mpDebugGeo->build("/debugLinks", mInstancerGeoPrimHandle.getStage());
 }
 
 PointInstancerDeformer::~PointInstancerDeformer() {
