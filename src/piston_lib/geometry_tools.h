@@ -101,6 +101,25 @@ inline void barycentrics_clamp_to_triangle(float& u, float& v, float& w) {
     }
 }
 
+inline void barycentrics_clamp_to_triangle(float& u, float& v) {
+    float w = 1 - u - v;
+    if (u >= 0.f && v >= 0.f && w >= 0.f) return;
+    
+    if (u < v && u < w) {
+        float sum = v + w;
+        u = 0.0f; v = v / sum;
+        return;
+    } else if (v < w) {
+        float sum = u + w;
+        u = u / sum; v = 0.0f;
+        return;
+    } else {
+        float sum = u + v;
+        u = u / sum; v = v / sum;
+        return;
+    }
+}
+
 // Distance from point's barycentric coords to centroid (1/3, 1/3, 1/3)
 inline float barycentricDistanceSquaredToCenter(float u, float v, float w) {
     static constexpr float k = 1.0f/3.0f;

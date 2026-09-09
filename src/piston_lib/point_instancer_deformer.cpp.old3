@@ -112,7 +112,7 @@ bool PointInstancerDeformer::outputDeformedPoints(const PointsList* pPointsList,
 	pxr::UsdAttribute attr_o = instancer.GetOrientationsAttr();
 	const auto& orientations = pPointsList->getOrientationsVtArray();
 	if(attr_o && orientations.size() == pPointsList->size()) {
-		attr_o.Set(orientations, time_code);
+		//attr_o.Set(orientations, time_code);
 	}
 
 	return true;
@@ -180,6 +180,9 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 	const auto& bindings = mpPointInstancerDeformerData->mPointBinds;
 	assert(points_list.size() == bindings.size());
 
+	const auto& instancer_rest_orientations = mpInstancerContainer->getRestOrientations();
+
+
 	assert(mpAdjacencyData);
 	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
 	assert(pAdjacency);
@@ -187,14 +190,11 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 	mLiveVertexNormals.resize(pAdjacency->getVertexCount());
 	buildVertexNormals(pAdjacency, nullptr, mLiveVertexNormals, mesh_live_positions, (multi_threaded ? &mPool : nullptr));
 
-	const auto& instancer_rest_orientations = mpInstancerContainer->getRestOrientations();
-
 	auto* pOutPoints = points_list.points();
 	auto* pOutOrientations = points_list.orientations();
 
 	uint32_t projected_inside_count = 0;
 
-	evaluateBaseMeshLiveFrames(pAdjacency, mLiveVertexNormals);
 	for(size_t i = 0; i < points_list.size(); ++i) {
 		const auto& bind = bindings[i];
 		assert(bind.isValid());
@@ -207,15 +207,15 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 		const pxr::GfVec3f& p2 = mesh_live_positions[bind.point_indices[2]];
 		const pxr::GfVec3f& p3 = is_quad_bound ? mesh_live_positions[bind.point_indices[3]] : sZeroPoint;
 
-		pxr::GfMatrix4f liveMatrix;
-    	liveMatrix.SetIdentity();
+		pxr::GfMatrix4f localToWorld;
+    	localToWorld.SetIdentity();
 
     	pxr::GfVec3f du, dv, normal;
 
 		if(is_quad_bound) {
 			// quad bound
-			du = (p3 - p0) * (1.0f - bind.u) + (p2 - p1) * bind.u;
-			dv = (p1 - p0) * (1.0f - bind.v) + (p2 - p3) * bind.v;
+			du = (p3 - p0) * (1.0 - bind.v) + (p2 - p1) * bind.v;
+    		dv = (p1 - p0) * (1.0 - bind.u) + (p2 - p3) * bind.u;
 		} else {
 			// Triangle bound
 			du = p1 - p0;
@@ -226,9 +226,9 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 
 		if (bind.edge_id < 0) {
 			// prim bound
-			liveMatrix.SetRow3(0, du);
-			liveMatrix.SetRow3(1, dv);
-			liveMatrix.SetRow3(2, normal);
+			localToWorld.SetRow3(0, du);
+			localToWorld.SetRow3(1, dv);
+			localToWorld.SetRow3(2, normal);
 
 			if(is_quad_bound) {
 				float w0 = (1.0f - bind.u) * (1.0f - bind.v);
@@ -237,9 +237,9 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
    				float w3 = (1.0f - bind.u) * bind.v;
    				// Linearly combine the positions using the weights
     			pxr::GfVec3f surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
-    			liveMatrix.SetRow3(3, surfacePoint);
+    			localToWorld.SetRow3(3, surfacePoint);
     		} else {
-				liveMatrix.SetRow3(3, p0);
+				localToWorld.SetRow3(3, p0);
 			}
 		} else {
 			// edge bound
@@ -269,40 +269,13 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 
 	        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
 
-			liveMatrix.SetRow3(0, axisX);
-			liveMatrix.SetRow3(1, normalY);
-			liveMatrix.SetRow3(2, normal);
-			liveMatrix.SetRow3(3, origin);
+			localToWorld.SetRow3(0, axisX);
+			localToWorld.SetRow3(1, normalY);
+			localToWorld.SetRow3(2, normal);
+			localToWorld.SetRow3(3, origin);
 		}
 
-		pOutPoints[i] = liveMatrix.Transform(bind.localPos);
-
-		if(pOutOrientations) {
-			pxr::GfMatrix4f restMatrix;
-			restMatrix.SetRow(0, pxr::GfVec4f(bind.restTangent[0], bind.restTangent[1], bind.restTangent[2], 0.0f));
-			restMatrix.SetRow(1, pxr::GfVec4f(bind.restBinormal[0], bind.restBinormal[1], bind.restBinormal[2], 0.0f));	
-			restMatrix.SetRow(2, pxr::GfVec4f(bind.restNormal[0], bind.restNormal[1], bind.restNormal[2], 0.0f));	
-			restMatrix.SetRow(3, pxr::GfVec4f(bind.localPos[0], bind.localPos[1], bind.localPos[2], 1.0f));
-
-			pxr::GfMatrix3f rLive = liveMatrix.ExtractRotationMatrix();
-			pxr::GfMatrix3f rRest = restMatrix.ExtractRotationMatrix();
-
-			rLive.Orthonormalize();
-			rRest.Orthonormalize();
-
-			pxr::GfMatrix3f rDeltaLocal = rRest.GetInverse() * rLive;
-			pxr::GfRotation deltaRotation = rDeltaLocal.ExtractRotation();
-
-			pxr::GfQuatd deltaQuat = deltaRotation.GetQuat();
-			pOutOrientations[i] = pxr::GfQuath(deltaQuat * instancer_rest_orientations[i]);
-			//pOutOrientations[i] = pxr::GfQuath(deltaQuat);
-
-			//pxr::GfMatrix4f deltaMatrix = restMatrix.GetInverse() * liveMatrix;
-			//pxr::GfQuatf deltaQuat(deltaMatrix.ExtractRotation().GetQuaternion().GetReal());
-
-			//pOutOrientations[i] = pxr::GfQuath(deltaQuat * instancer_rest_orientations[i]);
-			//pOutOrientations[i] = instancer_rest_orientations[i];
-		}
+		pOutPoints[i] = localToWorld.Transform(bind.localPos);
 	};
 
 	return true;
@@ -644,7 +617,6 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 	uint32_t projected_inside_count = 0;
 
-	captureBaseMeshRestFrames(pAdjacency, rest_vertex_normals);
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
 			DLOG_ERR << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
@@ -722,8 +694,8 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 				bind.u = std::max(0.0f, std::min(1.0f, bind.u));
 				bind.v = std::max(0.0f, std::min(1.0f, bind.v));
 
-				du = (p3 - p0) * (1.0f - bind.u) + (p2 - p1) * bind.u;
-    			dv = (p1 - p0) * (1.0f - bind.v) + (p2 - p3) * bind.v;
+				du = (p3 - p0) * (1.0f - bind.v) + (p2 - p1) * bind.v;
+    			dv = (p1 - p0) * (1.0f - bind.u) + (p2 - p3) * bind.u;
 
     			// Surface point
     			float w0 = (1.0f - bind.u) * (1.0f - bind.v);
@@ -734,9 +706,6 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
     		} else {
 				// prim is triangle
 				is_projected_inside = getTriUV(instPos, p0, p1, p2, bind.u, bind.v);
-
-				barycentrics_clamp_to_triangle(bind.u, bind.v);
-
 				du = p1 - p0; // edge01
     			dv = p2 - p0; // edge02
     			surfacePoint = p0;
@@ -894,7 +863,7 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 
 	for(size_t i = 0; i < mesh_live_positions.size(); ++i) {
 		const pxr::GfVec3f& vtxNormal = mLiveVertexNormals[i];
-		DebugGeo::Line lvtxN(mesh_live_positions[i], mesh_live_positions[i] - vtxNormal * 0.5);
+		DebugGeo::Line lvtxN(mesh_live_positions[i], mesh_live_positions[i] - vtxNormal);
 		lvtxN.setColor({0.0, 0.1, 0.0}, {0.0, 0.1, 0.0});
 		lvtxN.setWidth(0.01);
 		mpDebugGeo->addLine(lvtxN);
@@ -920,8 +889,8 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 
 		if(is_quad_bound) {
 			// quad bound
-			du = (p3 - p0) * (1.0f - bind.u) + (p2 - p1) * bind.u;
-    		dv = (p1 - p0) * (1.0f - bind.v) + (p2 - p3) * bind.v;
+			du = (p3 - p0) * (1.0f - bind.v) + (p2 - p1) * bind.v;
+    		dv = (p1 - p0) * (1.0f - bind.u) + (p2 - p3) * bind.u;
 		} else {
 			// Triangle bound
 			du = p1 - p0;
@@ -932,38 +901,25 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 
 		// Surface point
 		pxr::GfVec3f surfacePoint;
-		if(is_quad_bound) {
-	    	float w0 = (1.0f - bind.u) * (1.0f - bind.v);
-	    	float w1 = bind.u * (1.0f - bind.v);
-	    	float w2 = bind.u * bind.v;
-	    	float w3 = (1.0f - bind.u) * bind.v;
-	   		surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
-	   	} else {
-	   		surfacePoint = ((1.0 - bind.u - bind.v) * p0) + (bind.u * p1) + (bind.v * p2);
-	   	}
+    	float w0 = (1.0f - bind.u) * (1.0f - bind.v);
+    	float w1 = bind.u * (1.0f - bind.v);
+    	float w2 = bind.u * bind.v;
+    	float w3 = (1.0f - bind.u) * bind.v;
+   		surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
 
-  		DebugGeo::Pt sP(surfacePoint);
+   		pxr::GfVec3f blendVtxNormal = (
+   			mLiveVertexNormals[bind.point_indices[0]] * w0 + 
+   			mLiveVertexNormals[bind.point_indices[1]] * w1 +
+   			mLiveVertexNormals[bind.point_indices[2]] * w2 +
+   			mLiveVertexNormals[bind.point_indices[3]] * w3).GetNormalized();
+
+   		DebugGeo::Pt sP(surfacePoint);
 		sP.setColor({1.0, 0.0, 0.0});
-		sP.setWidth(0.1);
+		sP.setWidth(0.02);
 		mpDebugGeo->addPoint(sP);
 
-		DebugGeo::Line edgeN(surfacePoint, surfacePoint + normal * 0.5);
-		edgeN.setColor({0.0, 1.0, 0.0}, {0.0, 1.0, 0.0});
-		edgeN.setWidth(0.01);
-		mpDebugGeo->addLine(edgeN);
-
-		DebugGeo::Line lineDU(surfacePoint, surfacePoint + du.GetNormalized() * 0.5);
-		lineDU.setColor({1.0, 0.0, 0.0});
-		lineDU.setWidth(0.01);
-		mpDebugGeo->addLine(lineDU);
-
-		DebugGeo::Line lineDV(surfacePoint, surfacePoint + dv.GetNormalized() * 0.5);
-		lineDV.setColor({0.0, 1.0, 0.0});
-		lineDV.setWidth(0.01);
-		mpDebugGeo->addLine(lineDV);
 
 		if(bind.edge_id < 0) {
-			/*
 			// Prim surface bound
 			DebugGeo::Line lp0(pt, p0);
 			lp0.setColor({1.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
@@ -987,7 +943,6 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 				lp3.setWidth(0.01);
 				mpDebugGeo->addLine(lp3);
 			}
-			*/
 
 		} else {
 			// Prim edge bound
@@ -999,6 +954,8 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 			lE.setColor({0.0, 0.0, 1.0}, {0.0, 0.0, 1.0});
 			lE.setWidth(0.02);
 			mpDebugGeo->addLine(lE);
+
+			pxr::GfVec3f edge_mid_point = (edge_pA + edge_pB) * 0.5;
 
 			DebugGeo::Line lpE(pt, surfacePoint);
 			lpE.setColor({1.0, 0.0, 1.0}, {0.0, 0.0, 1.0});
@@ -1018,6 +975,11 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 		        }else {
 		            origin = p3; axisX = p0 - p3;
 		        }
+
+		        if(bind.edge_id == 1 || bind.edge_id == 3) {
+		        	du = (p3 - p0) * (bind.v) + (p2 - p1) * (1.0f - bind.v);
+    				dv = (p1 - p0) * (bind.u) + (p2 - p3) * (1.0f - bind.u);
+    			}
 		    } else {
 		    	// triangle
 		    	if (bind.edge_id == 0) {
@@ -1029,7 +991,20 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 		        }
 		    }
 
+		    //normal = pxr::GfCross(du, dv).GetNormalized();
 	        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
+
+	        // Edge blend vtx normal
+			DebugGeo::Line bvtxN(surfacePoint, surfacePoint + blendVtxNormal * 2.0);
+			bvtxN.setColor({0.0, 0.3, 0.0}, {0.0, 0.3, 0.0});
+			bvtxN.setWidth(0.01);
+			mpDebugGeo->addLine(bvtxN);
+
+	        // Edge normal
+			DebugGeo::Line edgeN(surfacePoint, surfacePoint + normal);
+			edgeN.setColor({0.0, 1.0, 0.0}, {0.0, 1.0, 0.0});
+			edgeN.setWidth(0.01);
+			mpDebugGeo->addLine(edgeN);
 
 	        // X axis (scaling one)
 	        DebugGeo::Line edgeX(surfacePoint, surfacePoint + axisX);
