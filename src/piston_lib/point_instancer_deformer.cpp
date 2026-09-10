@@ -87,7 +87,6 @@ bool PointInstancerDeformer::deformerOutputsOrientations() const {
 	pxr::UsdAttribute attr_o = instancer.GetOrientationsAttr();
 
 	if(!attr_o) return false;
-
 	return true;
 }
 
@@ -184,8 +183,12 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
 	assert(pAdjacency);
 
+	/* 
+	// We dont use these for now
 	mLiveVertexNormals.resize(pAdjacency->getVertexCount());
 	buildVertexNormals(pAdjacency, nullptr, mLiveVertexNormals, mesh_live_positions, (multi_threaded ? &mPool : nullptr));
+	evaluateBaseMeshLiveFrames(pAdjacency, mLiveVertexNormals);
+	*/
 
 	const auto& instancer_rest_orientations = mpInstancerContainer->getRestOrientations();
 
@@ -194,116 +197,117 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 
 	uint32_t projected_inside_count = 0;
 
-	evaluateBaseMeshLiveFrames(pAdjacency, mLiveVertexNormals);
-	for(size_t i = 0; i < points_list.size(); ++i) {
-		const auto& bind = bindings[i];
-		assert(bind.isValid());
+	auto func = [&](const std::size_t start, const std::size_t end) {
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = bindings[i];
+			assert(bind.isValid());
 
-		const bool is_quad_bound = bind.isQuadBound();
+			const bool is_quad_bound = bind.isQuadBound();
 
-		static const pxr::GfVec3f sZeroPoint(0.0, 0.0, 0.0); // just for code logic
-		const pxr::GfVec3f& p0 = mesh_live_positions[bind.point_indices[0]];
-		const pxr::GfVec3f& p1 = mesh_live_positions[bind.point_indices[1]];
-		const pxr::GfVec3f& p2 = mesh_live_positions[bind.point_indices[2]];
-		const pxr::GfVec3f& p3 = is_quad_bound ? mesh_live_positions[bind.point_indices[3]] : sZeroPoint;
+			static const pxr::GfVec3f sZeroPoint(0.0, 0.0, 0.0); // just for code logic
+			const pxr::GfVec3f& p0 = mesh_live_positions[bind.point_indices[0]];
+			const pxr::GfVec3f& p1 = mesh_live_positions[bind.point_indices[1]];
+			const pxr::GfVec3f& p2 = mesh_live_positions[bind.point_indices[2]];
+			const pxr::GfVec3f& p3 = is_quad_bound ? mesh_live_positions[bind.point_indices[3]] : sZeroPoint;
 
-		pxr::GfMatrix4f liveMatrix;
-    	liveMatrix.SetIdentity();
+			pxr::GfMatrix4f liveMatrix;
+	    	liveMatrix.SetIdentity();
 
-    	pxr::GfVec3f du, dv, normal;
-
-		if(is_quad_bound) {
-			// quad bound
-			du = (p3 - p0) * (1.0f - bind.u) + (p2 - p1) * bind.u;
-			dv = (p1 - p0) * (1.0f - bind.v) + (p2 - p3) * bind.v;
-		} else {
-			// Triangle bound
-			du = p1 - p0;
-    		dv = p2 - p0;
-		}
-
-		normal = pxr::GfCross(du, dv).GetNormalized();
-
-		if (bind.edge_id < 0) {
-			// prim bound
-			liveMatrix.SetRow3(0, du);
-			liveMatrix.SetRow3(1, dv);
-			liveMatrix.SetRow3(2, normal);
+	    	pxr::GfVec3f du, dv, normal;
 
 			if(is_quad_bound) {
-				float w0 = (1.0f - bind.u) * (1.0f - bind.v);
-   				float w1 = bind.u * (1.0f - bind.v);
-   				float w2 = bind.u * bind.v;
-   				float w3 = (1.0f - bind.u) * bind.v;
-   				// Linearly combine the positions using the weights
-    			pxr::GfVec3f surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
-    			liveMatrix.SetRow3(3, surfacePoint);
-    		} else {
-				liveMatrix.SetRow3(3, p0);
+				// quad bound
+				du = (p3 - p0) * (1.0f - bind.u) + (p2 - p1) * bind.u;
+				dv = (p1 - p0) * (1.0f - bind.v) + (p2 - p3) * bind.v;
+			} else {
+				// Triangle bound
+				du = p1 - p0;
+	    		dv = p2 - p0;
 			}
-		} else {
-			// edge bound
-			// rebuild edge-locked orthonormal matrix
-	        pxr::GfVec3f origin, axisX;
-	        if(is_quad_bound) {
-	        	// quad
-		        if (bind.edge_id == 0) {
-		            origin = p0; axisX = p1 - p0;
-		        } else if (bind.edge_id == 1) {
-		            origin = p1; axisX = p2 - p1;
-		        } else if (bind.edge_id == 2) {
-		            origin = p2; axisX = p3 - p2;
-		        }else {
-		            origin = p3; axisX = p0 - p3;
-		        }
-		    } else {
-		    	// triangle
-		    	if (bind.edge_id == 0) {
-		            origin = p0; axisX = p1 - p0;
-		        } else if (bind.edge_id == 1) {
-		            origin = p1; axisX = p2 - p1;
-		        } else {
-		            origin = p2; axisX = p0 - p2;
-		        }
-		    }
 
-	        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
+			normal = pxr::GfCross(du, dv).GetNormalized();
 
-			liveMatrix.SetRow3(0, axisX);
-			liveMatrix.SetRow3(1, normalY);
-			liveMatrix.SetRow3(2, normal);
-			liveMatrix.SetRow3(3, origin);
-		}
+			if (bind.edge_id < 0) {
+				// prim bound
+				liveMatrix.SetRow3(0, du);
+				liveMatrix.SetRow3(1, dv);
+				liveMatrix.SetRow3(2, normal);
 
-		pOutPoints[i] = liveMatrix.Transform(bind.localPos);
+				if(is_quad_bound) {
+					float w0 = (1.0f - bind.u) * (1.0f - bind.v);
+	   				float w1 = bind.u * (1.0f - bind.v);
+	   				float w2 = bind.u * bind.v;
+	   				float w3 = (1.0f - bind.u) * bind.v;
+	   				// Linearly combine the positions using the weights
+	    			pxr::GfVec3f surfacePoint = (p0 * w0) + (p1 * w1) + (p2 * w2) + (p3 * w3);
+	    			liveMatrix.SetRow3(3, surfacePoint);
+	    		} else {
+					liveMatrix.SetRow3(3, p0);
+				}
+			} else {
+				// edge bound
+				// rebuild edge-locked orthonormal matrix
+		        pxr::GfVec3f origin, axisX;
+		        if(is_quad_bound) {
+		        	// quad
+			        if (bind.edge_id == 0) {
+			            origin = p0; axisX = p1 - p0;
+			        } else if (bind.edge_id == 1) {
+			            origin = p1; axisX = p2 - p1;
+			        } else if (bind.edge_id == 2) {
+			            origin = p2; axisX = p3 - p2;
+			        }else {
+			            origin = p3; axisX = p0 - p3;
+			        }
+			    } else {
+			    	// triangle
+			    	if (bind.edge_id == 0) {
+			            origin = p0; axisX = p1 - p0;
+			        } else if (bind.edge_id == 1) {
+			            origin = p1; axisX = p2 - p1;
+			        } else {
+			            origin = p2; axisX = p0 - p2;
+			        }
+			    }
 
-		if(pOutOrientations) {
-			pxr::GfMatrix4f restMatrix;
-			restMatrix.SetRow(0, pxr::GfVec4f(bind.restTangent[0], bind.restTangent[1], bind.restTangent[2], 0.0f));
-			restMatrix.SetRow(1, pxr::GfVec4f(bind.restBinormal[0], bind.restBinormal[1], bind.restBinormal[2], 0.0f));	
-			restMatrix.SetRow(2, pxr::GfVec4f(bind.restNormal[0], bind.restNormal[1], bind.restNormal[2], 0.0f));	
-			restMatrix.SetRow(3, pxr::GfVec4f(bind.localPos[0], bind.localPos[1], bind.localPos[2], 1.0f));
+		        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
 
-			pxr::GfMatrix3f rLive = liveMatrix.ExtractRotationMatrix();
-			pxr::GfMatrix3f rRest = restMatrix.ExtractRotationMatrix();
+				liveMatrix.SetRow3(0, axisX);
+				liveMatrix.SetRow3(1, normalY);
+				liveMatrix.SetRow3(2, normal);
+				liveMatrix.SetRow3(3, origin);
+			}
 
-			rLive.Orthonormalize();
-			rRest.Orthonormalize();
+			pOutPoints[i] = liveMatrix.Transform(bind.localPos);
 
-			pxr::GfMatrix3f rDeltaLocal = rRest.GetInverse() * rLive;
-			pxr::GfRotation deltaRotation = rDeltaLocal.ExtractRotation();
+			if(pOutOrientations) {
+				pxr::GfMatrix4f restMatrix;
+				restMatrix.SetRow(0, pxr::GfVec4f(bind.restTangent[0], bind.restTangent[1], bind.restTangent[2], 0.0f));
+				restMatrix.SetRow(1, pxr::GfVec4f(bind.restBinormal[0], bind.restBinormal[1], bind.restBinormal[2], 0.0f));	
+				restMatrix.SetRow(2, pxr::GfVec4f(bind.restNormal[0], bind.restNormal[1], bind.restNormal[2], 0.0f));	
+				restMatrix.SetRow(3, pxr::GfVec4f(bind.localPos[0], bind.localPos[1], bind.localPos[2], 1.0f));
 
-			pxr::GfQuatd deltaQuat = deltaRotation.GetQuat();
-			pOutOrientations[i] = pxr::GfQuath(deltaQuat * instancer_rest_orientations[i]);
-			//pOutOrientations[i] = pxr::GfQuath(deltaQuat);
+				pxr::GfMatrix3f rLive = liveMatrix.ExtractRotationMatrix();
+				pxr::GfMatrix3f rRest = restMatrix.ExtractRotationMatrix();
 
-			//pxr::GfMatrix4f deltaMatrix = restMatrix.GetInverse() * liveMatrix;
-			//pxr::GfQuatf deltaQuat(deltaMatrix.ExtractRotation().GetQuaternion().GetReal());
+				rLive.Orthonormalize();
+				rRest.Orthonormalize();
 
-			//pOutOrientations[i] = pxr::GfQuath(deltaQuat * instancer_rest_orientations[i]);
-			//pOutOrientations[i] = instancer_rest_orientations[i];
+				pxr::GfMatrix3f rDeltaLocal = rRest.GetInverse() * rLive;
+				pxr::GfRotation deltaRotation = rDeltaLocal.ExtractRotation();
+
+				pxr::GfQuatd deltaQuat = deltaRotation.GetQuat();
+				pOutOrientations[i] = pxr::GfQuath(deltaQuat * instancer_rest_orientations[i]);
+			}
 		}
 	};
+
+	if(multi_threaded) {
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, bindings.size(), func);
+		blocks.wait();
+	} else {
+		func(0u, bindings.size());
+	}
 
 	return true;
 }
@@ -571,7 +575,7 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 	std::unique_ptr<neighbour_search::KDTree<float, 3>> pKDtree = std::make_unique<neighbour_search::KDTree<float, 3>>(mesh_rest_positions, false /* no threads */);
 
 	captureBaseMeshRestFrames(pAdjacency, rest_vertex_normals);
-
+	
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
 			LOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
@@ -625,6 +629,24 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 	return true;
 }
 
+static std::vector<uint32_t> combineVectors(const std::vector<uint32_t>& short_vec, const std::vector<uint32_t>& large_vec) {
+    assert(short_vec.size() <= large_vec.size());
+
+    std::vector<uint32_t> result = short_vec;
+    result.reserve(large_vec.size());
+    
+    std::unordered_set<uint32_t> seen(short_vec.begin(), short_vec.end());
+    
+    for (uint32_t val : large_vec) {
+        if (seen.find(val) == seen.end()) {
+            result.push_back(val);
+        }
+    }
+    
+    return result;
+}
+
+
 bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, const std::vector<pxr::GfVec3f>& rest_vertex_normals, pxr::UsdTimeCode rest_time_code) {
 	const auto instances_count = mpInstancerContainer->getInstanceCount();
 	const auto& instancer_rest_positions = mpInstancerContainer->getRestInstancePoints();
@@ -644,7 +666,15 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 	uint32_t projected_inside_count = 0;
 
+	/* 
+	// We dont use it for now
 	captureBaseMeshRestFrames(pAdjacency, rest_vertex_normals);
+	*/
+
+	uint32_t mesh_prims_count = pAdjacency->getPrimCount();
+	std::vector<uint32_t> mesh_prims(mesh_prims_count);
+	for(uint32_t i = 0; i < mesh_prims_count; ++i) mesh_prims[i] = i;
+
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
 			DLOG_ERR << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
@@ -658,7 +688,9 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 			uint32_t prim_id = UsdGeomMeshFaceAdjacency::kInvalidID;
 
 			// try to find prim we can project instance point on
-			std::vector<uint32_t> candidate_prim_indices = pAdjacency->getNeighborPrims(nearest_point.first);
+			const std::vector<uint32_t> candidate_prim_indices = pAdjacency->getNeighborPrims(nearest_point.first);
+
+			// try to project on prims sharing closest point
 			for(uint32_t candidate_prim_id: candidate_prim_indices) {
 				const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(candidate_prim_id);
 				if(prim_vertex_count == 3) {
@@ -686,6 +718,7 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 			// if projection test failed we pick just best prim based on proximity and orientation
 			if(prim_id == UsdGeomMeshFaceAdjacency::kInvalidID) {
+				// start search with prims sharing closest point
 				prim_id = pAdjacency->findBestPrimOriented(instPos, nearest_point.first, mesh_rest_positions);
 			}
 

@@ -93,6 +93,10 @@ class UsdGeomMeshFaceAdjacency {
 		// lowest score means better match
 		float evaluatePrimMatch(uint32_t prim_id, const pxr::GfVec3f& target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions, float weightDistance = 0.5f, float weightOrientation = 0.5f) const;
 
+		// same but no common apex testing
+		float evaluatePrimMatch(uint32_t prim_id, const pxr::GfVec3f& target, const pxr::VtArray<pxr::GfVec3f>& positions, float weightDistance = 0.5f, float weightOrientation = 0.5f) const;
+
+
 		/*
 		 * find best mesh prim contaning point with "common_point_idx" index to target point "target". returns lowest index prim 
 		 */
@@ -101,6 +105,7 @@ class UsdGeomMeshFaceAdjacency {
 		/*
 		 * find best mesh prim contaning point with "common_point_idx" index to target point "target". returns best oriented prim 
 		 */
+		uint32_t findBestPrimOriented(const pxr::GfVec3f target, const std::vector<uint32_t>& prims, const pxr::VtArray<pxr::GfVec3f>& positions) const;
 		uint32_t findBestPrimOriented(const pxr::GfVec3f target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions) const;
 
 

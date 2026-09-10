@@ -235,6 +235,60 @@ uint32_t UsdGeomMeshFaceAdjacency::findBestPrimFast(const pxr::GfVec3f target, u
     return *min_it;
 }
 ////////////
+float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::GfVec3f& target, const pxr::VtArray<pxr::GfVec3f>& positions, float weightDistance, float weightOrientation) const {
+    const uint32_t prim_vertex_count = getPrimVertexCount(prim_id);
+    assert(prim_vertex_count > 2);
+    if (prim_vertex_count < 3) return std::numeric_limits<float>::max(); // degenerate prim. 
+
+    pxr::GfVec3f centroid(0.0, 0.0, 0.0);
+
+    for (uint32_t i = 0; i < prim_vertex_count; ++i) {
+    	centroid += positions[getPrimVertex(prim_id, i)];
+    }
+    centroid /= static_cast<float>(prim_vertex_count);
+
+    pxr::GfVec3f targetDir = target - centroid;
+    float targetDist = targetDir.Normalize(); // Normalizes in place, returns distance to centroid
+
+
+   	// 2. Compute Orientation (Average Direction of this Prim)
+    pxr::GfVec3f primAvgDir(0, 0, 0);
+    for (uint32_t i = 0; i < prim_vertex_count; ++i) {
+    	pxr::GfVec3f dir = positions[getPrimVertex(prim_id, i)] - centroid;
+        dir.Normalize();
+        primAvgDir += dir;
+    }
+    primAvgDir.Normalize();
+
+    // Orientation Penalty: 1.0 means perfectly aligned, -1.0 means opposite direction
+    float dotAlignment = GfDot(targetDir, primAvgDir);
+    // Convert to a penalty where 0 is perfect alignment and 2 is worst
+    float orientationPenalty = 1.0f - dotAlignment;
+
+    // 3. Compute Shortest Distance to the Ray Edges radiating from the common point
+    float minEdgeDistance = std::numeric_limits<float>::max();
+    float totalEdgeDistance = 0.0f;
+    uint32_t edgeCount = 0;
+
+    // Evaluate outer lip edges connecting consecutive outer perimeter vertices
+    for (size_t i = 0; i < prim_vertex_count; ++i) {
+        pxr::GfLineSeg outerLip(positions[getPrimVertex(prim_id, i)], positions[getPrimVertex(prim_id, (i + 1) % prim_vertex_count)]);
+        pxr::GfVec3f closestOnLip = pxr::GfVec3f(outerLip.FindClosestPoint(target));
+        float dist = (closestOnLip - target).GetLength();
+
+        minEdgeDistance = std::min(minEdgeDistance, dist);
+        totalEdgeDistance += dist;
+        edgeCount++;
+    }
+
+    float avgEdgeDistance = totalEdgeDistance / static_cast<float>(edgeCount);
+    float blendedDistance = (minEdgeDistance * 0.4f) + (avgEdgeDistance * 0.6f);
+
+    // 4. Combine Metrics into a Single Score (Lower is better/closer)
+    // Adjust weights based on whether physical proximity or angular alignment matters more
+    float finalScore = (weightDistance * blendedDistance) + (weightOrientation * orientationPenalty * targetDist);
+    return finalScore;
+}
 
 float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::GfVec3f& target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions, float weightDistance, float weightOrientation) const {
     const uint32_t prim_vertex_count = getPrimVertexCount(prim_id);
@@ -292,8 +346,6 @@ float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::G
     }
 
     float avgEdgeDistance = totalEdgeDistance / static_cast<float>(edgeCount);
-    std::cout << "Avg dist " << avgEdgeDistance << std::endl;
-
     float blendedDistance = (minEdgeDistance * 0.4f) + (avgEdgeDistance * 0.6f);
 
     // 4. Combine Metrics into a Single Score (Lower is better/closer)
@@ -303,15 +355,26 @@ float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::G
 }
 
 ///////////
-uint32_t UsdGeomMeshFaceAdjacency::findBestPrimOriented(const pxr::GfVec3f target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions) const {
+uint32_t UsdGeomMeshFaceAdjacency::findBestPrimOriented(const pxr::GfVec3f target, const std::vector<uint32_t>& prims, const pxr::VtArray<pxr::GfVec3f>& positions) const {
     uint32_t best_prim_id = kInvalidID;
     float lowestScore = std::numeric_limits<float>::max();
 
-    std::cout << "Testing best of " << getNeighborsCount(common_point_idx) << " prims";
-    for(const uint32_t prim_id : getNeighborPrims(common_point_idx)) {
-    	std::cout << prim_id << " ";
+    for (const uint32_t prim_id : prims) {
+        // Equal weighting for distance to boundary and orientation direction
+        float score = evaluatePrimMatch(prim_id, target, positions, 0.6f, 0.4f);
+        
+        if (score < lowestScore) {
+            lowestScore = score;
+            best_prim_id = prim_id;
+        }
     }
-    std::cout << std::endl;
+
+    return best_prim_id;
+}
+
+uint32_t UsdGeomMeshFaceAdjacency::findBestPrimOriented(const pxr::GfVec3f target, uint32_t common_point_idx, const pxr::VtArray<pxr::GfVec3f>& positions) const {
+    uint32_t best_prim_id = kInvalidID;
+    float lowestScore = std::numeric_limits<float>::max();
 
     for (const uint32_t prim_id : getNeighborPrims(common_point_idx)) {
         // Equal weighting for distance to boundary and orientation direction
