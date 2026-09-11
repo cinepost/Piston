@@ -71,10 +71,12 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("GuideCurvesDeformer::deformImpl");
+			if(!BaseCurvesDeformer::deformImpl(points, time_code)) return false;
 			return __deform__(points, false, time_code);
 		}
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("GuideCurvesDeformer::deformMtImpl");
+			if(!BaseCurvesDeformer::deformMtImpl(points, time_code)) return false;
 			return __deform__(points, true, time_code);
 		}
 

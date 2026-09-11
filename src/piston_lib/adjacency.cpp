@@ -576,32 +576,6 @@ bool SerializableUsdGeomMeshFaceAdjacency::readFromJSON(const json& j) {
 
 		return pAdjacency->mValid;
     };
-/*
-	mpAdjacency->mFaceCount = j[kJFaceCount];
-	mpAdjacency->mVertexCount = j[kJVertexCount];
-	mpAdjacency->mMaxFaceVertexCount = j[kJMaxFaceCount];
-
-	mpAdjacency->mCounts = j[kJCounts].template get<std::vector<unsigned int>>();
-	mpAdjacency->mOffsets = j[kJOffsets].template get<std::vector<unsigned int>>();
-	mpAdjacency->mPrimData = j[kJPrimData].template get<std::vector<unsigned int>>();
-	mpAdjacency->mVtxToFace = j[kJVtxToFace].template get<std::vector<unsigned int>>();
-	mpAdjacency->mCornerVertexData = j[kJCornerVertexData];
-
-	mpAdjacency->mSrcFaceVertexOffsets = j[kJSrcFaceVertexOffsets].template get<std::vector<unsigned int>>();
-	mpAdjacency->mSrcFaceVertexIndices = j[kJSrcFaceVertexIndices].template get<std::vector<UsdGeomMeshFaceAdjacency::PxrIndexType>>();
-	mpAdjacency->mSrcFaceVertexCounts = j[kJSrcFaceVertexCounts].template get<std::vector<UsdGeomMeshFaceAdjacency::PxrIndexType>>();
-
-	const size_t json_adjacency_data_hash = j[kJDataHash];
-	const size_t calc_adjacency_data_hash = mpAdjacency->calcHash();
-
-
-	if(calc_adjacency_data_hash != json_adjacency_data_hash) {
-		return false;
-	}
-
-	mpAdjacency->mHash = calc_adjacency_data_hash;
-	mpAdjacency->mValid = true;
-*/
 
     if(!json_to_data(j["adj_data"], mpAdjacency.get())) {
     	return false;

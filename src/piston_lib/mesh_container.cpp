@@ -41,6 +41,7 @@ template <typename T>
 bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
 	assert(prim_handle.isMeshGeoPrim() || prim_handle.isBasisCurvesGeoPrim());
 
+	mUsdMeshLivePositions.clear();
 
 	const PersistentMeshRefiner* pRefiner = prim_handle.getMeshRefiner();
 	if( pRefiner && pRefiner->isInitialized() && pRefiner->isValidOutputMesh()) {

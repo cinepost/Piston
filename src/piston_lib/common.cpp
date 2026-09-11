@@ -220,6 +220,7 @@ void UsdPrimHandle::setSubdivLevel(uint8_t level) {
 	if(mSubdivLevel == level) return;
 	
 	mSubdivLevel = level;
+	mpRefiner = nullptr;
 }
 
 bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {

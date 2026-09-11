@@ -39,10 +39,12 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		WrapCurvesDeformer(const std::string& name);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final  {
 			PROFILE("WrapCurvesDeformer::deformImpl");
+			if(!BaseMeshCurvesDeformer::deformImpl(points, time_code)) return false;
 			return __deform__(points, false, time_code);
 		}
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("WrapCurvesDeformer::deformMtImpl");
+			if(!BaseMeshCurvesDeformer::deformMtImpl(points, time_code)) return false;
 			return __deform__(points, true, time_code);
 		}
 		virtual void invalidateData(DeformerDataCache& cache) override final;

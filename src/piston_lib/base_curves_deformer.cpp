@@ -57,19 +57,6 @@ size_t BaseCurvesDeformer::getDeformedPointsCount() const {
 	return mpCurvesContainer->getTotalVertexCount();
 }
 
-bool BaseCurvesDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded, bool ignoreVelocities) {
-	assert(mpCurvesContainer);	
-	if(!mpCurvesContainer || mpCurvesContainer->empty()) {
-		return false;
-	}
-
-	if(mpCurvesContainer && !mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty())) {
-		return false;
-	}
-
-	return BaseDeformer::deform(time_code, multi_threaded, ignoreVelocities);
-}
-
 bool BaseCurvesDeformer::outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) {
 	assert(pPointsList);
 

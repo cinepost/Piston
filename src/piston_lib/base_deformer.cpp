@@ -372,11 +372,15 @@ bool BaseDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
 }
 
 void BaseDeformer::setDeformerSubdivLevel(uint8_t level) {
-	if(mDeformerSubdivLevel == level && mDeformerGeoPrimHandle.getSubdivLevel() == level) return;
-	mDeformerSubdivLevel = std::min(level, kMaxSubdivLevel);
+	level = std::min(level, kMaxSubdivLevel);
+
+	if(level == getDeformerSubdivLevel()) return;
 
 	if(mDeformerGeoPrimHandle.isValid()) {
-		mDeformerGeoPrimHandle.setSubdivLevel(mDeformerSubdivLevel);
+		mDeformerGeoPrimHandle.setSubdivLevel(level);
+		mDeformerSubdivLevel = mDeformerGeoPrimHandle.getSubdivLevel();
+	} else {
+		mDeformerSubdivLevel = level;
 	}
 
 	makeDirty();
@@ -384,10 +388,13 @@ void BaseDeformer::setDeformerSubdivLevel(uint8_t level) {
 
 
 uint8_t BaseDeformer::getDeformerSubdivLevel() const {
+	assert(mDeformerSubdivLevel == mDeformerGeoPrimHandle.getSubdivLevel());
+
 	if(mDeformerGeoPrimHandle.isValid()) {
-		assert(mDeformerSubdivLevel == mDeformerGeoPrimHandle.getSubdivLevel());
+		return  mDeformerGeoPrimHandle.getSubdivLevel();
 	}
-	return mDeformerGeoPrimHandle.getSubdivLevel();
+
+	return mDeformerSubdivLevel;
 }
 
 

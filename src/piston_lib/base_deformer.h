@@ -99,7 +99,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		 * @return something
 		 *
 		 */	
-		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
+		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
 		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
 
 		const std::string& getName() const { return mName; }
@@ -122,8 +122,8 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 	protected:
 		BaseDeformer(const Type type, const std::string& name);
 
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) = 0;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) { return true; }
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) { return true; }
 
 		virtual size_t getDeformedPointsCount() const = 0; 
 		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) = 0;

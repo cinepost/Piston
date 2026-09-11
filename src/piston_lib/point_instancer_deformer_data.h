@@ -24,8 +24,15 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 		struct PointBindData {
 			static constexpr uint32_t kInvalidPointID = std::numeric_limits<uint32_t>::max();
 			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
-			uint32_t point_indices[4]{ kInvalidPointID, kInvalidPointID, kInvalidPointID, kInvalidPointID };
-			int8_t  edge_id = -1;
+
+			enum class Flags : uint8_t {
+			    NONE    = 0,
+			    OUTSIDE = 1 << 0
+			};
+
+			uint32_t 	point_indices[4]{ kInvalidPointID, kInvalidPointID, kInvalidPointID, kInvalidPointID };
+			int8_t  	edge_id = -1;
+			Flags 		flags = Flags::NONE;
 
 			pxr::GfVec3f localPos;
 			pxr::GfVec3f restNormal;
@@ -37,6 +44,7 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 
 			inline bool isValid() const { return point_indices[0] != kInvalidPointID; }
 			inline bool isQuadBound() const { return point_indices[3] != kInvalidPointID; }
+			inline bool isOutside() const { return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(Flags::OUTSIDE)) != static_cast<uint8_t>(Flags::NONE); }
 		};
 
 		// Multi-Point Proximity
@@ -106,6 +114,24 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 
 		friend class PointInstancerDeformer;
 };
+
+inline PointInstancerDeformerData::PointBindData::Flags operator|(PointInstancerDeformerData::PointBindData::Flags lhs, PointInstancerDeformerData::PointBindData::Flags rhs) {
+    return static_cast<PointInstancerDeformerData::PointBindData::Flags>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+}
+
+inline PointInstancerDeformerData::PointBindData::Flags operator&(PointInstancerDeformerData::PointBindData::Flags lhs, PointInstancerDeformerData::PointBindData::Flags rhs) {
+    return static_cast<PointInstancerDeformerData::PointBindData::Flags>(static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs));
+}
+
+inline PointInstancerDeformerData::PointBindData::Flags& operator|=(PointInstancerDeformerData::PointBindData::Flags& lhs, PointInstancerDeformerData::PointBindData::Flags rhs) {
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+inline PointInstancerDeformerData::PointBindData::Flags& operator&=(PointInstancerDeformerData::PointBindData::Flags& lhs, PointInstancerDeformerData::PointBindData::Flags rhs) {
+    lhs = lhs & rhs;
+    return lhs;
+}
 
 void to_json(json& j, const PointInstancerDeformerData::PointBindData& bind);
 void from_json(const json& j, PointInstancerDeformerData::PointBindData& bind);

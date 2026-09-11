@@ -48,11 +48,13 @@ class PointInstancerDeformer :public BaseDeformer, public inherit_shared_from_th
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("PointInstancerDeformer::deformImpl");
+			if(!BaseDeformer::deformImpl(points, time_code)) return false;
 			return __deform__(points, false, time_code);
 		}
 
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("PointInstancerDeformer::deformMtImpl");
+			if(!BaseDeformer::deformMtImpl(points, time_code)) return false;
 			return __deform__(points, true, time_code);
 		}
 

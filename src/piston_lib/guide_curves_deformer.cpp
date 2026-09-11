@@ -525,8 +525,6 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 		const uint32_t prim_vertex_count = pSkinAdjacency->getPrimVertexCount(prim_id);
 		const uint32_t prim_vertex_offset = pSkinAdjacency->getPrimVertexOffset(prim_id);
 
-				printf("bindPointToSkinPrim %u vertex count: %u vertex offset: %u \n", prim_id, prim_vertex_count, prim_vertex_offset);
-
 		const MeshContainer::ContainerType& rest_positions = pSkinMeshContainer->getRestPositions();
 
 		uint32_t face_id = PhantomTrimesh::kInvalidTriFaceID; 
@@ -548,8 +546,6 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 
 			for(uint32_t i = 1; i < (prim_vertex_count - 1); ++i) {
 
-				printf("getOrCreateFaceID %u %u %u \n", local_index, (local_index + i) % prim_vertex_count, (local_index + i + 1) % prim_vertex_count);
-
 				face_id = pSkinPhantomTrimesh->getOrCreateFaceID(
 					pSkinAdjacency->getPrimVertex(prim_id, local_index), 
 					pSkinAdjacency->getPrimVertex(prim_id, (local_index + i) % prim_vertex_count),
@@ -562,8 +558,6 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 					return true;
 				}
 			}
-
-			printf("getOrCreateFaceID ear %u %u %u \n", (prim_vertex_count + local_index - 1) % prim_vertex_count, local_index, (local_index + 1) % prim_vertex_count);
 
 			// if ignore boundaries and we are still somewhere oustide
 			// ear triangle
@@ -708,6 +702,7 @@ bool GuideCurvesDeformer::guideIndicesNeeded() const {
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+
 	LOG_DBG << "GuideCurvesDeformer::buildDeformerDataImpl";
 	if(!BaseCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;

@@ -47,6 +47,7 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 	// Get primitive adjacency json data if present
 	if(adjacency_data_created || !getReadJsonDataState() || !mDeformerGeoPrimHandle.getDataFromBson(getDataPrimPath(), mpAdjacencyData.get())) {
 		// Build in place if no json data present or not needed
+		DLOG_DBG << "!!! building adjacency !!!";
 		if(!mpAdjacencyData->buildInPlace(mDeformerGeoPrimHandle)) {
 			DLOG_ERR << "Error building mesh adjacency data!";
 			return false;

@@ -270,6 +270,10 @@ bool PointInstancerDeformer::__deform__simple__(PointsList& points_list, bool mu
 			        }
 			    }
 
+			    if(bind.isOutside()) {
+					axisX = axisX.GetNormalized();
+				}
+
 		        pxr::GfVec3f normalY = pxr::GfCross(axisX, normal).GetNormalized();
 
 				liveMatrix.SetRow3(0, axisX);
@@ -682,6 +686,8 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 		for(size_t i = start; i < end; ++i) {
 			PointInstancerDeformerData::PointBindData& bind = bindings[i];
+			bind.flags = PointBindData::Flags::NONE;
+
 			const pxr::GfVec3f& instPos = instancer_rest_positions[i];
 
 			const neighbour_search::KDTree<float, 3>::ReturnType nearest_point = deformer_restpoints_kdtree.findNearestNeighbour(instPos);
@@ -814,15 +820,23 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 			        return a + t * ab;
 			    };
 
+			    auto isProjectedOutsideSegment = [](const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b) {
+			        pxr::GfVec3f ab = b - a;
+			        float lenSq = pxr::GfDot(ab, ab);
+			        float t = (lenSq > 1e-6f) ? pxr::GfDot(p - a, ab) / lenSq : 0.0f;
+			        return(t < 0.0f || t > 1.0f);    
+			    };
+
 			    float t0, t1, t2, t3;
 			    pxr::GfVec3f cp0, cp1, cp2, cp3;
 			    float sqdist0, sqdist1, sqdist2, sqdist3;
 
 			    pxr::GfVec3f origin, axisX;
 
+			    bool is_outside_edge = false;
 			    if(is_quad) {
 			    	// Quad
-					cp0 = closestPointOnSegment(surfacePoint, p0, p1, t0);
+			    	cp0 = closestPointOnSegment(surfacePoint, p0, p1, t0);
 					cp1 = closestPointOnSegment(surfacePoint, p1, p2, t1);
 					cp2 = closestPointOnSegment(surfacePoint, p2, p3, t2);
 					cp3 = closestPointOnSegment(surfacePoint, p3, p0, t3);
@@ -834,12 +848,16 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 			    	if (sqdist0 <= sqdist1 && sqdist0 <= sqdist2 && sqdist0 <= sqdist3) {
 				        bind.edge_id = 0; origin = p0; axisX = p1 - p0;   // Edge 01
+				        is_outside_edge = isProjectedOutsideSegment(instPos, p0, p1);
 				    } else if (sqdist1 <= sqdist0 && sqdist1 <= sqdist2 && sqdist1 <= sqdist3) {
 				        bind.edge_id = 1; origin = p1; axisX = p2 - p1;   // Edge 12
+				        is_outside_edge = isProjectedOutsideSegment(instPos, p1, p2);
 				    } else if (sqdist2 <= sqdist0 && sqdist2 <= sqdist1 && sqdist2 <= sqdist3) {
 				        bind.edge_id = 2; origin = p2; axisX = p3 - p2;   // Edge 23
+				        is_outside_edge = isProjectedOutsideSegment(instPos, p2, p3);
 				    } else {
 				        bind.edge_id = 3; origin = p3; axisX = p0 - p3;   // Edge 30
+				    	is_outside_edge = isProjectedOutsideSegment(instPos, p3, p0);
 				    }
 			    } else {
 			    	// Triangle
@@ -856,11 +874,19 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 				    if (sqdist0 <= sqdist1 && sqdist0 <= sqdist2) {
 				        bind.edge_id = 0; origin = p0; axisX = p1 - p0;   // Edge 01
+				        is_outside_edge = isProjectedOutsideSegment(instPos, p0, p1);
 				    } else if (sqdist1 <= sqdist0 && sqdist1 <= sqdist2) {
 				        bind.edge_id = 1; origin = p1; axisX = p2 - p1;   // Edge 12
+				        is_outside_edge = isProjectedOutsideSegment(instPos, p1, p2);
 				    } else {
 				        bind.edge_id = 2; origin = p2; axisX = p0 - p2;   // Edge 20
+				    	is_outside_edge = isProjectedOutsideSegment(instPos, p2, p0);
 				    }
+				}
+
+				if(is_outside_edge) {
+					bind.flags |= PointBindData::Flags::OUTSIDE;
+					axisX = axisX.GetNormalized();
 				}
 
 			    // Rigid Orthonormal Frame relative to the active edge
@@ -1034,7 +1060,12 @@ void PointInstancerDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const
 			mpDebugGeo->addLine(lE);
 
 			DebugGeo::Line lpE(pt, surfacePoint);
-			lpE.setColor({1.0, 0.0, 1.0}, {0.0, 0.0, 1.0});
+
+			if(bind.isOutside()) {
+				lpE.setColor({0.0, 0.0, 1.0}, {1.0, 0.0, 0.0});
+			} else {
+				lpE.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+			}
 			lpE.setWidth(0.02);
 			mpDebugGeo->addLine(lpE);
 

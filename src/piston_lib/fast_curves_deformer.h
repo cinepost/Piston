@@ -39,10 +39,14 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		FastCurvesDeformer(const std::string& name);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("FastCurvesDeformer::deformImpl");
+			if(!BaseMeshCurvesDeformer::deformImpl(points, time_code)) return false;
+			
 			return __deform__(points, false, time_code);
 		}
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override final{
 			PROFILE("FastCurvesDeformer::deformMtImpl");
+			if(!BaseMeshCurvesDeformer::deformMtImpl(points, time_code)) return false;
+			
 			return __deform__(points, true, time_code);
 		}
 

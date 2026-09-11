@@ -45,10 +45,18 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 		void setCurvesRestAttrName(const std::string& name);
 		const std::string& getCurvesRestAttrName() const { return mCurvesGeoPrimHandle.getRestAttrName(); }
 
-		virtual bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false) override final;
-
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
+
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
+			assert(mpCurvesContainer);
+			return mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty());
+		}
+
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
+			assert(mpCurvesContainer);
+			return mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty());
+		}
 
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mCurvesGeoPrimHandle; }
 

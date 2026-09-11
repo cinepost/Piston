@@ -26,6 +26,14 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type type, const std::string& name);
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
+
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
+			return BaseCurvesDeformer::deformImpl(points, time_code);
+		}
+
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
+			return BaseCurvesDeformer::deformMtImpl(points, time_code);
+		}
 		
 	protected:
 		std::shared_ptr<SerializableUsdGeomMeshFaceAdjacency> 	mpAdjacencyData;
