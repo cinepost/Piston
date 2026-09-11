@@ -580,7 +580,7 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 
 	captureBaseMeshRestFrames(pAdjacency, rest_vertex_normals);
 	
-	auto func = [&](const std::size_t start, const std::size_t end) {
+	auto func = [&](const uint32_t start, const uint32_t end) {
     	if(multi_threaded) {
 			LOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
@@ -588,10 +588,10 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 		const auto kNeighbors = mpPointInstancerDeformerData->mMPPPointBindings.getStride();
 		std::vector<neighbour_search::KDTree<float, 3>::ReturnType> closest_deformer_points(kNeighbors);
 
-		for(size_t i = start; i < end; ++i) {
+		for(uint32_t i = start; i < end; ++i) {
 			const pxr::GfVec3f& instPos = instancer_rest_positions[i];
 
-			size_t flatIndexStart = i * kNeighbors;
+			uint32_t flatIndexStart = i * kNeighbors;
 
 			// Nearest K points
 			pKDtree->findKNearestNeighbours(instPos, kNeighbors, closest_deformer_points);
@@ -599,15 +599,15 @@ bool PointInstancerDeformer::buildDeformerData_MPPPMode(bool multi_threaded, con
 			// Weights
 			float totalWeight = 0.0f;
 	        std::vector<float> rawWeights(kNeighbors);
-	        for (size_t n = 0; n < kNeighbors; ++n) {
+	        for (uint32_t n = 0; n < kNeighbors; ++n) {
 	            float dist_squared = std::max(closest_deformer_points[n].second, 1e-5f);
 	            rawWeights[n] = 1.0f / dist_squared;
 	            totalWeight += rawWeights[n];
 	        }
 
 	        // Populate flat lookup tables
-	        for (size_t n = 0; n < kNeighbors; ++n) {
-	            size_t mIdx = closest_deformer_points[n].first;
+	        for (uint32_t n = 0; n < kNeighbors; ++n) {
+	            uint32_t mIdx = closest_deformer_points[n].first;
 	            float normWeight = rawWeights[n] / totalWeight;
 
 	            // Instantly grab precomputed alignment frames

@@ -222,7 +222,7 @@ std::vector<uint32_t> UsdGeomMeshFaceAdjacency::getNeighborPrims(uint32_t common
 uint32_t UsdGeomMeshFaceAdjacency::findBestPrimFast(const pxr::GfVec3f target, uint32_t common_point_idx) const {
 	const uint32_t neighbors_count = getNeighborsCount(common_point_idx);
 	if(neighbors_count == 0) return kInvalidID;
-	const uint neighbors_offset = getNeighborsOffset(common_point_idx);
+	const uint32_t neighbors_offset = getNeighborsOffset(common_point_idx);
 	if(neighbors_count == 1) return getNeighborPrim(neighbors_offset);
 
 	std::vector<uint32_t> prim_indices(neighbors_count);
@@ -271,7 +271,7 @@ float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::G
     uint32_t edgeCount = 0;
 
     // Evaluate outer lip edges connecting consecutive outer perimeter vertices
-    for (size_t i = 0; i < prim_vertex_count; ++i) {
+    for (uint32_t i = 0; i < prim_vertex_count; ++i) {
         pxr::GfLineSeg outerLip(positions[getPrimVertex(prim_id, i)], positions[getPrimVertex(prim_id, (i + 1) % prim_vertex_count)]);
         pxr::GfVec3f closestOnLip = pxr::GfVec3f(outerLip.FindClosestPoint(target));
         float dist = (closestOnLip - target).GetLength();
@@ -335,7 +335,7 @@ float UsdGeomMeshFaceAdjacency::evaluatePrimMatch(uint32_t prim_id, const pxr::G
     }
 
     // Evaluate outer lip edges connecting consecutive outer perimeter vertices
-    for (size_t i = 0; i < prim_vertex_count; ++i) {
+    for (uint32_t i = 0; i < prim_vertex_count; ++i) {
         pxr::GfLineSeg outerLip(positions[getPrimVertex(prim_id, i)], positions[getPrimVertex(prim_id, (i + 1) % prim_vertex_count)]);
         pxr::GfVec3f closestOnLip = pxr::GfVec3f(outerLip.FindClosestPoint(target));
         float dist = (closestOnLip - target).GetLength();
