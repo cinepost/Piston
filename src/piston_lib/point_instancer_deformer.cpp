@@ -681,7 +681,7 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
     	if(multi_threaded) {
-			DLOG_ERR << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
+			DLOG_TRC << "Binding instances from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
 		}
 
 		for(size_t i = start; i < end; ++i) {
@@ -914,8 +914,6 @@ bool PointInstancerDeformer::buildDeformerData_SimpleMode(bool multi_threaded, c
 	} else {
 		func(0, instances_count);
 	}
-
-	std::cout << projected_inside_count << " points prim projected" << std::endl;
 
 	mpPhantomTrimeshData->setValid(true);
 

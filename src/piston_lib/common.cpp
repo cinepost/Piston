@@ -258,6 +258,7 @@ bool UsdPrimHandle::fetchAttributeValues(const std::string& attribute_name, pxr:
 
 	if(!primVar.GetAttr().Get(&array, time_code)) {
 		LOG_ERR << "Error getting " << getPath() << " \"" << attribute_name << "\" values !";
+		array.clear();
 		return false;
 	}
 

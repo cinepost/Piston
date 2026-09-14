@@ -463,10 +463,10 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 
 	std::vector<int> skin_prim_indices;
 
-	if(getSkinPrimAttrName().empty() || !mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) || (skin_prim_indices.size() == 0)) {
-
+	if(getSkinPrimAttrName().empty() || !mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code)) {
 		// if there is no curves skinprim attr exist we can still try to promote it from guides ...
 		if(mGuideIndices.size() == curves_count) {
+			DLOG_WRN << "No skin prim ID attribute name is set. Trying to promote from guide curves.";
 			std::vector<int> guides_skin_prim_indices;
 			if(mDeformerGeoPrimHandle.fetchAttributeValues(getGuidesSkinGeoPrimAttrName(), guides_skin_prim_indices, rest_time_code)) {
 				skin_prim_indices.resize(curves_count);
@@ -478,11 +478,11 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 				DLOG_ERR << "Unable to promote guide skin prim attribute to curves.";
 				return false;
 			}
-		} else {
-			DLOG_ERR << "Skin prim ID is needed to bind curves roots for now !!!";
-			return false;
 		}
-	} else {
+	}
+
+	if(skin_prim_indices.empty()) {
+		DLOG_ERR << "Skin prim ID is needed to bind curves roots!";
 		return false;
 	}
 
