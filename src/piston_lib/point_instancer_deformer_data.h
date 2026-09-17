@@ -55,12 +55,14 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 				hash += static_cast<size_t>(point_indices[3]) << 3;
 				hash += static_cast<size_t>(edge_id);
 				hash += static_cast<size_t>(flags) << 8;
-				hash += static_cast<size_t>(u) + static_cast<size_t>(v) << 32;
+				hash += static_cast<size_t>(u) + (static_cast<size_t>(v) << 32);
 
 				pxr::GfVec3f p = localPos + restNormal + restTangent + restBinormal;
 				hash += static_cast<size_t>(p[0]) << 8;
 				hash += static_cast<size_t>(p[1]) << 24;
 				hash += static_cast<size_t>(p[2]) << 32;
+			
+				return hash;
 			}
 		};
 
