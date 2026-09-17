@@ -117,19 +117,6 @@ bool PointInstancerDeformer::outputDeformedPoints(const PointsList* pPointsList,
 	return true;
 }
 
-bool PointInstancerDeformer::outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) {
-	assert(pVelocitiesList);
-
-	pxr::UsdGeomPointInstancer instancer(mInstancerGeoPrimHandle.getPrim());
-	pxr::UsdAttribute attr_v = instancer.GetVelocitiesAttr();
-
-	if(!attr_v || !attr_v.Set(pVelocitiesList->getPointsVtArray(), time_code)) {
-		return false;	
-	}
-
-	return true;
-}
-
 bool PointInstancerDeformer::writeJsonDataToPrimImpl() const {
 	LOG_DBG << "PointInstancerDeformer::buildDeformerDataImpl";
 

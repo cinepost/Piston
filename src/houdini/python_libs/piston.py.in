@@ -1,5 +1,7 @@
 import importlib
 import atexit
+from typing import Union, List
+
 import _piston
 
 ###################################
@@ -25,6 +27,18 @@ setattr(_piston.GuideCurvesDeformer, "BindMode", _piston.__GuideDeformer_BindMod
 
 # Init GlobalConfig instance so we grab env variables as soon as possible.
 _piston.GlobalConfig.getInstance() 
+
+#
+# Deform wrappers
+#
+
+def deform(time_codes: Union[float, List[float]]):
+	if not isinstance(time_codes, list):
+		time_codes = [time_codes]
+
+	for time_code in time_codes:
+		_piston.deform(time_code)
+
 
 #
 # Additional module unctions

@@ -126,7 +126,7 @@ const pxr::GfVec3f& GuideCurvesContainer::getCurveLivePoint(uint32_t curve_id, u
 	assert(vertex_id < mCurveVertexCounts[curve_id]);
 
 	const size_t global_vtx_id = mCurveOffsets[curve_id] + vertex_id;
-	const auto& live_points = mRestCurvePoints.AsConst();
+	const auto& live_points = mLiveCurvePoints.AsConst();
 	assert(global_vtx_id < live_points.size());
 
 	return live_points[global_vtx_id];

@@ -265,7 +265,17 @@ bool GuideCurvesDeformer::deformImpl_LHSMode(bool multi_threaded, PointsList& po
 			const auto& bind = pointBinds[i];
 			pOutPoints[i] = {0.0f, 0.0f, 0.0f};
 
-			if(bind.isValid()) {
+			float total_w = bind.w[0] + bind.w[1] + bind.w[2] + bind.w[3] + bind.w[4] + bind.w[5];
+
+			bool skip = false;
+			for(uint32_t j = 0; j < 6; ++j) {
+				if(bind.w[j] > 1.0f) skip = true;
+				if(bind.w[j] < 1.0f) skip = true;
+			}
+
+			std::cout << "bind " << i << " w " << bind.w[0] << " " << bind.w[1] << " " << bind.w[2] << " " << bind.w[3] << " " << bind.w[4] << " " << bind.w[5] << " " << std::endl;
+
+			if(bind.isValid() && !skip) {
 				pOutPoints[i] += positions[bind.v[0] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[0];
 				pOutPoints[i] += positions[bind.v[1] + pGuideCurvesContainer->getCurveVertexOffset(bind.curveIndices[0])] * bind.w[1];
 
@@ -552,7 +562,7 @@ bool GuideCurvesDeformer::buildCurvesRootsBindDeformerData(pxr::UsdTimeCode rest
 					pSkinAdjacency->getPrimVertex(prim_id, (local_index + i + 1) % prim_vertex_count)
 				);
 
-				if(pSkinMeshContainer->projectPoint(pt, pSkinPhantomTrimesh->getFace(face_id), u, v,dist)) {
+				if(pSkinMeshContainer->projectPoint(pt, pSkinPhantomTrimesh->getFace(face_id), u, v, dist)) {
 					bind.face_id = face_id;
 					bind.u = u; bind.v = v; bind.dist = dist;
 					return true;
@@ -2120,8 +2130,72 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 	}
 
 	const auto& guides_live_points = mpGuideCurvesContainer->getLiveCurvePoints();
+	const auto& deformed_points = pDeformedPoints->getPointsVtArray();
 
 	switch(mpGuideCurvesDeformerData->getBindMode()) {
+		case GuideCurvesDeformerData::BindMode::LHS:
+		{
+			const auto& pointBinds = mpGuideCurvesDeformerData->getLHSPointBinds();
+			for(size_t i = 0; i < pointBinds.size(); ++i) {
+				const auto& bind = pointBinds[i];
+				if(!bind.isValid()) continue;
+
+				const pxr::GfVec3f& p0 = mpGuideCurvesContainer->getCurveLivePoint(bind.curveIndices[0], bind.v[0]);
+				const pxr::GfVec3f& p1 = mpGuideCurvesContainer->getCurveLivePoint(bind.curveIndices[0], bind.v[1]);
+
+				const pxr::GfVec3f& p2 = mpGuideCurvesContainer->getCurveLivePoint(bind.curveIndices[1], bind.v[2]);
+				const pxr::GfVec3f& p3 = mpGuideCurvesContainer->getCurveLivePoint(bind.curveIndices[1], bind.v[3]);
+
+				const pxr::GfVec3f& p4 = mpGuideCurvesContainer->getCurveLivePoint(bind.curveIndices[2], bind.v[4]);
+				const pxr::GfVec3f& p5 = mpGuideCurvesContainer->getCurveLivePoint(bind.curveIndices[2], bind.v[5]);
+
+				const pxr::GfVec3f& pt = deformed_points[i];
+
+				DebugGeo::Line l0(p0, pt);
+				l0.setColor({1.0f, 0.0f, 0.0f});
+				l0.setWidth(0.0025f);
+				mpDebugGeo->addLine(l0);
+
+				DebugGeo::Line l1(p1, pt);
+				l1.setColor({1.0f, 0.0f, 0.0f});
+				l1.setWidth(0.0025f);
+				mpDebugGeo->addLine(l1);
+				//
+
+				DebugGeo::Line l2(p2, pt);
+				l2.setColor({0.0f, 1.0f, 0.0f});
+				l2.setWidth(0.0025f);
+				mpDebugGeo->addLine(l2);
+
+				DebugGeo::Line l3(p3, pt);
+				l3.setColor({0.0f, 1.0f, 0.0f});
+				l3.setWidth(0.0025f);
+				mpDebugGeo->addLine(l3);
+				//
+
+				DebugGeo::Line l4(p4, pt);
+				l4.setColor({0.0f, 0.0f, 1.0f});
+				l4.setWidth(0.0025f);
+				mpDebugGeo->addLine(l4);
+
+				DebugGeo::Line l5(p5, pt);
+				l5.setColor({0.0f, 0.0f, 1.0f});
+				l5.setWidth(0.0025f);
+				mpDebugGeo->addLine(l5);
+
+				//std::cout << "bind " << i << " w " << bind.w[0] << " " << bind.w[1] << " " << bind.w[2] << " " << bind.w[3] << " " << bind.w[4] << " " << bind.w[5] << " " << std::endl;
+
+			}
+
+			mpDebugGeo->build("/linksLHS", mCurvesGeoPrimHandle.getStage());
+
+			/*
+			uint32_t curveIndices[3]; 	// TODO: use three 24 or 30 bit indices and rest bits are for flags
+			uint8_t v[6];            	// TODO: use relative 8bit vertex indices
+			float16_t w[6];				// TODO: float16_t weight
+			*/
+		}
+			break;
 		case GuideCurvesDeformerData::BindMode::BLEND:
 		{
 			std::vector<NTBFrame> live_guide_frames(guides_live_points.size());
@@ -2133,8 +2207,6 @@ void GuideCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Po
 
 			// vector from curve point to frame
 			const auto& pointBinds = mpGuideCurvesDeformerData->getBlendNTBPointBinds();
-			
-			const auto& deformed_points = pDeformedPoints->getPointsVtArray();
 
 			for(size_t i = 0; i < pointBinds.size(); ++i) {
 				const auto& bind = pointBinds[i];

@@ -68,19 +68,6 @@ bool BaseCurvesDeformer::outputDeformedPoints(const PointsList* pPointsList, pxr
 	return true;
 }
 
-bool BaseCurvesDeformer::outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) {
-	assert(pVelocitiesList);
-
-	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	pxr::UsdAttribute attr_v = curves.GetVelocitiesAttr();
-
-	if(!attr_v || !attr_v.Set(pVelocitiesList->getPointsVtArray(), time_code)) {
-		return false;	
-	}
-
-	return true;
-}
-
 bool BaseCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	LOG_DBG << "BaseCurvesDeformer::buildDeformerDataImpl";
 

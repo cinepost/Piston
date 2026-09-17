@@ -3,6 +3,7 @@
 #include "logging.h"
 
 
+
 namespace Piston {
 
 static const SerializableDeformerDataBase::DataVersion kPointInstancerDeformerDataVersion( 0u, 0u, 1u);
@@ -29,15 +30,10 @@ size_t PointInstancerDeformerData::calcHash() const {
 
 	size_t hash = 0;
 
-	for(const auto& bind: mPointBinds) {
-		std::size_t raw_bits;
-		double _tmp = static_cast<double>(bind.localPos[0] + bind.localPos[1] + bind.localPos[2]);
-
-    	std::memcpy(&raw_bits, &_tmp, sizeof(double));
-		hash += static_cast<size_t>(bind.edge_id) + raw_bits;
-	}
-
 	if(mBindMode == BindMode::SIMPLE) {
+		for(const auto& bind: mPointBinds) {
+			hash += bind.getHash();
+		}
 		hash += mPointBinds.size();
 	} else {
 		hash += mMPPPointBindings.size();
@@ -71,15 +67,15 @@ bool PointInstancerDeformerData::readFromJSON(const json& j) {
 	mIsValid = false;
 
 	BindMode bind_mode = BindMode::SIMPLE;
-	from_string(j[kJMode].template get<std::string>(), bind_mode);
+	from_string(j[kJMode].get<std::string>(), bind_mode);
 
 	if(bind_mode != mBindMode) {
 		LOG_ERR << typeName() << " json data bind mode mismatch !";
 		return false;
 	}
 
-	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
-	if(j[kJDataHash].template get<size_t>() != calcHash()) {
+	mPointBinds = j[kJPointBinds].get<std::vector<PointBindData>>();
+	if(j[kJDataHash].get<size_t>() != calcHash()) {
 		LOG_ERR << typeName() << " json data hash mismatch !";
 		return false;
 	}
@@ -107,17 +103,40 @@ const SerializableDeformerDataBase::DataVersion& PointInstancerDeformerData::jso
 
 void to_json(json& j, const PointInstancerDeformerData::PointBindData& bind) {
 	assert(false && "PointInstancerDeformerData to_json NOT_IMPLEMENTED");
-	j = {bind.localPos[0], bind.localPos[1], bind.localPos[2], bind.edge_id};
+	j = {
+		bind.point_indices[0],
+		bind.point_indices[1],
+		bind.point_indices[2],
+		bind.point_indices[3],
+		bind.edge_id,
+		bind.flags,
+		bind.localPos, 
+		bind.restNormal,
+		bind.restTangent,
+		bind.restBinormal,
+		bind.u,
+		bind.v
+	};
 }
 
 void from_json(const json& j, PointInstancerDeformerData::PointBindData& bind) {
-	
 	assert(false && "PointInstancerDeformerData from_json NOT_IMPLEMENTED");
 
-	bind.localPos[0] = j.at(0).template get<float>();
-	bind.localPos[1] = j.at(1).template get<float>();
-	bind.localPos[2] = j.at(2).template get<float>();
-	bind.edge_id = j.at(4).template get<float>();
+	bind.point_indices[0] = j.at(0).get<uint32_t>();
+	bind.point_indices[1] = j.at(1).get<uint32_t>();
+	bind.point_indices[2] = j.at(2).get<uint32_t>();
+	bind.point_indices[3] = j.at(3).get<uint32_t>();
+
+	bind.edge_id = j.at(4).get<int8_t>();
+	bind.flags = static_cast<PointInstancerDeformerData::PointBindData::Flags>(j.at(5).get<uint8_t>());
+
+	bind.localPos 	  = j.at(6).get<pxr::GfVec3f>();
+	bind.restNormal   = j.at(7).get<pxr::GfVec3f>();
+	bind.restTangent  = j.at(8).get<pxr::GfVec3f>();
+	bind.restBinormal = j.at(9).get<pxr::GfVec3f>();
+
+	bind.u = j.at(10).get<float>();
+	bind.v = j.at(11).get<float>();
 }
 
 } // namespace Piston

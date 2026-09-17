@@ -224,7 +224,7 @@ void UsdPrimHandle::setSubdivLevel(uint8_t level) {
 }
 
 bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {
-	if(mpDeformer && !mpDeformer->deform(time_code, multi_threaded, true /* ignore velocities */)) {
+	if(mpDeformer && !mpDeformer->deform(time_code, multi_threaded)) {
 		LOG_FTL << "Unable to execute " << mpDeformer->getName() << ".deform(...) for " << getPath() << " !!!";
 		return false;
 	}

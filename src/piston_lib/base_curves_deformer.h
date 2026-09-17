@@ -64,7 +64,6 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 
 		virtual size_t getDeformedPointsCount() const override final; 
 		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) override final;
-		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) override final;
 
 	protected:
 		UsdPrimHandle 					mCurvesGeoPrimHandle;

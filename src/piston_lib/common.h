@@ -267,7 +267,7 @@ inline std::ostream& operator<<( std::ostream& os, const std::vector<pxr::SdfPat
 	for(const auto& path: paths) {
 		os << path;
 		if (i++ != last_i) {
-            std::cout << ", ";
+            os << ", ";
         }
 	}
 	os << " }";

@@ -144,18 +144,12 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setDataPrimPath", &BaseDeformer::setDataPrimPath)
 		.def("getDataPrimPath", &BaseDeformer::getDataPrimPath, return_value_policy<copy_const_reference>())
 
-		.def("setMotionBlurState", &BaseDeformer::setMotionBlurState)
-		.def("getMotionBlurState", &BaseDeformer::getMotionBlurState)
-
 		.def("deform", &BaseDeformer::deform, BaseDeformer_deform_overloads(args("time_code")))
 		.def("deform_dbg", &BaseDeformer::deform_dbg, BaseDeformer_deform_dbg_overloads(args("time_code")))
 
 		.def("showDebugGeometry", &BaseDeformer::showDebugGeometry)
 		.def("setDebugGeometryMultiplier", &BaseDeformer::setDebugGeometryMultiplier)
 		
-		.def("setVelocityAttrName", &BaseDeformer::setVelocityAttrName)
-		.def("getVelocityAttrName", &BaseDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
-
 		.def("setReadJsonDataFromPrim", &BaseDeformer::setReadJsonDataFromPrim)
 		.def("writeJsonDataToPrim", &BaseDeformer::writeJsonDataToPrim, BaseDeformer_writeJsonDataToPrim_overloads(args("time_code")))
 	;

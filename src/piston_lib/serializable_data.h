@@ -5,6 +5,7 @@
 #include "common.h"
 
 #include <pxr/usd/usd/prim.h>
+#include <pxr/base/gf/vec3f.h>
 
 #include <nlohmann/json.hpp>
 
@@ -68,5 +69,22 @@ inline std::string to_string(const SerializableDeformerDataBase::ErrorCode& err)
 }
 
 }  // namespace Piston
+
+namespace nlohmann {
+    template <>
+    struct adl_serializer<pxr::GfVec3f> {
+        static void from_json(const json& j, pxr::GfVec3f& v) {
+            // Check if JSON entry is actually an array with 3 elements
+            if (!j.is_array() || j.size() != 3) {
+                throw json::type_error::create(302, "Validation failed: GfVec3f requires a JSON array of 3 numbers", &j);
+            }
+            v.Set(j[0].get<float>(), j[1].get<float>(), j[2].get<float>());
+        }
+
+        static void to_json(json& j, const pxr::GfVec3f& v) {
+            j = json::array({v[0], v[1], v[2]});
+        }
+    };
+}
 
 #endif  // PISTON_LIB_SERIALIZABLEDATA_H_

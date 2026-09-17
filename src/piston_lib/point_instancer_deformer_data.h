@@ -9,6 +9,7 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usdGeom/pointInstancer.h>
 
+
 namespace Piston {
 
 class PointInstancerDeformer;
@@ -42,9 +43,25 @@ class PointInstancerDeformerData : public SerializableDeformerDataBase {
 
 			PointBindData() = default; 
 
-			inline bool isValid() const { return point_indices[0] != kInvalidPointID; }
-			inline bool isQuadBound() const { return point_indices[3] != kInvalidPointID; }
-			inline bool isOutside() const { return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(Flags::OUTSIDE)) != static_cast<uint8_t>(Flags::NONE); }
+			bool isValid() const { return point_indices[0] != kInvalidPointID; }
+			bool isQuadBound() const { return point_indices[3] != kInvalidPointID; }
+			bool isOutside() const { return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(Flags::OUTSIDE)) != static_cast<uint8_t>(Flags::NONE); }
+		
+			size_t getHash() const {
+				size_t hash = 0;
+				hash += static_cast<size_t>(point_indices[0]);
+				hash += static_cast<size_t>(point_indices[1]) << 1;
+				hash += static_cast<size_t>(point_indices[2]) << 2;
+				hash += static_cast<size_t>(point_indices[3]) << 3;
+				hash += static_cast<size_t>(edge_id);
+				hash += static_cast<size_t>(flags) << 8;
+				hash += static_cast<size_t>(u) + static_cast<size_t>(v) << 32;
+
+				pxr::GfVec3f p = localPos + restNormal + restTangent + restBinormal;
+				hash += static_cast<size_t>(p[0]) << 8;
+				hash += static_cast<size_t>(p[1]) << 24;
+				hash += static_cast<size_t>(p[2]) << 32;
+			}
 		};
 
 		// Multi-Point Proximity

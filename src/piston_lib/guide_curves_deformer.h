@@ -109,8 +109,6 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool deformImpl_LHSMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 		bool deformImpl_BlendNTBMode(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
-
-
 		bool moveSkinBoundPoints(bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code);
 
 		bool guideIndicesNeeded() const;

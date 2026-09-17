@@ -28,7 +28,6 @@ namespace Piston {
 
 
 namespace {
-	const std::string kVelocitiAttrName = "velocities";
 	const std::string kСurvesSkinPrimAttrName = ""; //"skinprim"
 }
 
@@ -88,10 +87,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 		bool writeJsonDataToPrim(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
-		void setVelocityAttrName(const std::string& name);
-		const std::string& getVelocityAttrName() const { return mVelocityAttrName; }
-
-
 		// DocString: deform
 		/**
 		 * @brief Sets the Pixar USD curves primitive that will undergo deformation.
@@ -99,8 +94,8 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		 * @return something
 		 *
 		 */	
-		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignoreVelocities = false);
-		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool ignoreVelocities = false);
+		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
+		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
 
 		const std::string& getName() const { return mName; }
 
@@ -108,10 +103,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		virtual const std::string& toString() const;
 
 		const DeformerStats& getStats() const { return mStats; }
-
-		void setMotionBlurState(bool state);
-
-		bool getMotionBlurState() const { return mCalcMotionVectors; }
 
 		void showDebugGeometry(bool state);
 
@@ -127,7 +118,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 		virtual size_t getDeformedPointsCount() const = 0; 
 		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) = 0;
-		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) = 0;
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) = 0;
 		virtual void invalidateData(DeformerDataCache& cache) = 0;
@@ -161,7 +151,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		UsdPrimHandle 	mDeformerGeoPrimHandle;
 
 		std::string 	mSkinPrimAttrName = kСurvesSkinPrimAttrName;		
-		std::string   	mVelocityAttrName = kVelocitiAttrName;
 		
 		MeshContainer::UniquePtr   		mpDeformerMeshContainer;
 
@@ -178,11 +167,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		}
 
 		const std::string& uniqueName() const { return mUniqueName; }
-		std::string velocityKeyName() const { return uniqueName() + "_vel"; }
-
-		MotionBlurDirection motionBlurDirection() const { return mMotionBlurDirection; }
-		bool calcMotionVectors() const { return mCalcMotionVectors; }
-
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) = 0;
 
 	private:
@@ -205,7 +189,6 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		// we use these containers to store deformed points data when LRU cache is disabled
 		std::unique_ptr<PointsList> 	mpDeformedPointsList;
 		std::unique_ptr<PointsList> 	mpDeformedPointsListStep;
-		std::unique_ptr<PointsList> 	mpTempVelocitiesList;
 
 		friend class UsdPrimHandle;
 };
