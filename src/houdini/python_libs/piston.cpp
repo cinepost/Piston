@@ -7,6 +7,7 @@
 #include <hboost/python.hpp>
 #include <hboost/python/overloads.hpp>
 #include <hboost/python/suite/indexing/map_indexing_suite.hpp>
+#include <hboost/python/suite/indexing/vector_indexing_suite.hpp>
 #define BOOST_PYTHON_MODULE HBOOST_PYTHON_MODULE
 #define BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS HBOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS
 namespace boost = hboost;
@@ -66,13 +67,14 @@ boost::python::list get_deformers_map_items(Piston::CurvesDeformerFactory::Defor
 }
 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_writeJsonDataToPrim_overloads, Piston::BaseDeformer::writeJsonDataToPrim, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_deform_overloads, Piston::BaseDeformer::deform, 0, 1)
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_deform_dbg_overloads, Piston::BaseDeformer::deform_dbg, 0, 1)
 
 BOOST_PYTHON_MODULE(_piston) {
 	using namespace boost::python;
 	using namespace Piston;
 
+	class_<std::vector<pxr::UsdTimeCode>>("UsdTimeCodeVector")
+    	.def(vector_indexing_suite<std::vector<pxr::UsdTimeCode>>())
+    ;
 
 	class_<SimpleProfiler, boost::noncopyable>("Profiler",  no_init)
 		.def("printReport", &SimpleProfiler::printReport)
@@ -144,8 +146,15 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setDataPrimPath", &BaseDeformer::setDataPrimPath)
 		.def("getDataPrimPath", &BaseDeformer::getDataPrimPath, return_value_policy<copy_const_reference>())
 
-		.def("deform", &BaseDeformer::deform, BaseDeformer_deform_overloads(args("time_code")))
-		.def("deform_dbg", &BaseDeformer::deform_dbg, BaseDeformer_deform_dbg_overloads(args("time_code")))
+		.def("deform", 
+			&BaseDeformer::deform, 
+			(args("time_code") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
+		)
+
+		.def("deform", 
+			&BaseDeformer::deform_multiple, 
+			(args("time_code_list") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
+		)
 
 		.def("showDebugGeometry", &BaseDeformer::showDebugGeometry)
 		.def("setDebugGeometryMultiplier", &BaseDeformer::setDebugGeometryMultiplier)

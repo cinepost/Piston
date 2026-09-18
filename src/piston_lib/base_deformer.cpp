@@ -127,10 +127,6 @@ pxr::UsdTimeCode BaseDeformer::getRestTimeCode() const {
 	return mRestTimeCode;
 }
 
-bool BaseDeformer::deform_dbg(pxr::UsdTimeCode time_code) {	
-	return deform(time_code, false);
-}
-
 bool BaseDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
 	DLOG_TRC << "Deform at time code: " << time_code.GetValue();
 		

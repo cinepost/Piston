@@ -95,7 +95,13 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		 *
 		 */	
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
-		bool deform_dbg(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		
+		bool deform_multiple(const std::vector<pxr::UsdTimeCode>& time_code_list, bool multi_threaded = true) {
+            for (const auto& time_code : time_code_list) {
+                if(!deform(time_code, multi_threaded)) return false;
+            }
+            return true;
+        }
 
 		const std::string& getName() const { return mName; }
 
