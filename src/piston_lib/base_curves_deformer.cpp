@@ -8,6 +8,8 @@
 #include <thread>
 #include <atomic>
 
+#include <pxr/usd/usd/editContext.h>
+
 static std::string gLRUCacheStatsLastUsageStr = "-";
 
 namespace Piston {
@@ -59,17 +61,22 @@ size_t BaseCurvesDeformer::getDeformedPointsCount() const {
 
 bool BaseCurvesDeformer::outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) {
 	assert(pPointsList);
+	bool result = false;
 
-	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	if(!curves.GetPointsAttr().Set(pPointsList->getPointsVtArray(), time_code)) {
-		return false;
+	pxr::VtArray<pxr::GfVec3f> new_points(pPointsList->getPointsVtArray().size());
+
+	for(size_t i = 0; i < pPointsList->getPointsVtArray().size(); ++i) {
+		new_points[i] = pPointsList->getPointsVtArray()[i];
 	}
 
-	return true;
+	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
+	result = curves.GetPointsAttr().Set(new_points, time_code);
+
+	return result;
 }
 
 bool BaseCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	LOG_DBG << "BaseCurvesDeformer::buildDeformerDataImpl";
+	DLOG_DBG << "BaseCurvesDeformer::buildDeformerDataImpl";
 
 	if(!mCurvesGeoPrimHandle) {
 		DLOG_ERR << "No curves UsdPrim is set !!!";
@@ -77,16 +84,20 @@ bool BaseCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	}
 
 	if(!mpCurvesContainer) {
+		DLOG_DBG << "Creating curves container for " << mCurvesGeoPrimHandle;
 		mpCurvesContainer = PxrCurvesContainer::create(mCurvesGeoPrimHandle, getCurvesRestAttrName(), rest_time_code);
 		if(!mpCurvesContainer) {
 			DLOG_ERR << "Error creating curves container for prim " << mCurvesGeoPrimHandle << " !";
 			return false;
 		}
+		DLOG_DBG << mCurvesGeoPrimHandle << "curves container created";
 	} else {
+		DLOG_DBG << "initializing curves container for " << mCurvesGeoPrimHandle;
 		if(!mpCurvesContainer->init(mCurvesGeoPrimHandle, getCurvesRestAttrName(), rest_time_code)) {
 			DLOG_ERR << "Error initializing curves container for prim " << mCurvesGeoPrimHandle << " !";
 			return false;
 		}
+		DLOG_DBG << mCurvesGeoPrimHandle << "curves container initilized";
 	}
 
 	return true;

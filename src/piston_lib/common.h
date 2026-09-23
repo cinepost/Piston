@@ -192,7 +192,7 @@ class UsdPrimHandle {
 		std::string  getFullName() const { return getPath().GetText(); }
 		std::string  getName() const { return getPath().GetName(); }
 		pxr::SdfPath getPath() const { return getPrim().GetPath(); }
-		pxr::UsdStageWeakPtr getStage() const { return getPrim().GetStage(); }
+		pxr::UsdStageRefPtr getStage() const { return getPrim().GetStage(); }
 
 		void setRestAttrName(const std::string& name);
 		const std::string& getRestAttrName() const { return mRestAttrName; }
@@ -206,6 +206,7 @@ class UsdPrimHandle {
 		void clearPrimBson(const pxr::SdfPath& prim_path, const std::string& identifier) const;
 
 		bool positionsMightBeTimeVarying() const;
+		bool hasPositionsTimeSample(const pxr::UsdTimeCode& timeCode, double epsilon = 1e-5) const;
 		bool hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const;
 
 		template<typename T>
@@ -239,7 +240,6 @@ class UsdPrimHandle {
 
   	private:
   		bool prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const;
-  		bool mightBeTimeVarying(const pxr::UsdAttributeQuery& attrQuery) const { return attrQuery.ValueMightBeTimeVarying(); }
 
 	private:
 		pxr::UsdPrim     	mPrim;

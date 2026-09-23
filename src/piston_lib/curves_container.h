@@ -75,6 +75,7 @@ class PxrCurvesContainer {
 		pxr::VtArray<pxr::GfVec3f>              mRestCurvePoints;
 
 		pxr::UsdTimeCode                        mLastUpdateTimeCode;
+		pxr::UsdAttributeQuery              	mPointsQuery;
 };
 
 inline std::string to_string(PxrCurvesContainer::Space space) {

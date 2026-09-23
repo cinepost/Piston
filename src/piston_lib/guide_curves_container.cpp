@@ -90,10 +90,14 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
 	assert(!mExternalLivePointDataSource);
 	assert(prim_handle.isBasisCurvesGeoPrim());
 
-	if(!force) {
-		if(mLastUpdateTimeCode == time_code) return true;
-		//if(!prim_handle.hasPositionsTimeSamples(mLastUpdateTimeCode, time_code)) return true;
-	}
+    // early return
+    if(!force && mLastUpdateTimeCode == time_code) return true;
+
+    if(!prim_handle.hasPositionsTimeSample(time_code)) {
+        LOG_TRC << "Prim " << prim_handle << " has no positions time sample at " << time_code;
+        mLastUpdateTimeCode = time_code;
+        return true;
+    }
 
 	// Curve live point positions
 	if(!prim_handle.getPoints(mLiveCurvePoints, time_code)) {

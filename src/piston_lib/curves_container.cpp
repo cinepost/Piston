@@ -5,6 +5,8 @@
 
 #include <limits>
 
+#include <pxr/usd/sdf/copyUtils.h>
+
 namespace Piston {
 
 PxrCurvesContainer::PxrCurvesContainer():mSpace(PxrCurvesContainer::Space::UNKNOWN), mCurvesCount(0), mLastUpdateTimeCode(std::numeric_limits<double>::lowest()) {
@@ -79,41 +81,45 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 
 	mLastUpdateTimeCode = rest_time_code;
 	mSpace = Space::LOCAL;
+
+	mPointsQuery = pxr::UsdAttributeQuery(geom_curves.GetPointsAttr());
+
 	return true;
 }
 
 bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) {
 	assert(prim_handle.isBasisCurvesGeoPrim());
 
-	if(!force) {
-		if(mLastUpdateTimeCode == time_code) return true;
-		//if(!prim_handle.hasPositionsTimeSamples(mLastUpdateTimeCode, time_code)) return true;
-	}
+	// early return
+	if(!force && mLastUpdateTimeCode == time_code) return true;
 
 	// Curve live point positions
-	pxr::VtArray<pxr::GfVec3f> points;
-	if(!prim_handle.getPoints(points, time_code)) {
+	pxr::VtArray<pxr::GfVec3f> _points;
+
+	if(!mPointsQuery.Get(&_points, time_code)) {
 		LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
 		return false;
 	}
 
-	assert(points.size() == getTotalVertexCount());
+	assert(_points.size() == getTotalVertexCount());
 
-	if(points.size() != getTotalVertexCount()) {
-		LOG_ERR << prim_handle.getPath() << " curve point positions count ( old " << getTotalVertexCount() << ", new " << points.size() << " ) mismatch !";
+	if(_points.size() != getTotalVertexCount()) {
+		LOG_ERR << prim_handle.getPath() << " curve point positions count ( old " << getTotalVertexCount() << ", new " << _points.size() << " ) mismatch !";
 		return false;
 	}
 
 	// Calc curves derivs
-	//#pragma omp parallel for num_threads(2) schedule(static)
-	const auto& _points = points.AsConst();
+	//const auto& points = _points.AsConst();
+
+	const std::vector<pxr::GfVec3f> points(_points.AsConst().begin(), _points.AsConst().end());
+
 	for(size_t i = 0; i < mCurvesCount; ++i) {
-		mCurveRootPositions[i] = _points[mCurveOffsets[i]];
+		mCurveRootPositions[i] = points[mCurveOffsets[i]];
 		
 		mCurveVectors[mCurveOffsets[i]] = {0.f, 0.f, 0.f};
 
 		for(size_t j = 1; j < mCurveVertexCounts[i]; ++j) {
-			mCurveVectors[mCurveOffsets[i] + j] = _points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
+			mCurveVectors[mCurveOffsets[i] + j] = points[mCurveOffsets[i] + j] - mCurveRootPositions[i];
 		}
 	}
 

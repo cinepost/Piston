@@ -140,7 +140,9 @@ const char *stringifyMemSize(size_t bytes) {
 	return output;
 }
 
-UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()), mpDeformer(nullptr), mpTopology(nullptr), mSubdivLevel(0) {}
+UsdPrimHandle::UsdPrimHandle(): mPrim(pxr::UsdPrim()), mpDeformer(nullptr), mpTopology(nullptr), mSubdivLevel(0) {
+
+}
 
 UsdPrimHandle::UsdPrimHandle(const pxr::UsdPrim& prim): UsdPrimHandle() {  
 	mPrim = prim; 
@@ -151,7 +153,14 @@ UsdPrimHandle::UsdPrimHandle(const BaseDeformer::SharedPtr& pDeformer): UsdPrimH
 	mpDeformer = pDeformer;
 }
 
-UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : mPrim(std::move(other.mPrim)), mpDeformer(std::move(other.mpDeformer)), mpTopology(std::move(other.mpTopology)), mSubdivLevel(other.mSubdivLevel) { }
+UsdPrimHandle::UsdPrimHandle(UsdPrimHandle&& other) noexcept : 
+	mPrim(std::move(other.mPrim)), 
+	mpDeformer(std::move(other.mpDeformer)), 
+	mpTopology(std::move(other.mpTopology)), 
+	mSubdivLevel(other.mSubdivLevel)
+{ 
+
+}
 
 UsdPrimHandle& UsdPrimHandle::operator=(UsdPrimHandle&& other) noexcept {
 	if (this != &other) {
@@ -224,10 +233,14 @@ void UsdPrimHandle::setSubdivLevel(uint8_t level) {
 }
 
 bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_threaded) const {
-	if(mpDeformer && !mpDeformer->deform(time_code, multi_threaded)) {
+	if(!mpDeformer) return true;
+
+	LOG_DBG << "Preparing points data for " << getPath() << " using " << mpDeformer->getName();
+	if(!mpDeformer->deform(time_code, multi_threaded)) {
 		LOG_FTL << "Unable to execute " << mpDeformer->getName() << ".deform(...) for " << getPath() << " !!!";
 		return false;
 	}
+
 	return true;
 }
 
@@ -520,11 +533,43 @@ bool UsdPrimHandle::positionsMightBeTimeVarying() const {
 	return attrQuery.ValueMightBeTimeVarying();
 }
 
+bool UsdPrimHandle::hasPositionsTimeSample(const pxr::UsdTimeCode& time_code, double epsilon) const {
+    pxr::UsdGeomPointBased pointGeom(getPrim());
+    pxr::UsdAttribute pointsAttr = pointGeom.GetPointsAttr();
+
+    if (!pointsAttr || !pointsAttr.HasValue()) {
+        return false;
+    }
+
+    double lower = 0.0;
+    double upper = 0.0;
+    bool hasSamples = false;
+    double queryTime = time_code.GetValue();
+
+    if (!pointsAttr.GetBracketingTimeSamples(queryTime, &lower, &upper, &hasSamples)) {
+        // If it has a value but no bracketing samples, it's a static fallback value
+        return false;
+    }
+
+    if(!hasSamples) {
+    	// No samples
+    	return false;
+    }
+
+    // If lower and upper brackets converge on the query time within epsilon, it's a keyframe.
+    if (std::abs(queryTime - lower) <= epsilon || std::abs(queryTime - upper) <= epsilon) {
+    	return true;
+    }
+
+    // If the query time sits strictly between a lower and an upper bracket, it's interpolated.
+    return true;
+}
+
 bool UsdPrimHandle::hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
 	if(mpDeformer) return mpDeformer->canProduceOutputTimeSamples(time_from, time_to);
 
 	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
-	if (!mightBeTimeVarying(attrQuery)) return false;
+	if (!attrQuery.ValueMightBeTimeVarying()) return false;
 
 	auto _hasTimeSample = [&attrQuery](double time) {
 		double lower, upper;

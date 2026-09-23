@@ -61,6 +61,7 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	}
 
 	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+	assert(pDeformerMeshContainer);
 
 	const bool build_live = true; // build using live data
 	std::vector<pxr::GfVec3f>& vertex_normals = build_live ? mLiveVertexNormals : mpFastCurvesDeformerData->mRestVertexNormals;
@@ -114,6 +115,8 @@ bool FastCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr
 	} else {
 		func(0u, curveBinds.size());
 	}
+
+	DLOG_TRC << "FastCurvesDeformer::__deform__ done for " << curveBinds.size() << " points";
 	return true;
 }
 
@@ -186,7 +189,7 @@ void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 }
 
 bool FastCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
-	LOG_DBG << "FastCurvesDeformer::buildDeformerDataImpl";
+	DLOG_DBG << "FastCurvesDeformer::buildDeformerDataImpl";
 	
 	if(!BaseMeshCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;

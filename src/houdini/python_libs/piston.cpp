@@ -32,6 +32,31 @@ namespace boost = hboost;
 
 #include <vector>
 
+//  pxr::UsdTimeCode converter structure
+struct UsdTimeCode_from_python {
+    UsdTimeCode_from_python() {
+        boost::python::converter::registry::push_back(
+            &convertible,
+            &construct,
+            boost::python::type_id<pxr::UsdTimeCode>()
+        );
+    }
+
+    static void* convertible(PyObject* obj_ptr) {
+        if (PyFloat_Check(obj_ptr) || PyLong_Check(obj_ptr)) {
+            return obj_ptr;
+        }
+        return nullptr;
+    }
+
+    static void construct(PyObject* obj_ptr, boost::python::converter::rvalue_from_python_stage1_data* data)  {
+        double value = PyFloat_AsDouble(obj_ptr);
+        void* storage = ((boost::python::converter::rvalue_from_python_storage<pxr::UsdTimeCode>*)data)->storage.bytes;
+        
+        new (storage) pxr::UsdTimeCode(value);
+        data->convertible = storage;
+    }
+};
 
 static void _setLogLevel(Piston::LogLevel level) {
 	Piston::Logger::getInstance().setLogLevel(level);
@@ -51,10 +76,15 @@ static void _clearPistonDataFromPrim(pxr::UsdStageRefPtr pStage, const pxr::SdfP
 
 struct BSON_to_Python {
 	static PyObject *convert(const Piston::BSON& bson) {
-		dbg_printf("BSON_to_Python::convert()\n");
 		static const std::string sTestString = "Encoded bson data.";
 		return boost::python::incref(boost::python::object(sTestString).ptr());
 	}
+};
+
+struct UsdTimeCode_to_python {
+    static PyObject* convert(const pxr::UsdTimeCode& timeCode) {
+        return PyFloat_FromDouble(timeCode.GetValue());
+    }
 };
 
 // convert std::map to a list of tuples for .items() behavior
@@ -66,11 +96,12 @@ boost::python::list get_deformers_map_items(Piston::CurvesDeformerFactory::Defor
     return items;
 }
 
-BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(BaseDeformer_writeJsonDataToPrim_overloads, Piston::BaseDeformer::writeJsonDataToPrim, 0, 1)
-
 BOOST_PYTHON_MODULE(_piston) {
 	using namespace boost::python;
 	using namespace Piston;
+
+	UsdTimeCode_from_python(); // UsdTimeCode converter
+	to_python_converter<pxr::UsdTimeCode, UsdTimeCode_to_python>();
 
 	class_<std::vector<pxr::UsdTimeCode>>("UsdTimeCodeVector")
     	.def(vector_indexing_suite<std::vector<pxr::UsdTimeCode>>())
@@ -160,7 +191,7 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setDebugGeometryMultiplier", &BaseDeformer::setDebugGeometryMultiplier)
 		
 		.def("setReadJsonDataFromPrim", &BaseDeformer::setReadJsonDataFromPrim)
-		.def("writeJsonDataToPrim", &BaseDeformer::writeJsonDataToPrim, BaseDeformer_writeJsonDataToPrim_overloads(args("time_code")))
+		.def("writeJsonDataToPrim", &BaseDeformer::writeJsonDataToPrim)
 	;
 
 	class_<BaseCurvesDeformer, BaseCurvesDeformer::SharedPtr, bases<BaseDeformer>, boost::noncopyable>("BaseCurvesDeformer",  no_init)

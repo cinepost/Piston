@@ -69,6 +69,16 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
 
+		virtual bool updateInputs(pxr::UsdTimeCode time_code) override final {
+			if(!BaseCurvesDeformer::updateInputs(time_code)) {
+				return false;
+			}
+			if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
+				DLOG_ERR << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !";
+				return false;
+			}
+		}
+
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("GuideCurvesDeformer::deformImpl");
 			if(!BaseCurvesDeformer::deformImpl(points, time_code)) return false;

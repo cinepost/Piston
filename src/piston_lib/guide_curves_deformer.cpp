@@ -108,13 +108,13 @@ uint8_t GuideCurvesDeformer::getSkinGeoSubdivLevel() const {
 }
 
 bool GuideCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
+	const auto bind_mode = getBindMode();
+	DLOG_TRC << "GuideCurvesDeformer::__deform__() mode " << to_string(bind_mode) << " " << (multi_threaded ? "multi_threaded" : "single thread");
+
 	if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
 		DLOG_ERR << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !";
 		return false;
 	}
-
-	const auto bind_mode = getBindMode();
-	DLOG_TRC << "GuideCurvesDeformer::__deform__() mode " << to_string(bind_mode) << " " << (multi_threaded ? "multi_threaded" : "single thread");
 	
 	bool result = false;
 
@@ -712,8 +712,8 @@ bool GuideCurvesDeformer::guideIndicesNeeded() const {
 }
 
 bool GuideCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+	DLOG_DBG << "GuideCurvesDeformer::buildDeformerDataImpl";
 
-	LOG_DBG << "GuideCurvesDeformer::buildDeformerDataImpl";
 	if(!BaseCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
 		return false;
 	}
@@ -1944,6 +1944,8 @@ bool GuideCurvesDeformer::buildDeformerDataNTBMode(pxr::UsdTimeCode rest_time_co
 	} else {
 		func(0u, curves_count);
 	}
+
+	DLOG_DBG << "Binding curves to guides using NTB mode done.";
 
 	return true;
 }

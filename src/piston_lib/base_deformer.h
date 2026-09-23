@@ -85,7 +85,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		void setRestTimeCode(pxr::UsdTimeCode time_code);
 		pxr::UsdTimeCode getRestTimeCode() const;
 
-		bool writeJsonDataToPrim(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default());
+		bool writeJsonDataToPrim();
 
 		// DocString: deform
 		/**
@@ -97,7 +97,12 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
 		
 		bool deform_multiple(const std::vector<pxr::UsdTimeCode>& time_code_list, bool multi_threaded = true) {
-            for (const auto& time_code : time_code_list) {
+			if(time_code_list.empty()) {
+				DLOG_ERR << "Empty time_code list!";
+				return false;
+			}
+
+			for (const auto& time_code : time_code_list) {
                 if(!deform(time_code, multi_threaded)) return false;
             }
             return true;
@@ -119,6 +124,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 	protected:
 		BaseDeformer(const Type type, const std::string& name);
 
+		virtual bool updateInputs(pxr::UsdTimeCode time_code);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) { return true; }
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) { return true; }
 
@@ -177,7 +183,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 	private:
 		virtual bool deformerOutputsOrientations() const { return false; }
-		bool buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false);
+		bool buildDeformerData(bool multi_threaded = false);
 		virtual bool buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded = false) = 0;
 		
 		static std::atomic_uint32_t current_id;

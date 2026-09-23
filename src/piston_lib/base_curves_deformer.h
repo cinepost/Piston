@@ -48,14 +48,14 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 	protected:
 		BaseCurvesDeformer(const Type type, const std::string& name);
 
-		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
+		virtual bool updateInputs(pxr::UsdTimeCode time_code) override {
+			if(!BaseDeformer::updateInputs(time_code)) return false;
 			assert(mpCurvesContainer);
-			return mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty());
-		}
-
-		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
-			assert(mpCurvesContainer);
-			return mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty());
+			if(!mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty())) {
+				DLOG_ERR << "Error updating curves " << mCurvesGeoPrimHandle;
+				return false;
+			}
+			return true;
 		}
 
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mCurvesGeoPrimHandle; }

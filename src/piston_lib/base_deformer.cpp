@@ -127,14 +127,25 @@ pxr::UsdTimeCode BaseDeformer::getRestTimeCode() const {
 	return mRestTimeCode;
 }
 
+bool BaseDeformer::updateInputs(pxr::UsdTimeCode time_code) {
+	assert(mpDeformerMeshContainer);
+	if(!mpDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
+		DLOG_ERR << "Error updating deformer mesh " << mDeformerGeoPrimHandle;
+		return false;
+	}
+	return true;	
+}
+
 bool BaseDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
+	multi_threaded = false;
+
 	DLOG_TRC << "Deform at time code: " << time_code.GetValue();
 		
-	const pxr::UsdTimeCode bind_time_code = getRestTimeCode();
-	if(!buildDeformerData(bind_time_code, multi_threaded)) {
+	if(!buildDeformerData(multi_threaded)) {
 		return false;
 	}
 
+	// Do we need this ?
 	assert(mpDeformerMeshContainer);
 	if(!mpDeformerMeshContainer || mpDeformerMeshContainer->getRestPositions().empty()) {
 		return false;
@@ -143,13 +154,12 @@ bool BaseDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
 	const size_t points_count = getDeformedPointsCount();
 
 	auto deformPoints = [this](bool multi_threaded, PointsList& points, pxr::UsdTimeCode time_code) {
-		if(!mpDeformerMeshContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
-			return false;
-		}
-		
-		if(multi_threaded) { return deformMtImpl(points, time_code); }
+		//if(!updateInputs(time_code)) {
+		//	DLOG_ERR << "deformPoints lambda call updateInputs() failed!";
+		//	return false;
+		//}
 
-		return deformImpl(points, time_code);
+		return multi_threaded ? deformMtImpl(points, time_code) : deformImpl(points, time_code);
 	};
 
 	auto getDeformedPoints = [this, points_count, &deformPoints](std::unique_ptr<PointsList>& points, bool multi_threaded, const PxrPointsLRUCache::CompositeKey& key) {
@@ -226,7 +236,7 @@ bool BaseDeformer::deform(pxr::UsdTimeCode time_code, bool multi_threaded) {
 	return true;
 }
 
-bool BaseDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
+bool BaseDeformer::buildDeformerData(bool multi_threaded) {
 	if(!mDirty) return true;
 
 	SimpleProfiler::clear();
@@ -235,6 +245,8 @@ bool BaseDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi
 		DLOG_ERR << "No deformer UsdPrim is set !!!";
 		return false;
 	}
+
+	const pxr::UsdTimeCode rest_time_code = getRestTimeCode();
 
 	if(!mpDeformerMeshContainer) {
 		mpDeformerMeshContainer = MeshContainer::create(mDeformerGeoPrimHandle, rest_time_code);
@@ -264,17 +276,13 @@ bool BaseDeformer::buildDeformerData(pxr::UsdTimeCode rest_time_code, bool multi
 	return true;
 }
 
-bool BaseDeformer::writeJsonDataToPrim(pxr::UsdTimeCode time_code) {
+bool BaseDeformer::writeJsonDataToPrim() {
 	if(mDeformerDataWritten) return true;
 
 	mDeformerDataWritten = false;
 
-	if(time_code.IsDefault()) {
-		time_code = getRestTimeCode();
-	}
-
 	// Write json data if needed
-	if(!buildDeformerData(time_code)) {
+	if(!buildDeformerData()) {
 		DLOG_ERR << "Error building " << mName << " deformer data !";
 		return false;
 	}
