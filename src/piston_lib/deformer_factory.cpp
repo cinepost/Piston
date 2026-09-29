@@ -16,6 +16,14 @@ static std::string tolower(std::string s) {
     return s;
 }
 
+CurvesDeformerFactory::CurvesDeformerFactory(): 
+	mPool(std::max(2u, std::thread::hardware_concurrency()) - 1), 
+	mpPxrPointsLRUCache(nullptr), 
+	mPointCacheState(false) 
+{
+
+}
+
 CurvesDeformerFactory& CurvesDeformerFactory::getInstance() {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mInstancePtr == nullptr) {
@@ -69,26 +77,26 @@ BaseDeformer::SharedPtr CurvesDeformerFactory::getDeformer(BaseDeformer::Type ty
 	switch(type) {
 		case BaseDeformer::Type::POINT_INSTANCER: 
 		{
-			auto result = mDeformers.emplace(key, PointInstancerDeformer::create(name));
+			auto result = mDeformers.emplace(key, PointInstancerDeformer::create(name, mPool));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating PointInstancerDeformer !");
 		}
 		case BaseDeformer::Type::WRAP: 
 		{
-			auto result = mDeformers.emplace(key, WrapCurvesDeformer::create(name));
+			auto result = mDeformers.emplace(key, WrapCurvesDeformer::create(name, mPool));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating WrapCurvesDeformer !");
 		}
 		case BaseDeformer::Type::GUIDES: 
 		{
-			auto result = mDeformers.emplace(key, GuideCurvesDeformer::create(name));
+			auto result = mDeformers.emplace(key, GuideCurvesDeformer::create(name, mPool));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating GuideCurvesDeformer !");
 		}
 		case BaseDeformer::Type::FAST:
 		default:
 		{
-			auto result = mDeformers.emplace(key, FastCurvesDeformer::create(name));
+			auto result = mDeformers.emplace(key, FastCurvesDeformer::create(name, mPool));
 			if(result.second) return result.first->second;
 			throw std::runtime_error("Error creating FastCurvesDeformer !");
 		}
@@ -144,10 +152,6 @@ PxrPointsLRUCache* CurvesDeformerFactory::getPxrPointsLRUCachePtr() {
 }
 
 CurvesDeformerFactory::~CurvesDeformerFactory() {
-	//SimpleProfiler::printReport();
-}
-
-CurvesDeformerFactory::CurvesDeformerFactory(): mpPxrPointsLRUCache(nullptr), mPointCacheState(false) {
 
 }
 

@@ -46,16 +46,16 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 		const std::string& getCurvesRestAttrName() const { return mCurvesGeoPrimHandle.getRestAttrName(); }
 
 	protected:
-		BaseCurvesDeformer(const Type type, const std::string& name);
+		BaseCurvesDeformer(const Type type, const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 
-		virtual bool updateInputs(pxr::UsdTimeCode time_code) override {
-			if(!BaseDeformer::updateInputs(time_code)) return false;
+		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
 			assert(mpCurvesContainer);
-			if(!mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty())) {
-				DLOG_ERR << "Error updating curves " << mCurvesGeoPrimHandle;
-				return false;
-			}
-			return true;
+			return mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty());
+		}
+
+		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) override {
+			assert(mpCurvesContainer);
+			return mpCurvesContainer->update(mCurvesGeoPrimHandle, time_code, isDirty());
 		}
 
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override { return mCurvesGeoPrimHandle; }
@@ -64,7 +64,8 @@ class BaseCurvesDeformer :public BaseDeformer, public inherit_shared_from_this<B
 
 		virtual size_t getDeformedPointsCount() const override final; 
 		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) override final;
-
+		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) override final;
+		
 	protected:
 		UsdPrimHandle 					mCurvesGeoPrimHandle;
 		PxrCurvesContainer::UniquePtr 	mpCurvesContainer;

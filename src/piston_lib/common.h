@@ -207,7 +207,7 @@ class UsdPrimHandle {
 
 		bool positionsMightBeTimeVarying() const;
 		bool hasPositionsTimeSample(const pxr::UsdTimeCode& timeCode, double epsilon = 1e-5) const;
-		bool hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const;
+		bool hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to, double epsilon = 1e-5) const;
 
 		template<typename T>
 		bool fetchAttributeValues(const std::string& attribute_name, pxr::VtArray<T>& array, pxr::UsdTimeCode time_code) const;

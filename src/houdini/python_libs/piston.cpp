@@ -177,14 +177,30 @@ BOOST_PYTHON_MODULE(_piston) {
 		.def("setDataPrimPath", &BaseDeformer::setDataPrimPath)
 		.def("getDataPrimPath", &BaseDeformer::getDataPrimPath, return_value_policy<copy_const_reference>())
 
-		.def("deform", 
-			&BaseDeformer::deform, 
-			(args("time_code") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
+		.def("setVelocityBlurState", &BaseDeformer::setVelocityBlurState)
+		.def("getVelocityBlurState", &BaseDeformer::getVelocityBlurState)
+
+		.def("setVelocityAttrName", &BaseDeformer::setVelocityAttrName)
+		.def("getVelocityAttrName", &BaseDeformer::getVelocityAttrName, return_value_policy<copy_const_reference>())
+
+		//.def("deform", 
+		//	&BaseDeformer::deform, 
+		//	(args("time_code") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
+		//)
+
+		.def("deform", +[](BaseDeformer& self, pxr::UsdTimeCode time_code, bool multi_threaded) {
+		    self.deform(time_code, multi_threaded, false /* hidden ignore_velocities arg. don't ignore if requested */); }, 
+		    (args("time_code") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
 		)
 
-		.def("deform", 
-			&BaseDeformer::deform_multiple, 
-			(args("time_code_list") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
+		//.def("deform", 
+		//	&BaseDeformer::deform_multiple, 
+		//	(args("time_code_list") = pxr::UsdTimeCode::Default(), args("multi_threaded") = true)
+		//)
+
+		.def("deform", +[](BaseDeformer& self, const std::vector<pxr::UsdTimeCode>& time_code_list, bool multi_threaded) {
+		    self.deform_multiple(time_code_list, multi_threaded, true /* hidden ignore_velocities arg. ignore if requested */); }, 
+		    (arg("time_code_list"), args("multi_threaded") = true)
 		)
 
 		.def("showDebugGeometry", &BaseDeformer::showDebugGeometry)

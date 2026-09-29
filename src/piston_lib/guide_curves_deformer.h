@@ -38,7 +38,7 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 	public:
 		~GuideCurvesDeformer();
 
-		static SharedPtr create(const std::string& name);
+		static SharedPtr create(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 		virtual const std::string& toString() const override final;
 
 		void setBindMode(BindMode mode);
@@ -65,19 +65,9 @@ class GuideCurvesDeformer : public BaseCurvesDeformer, public inherit_shared_fro
 		bool isFastPointBind() const { return mFastPointBind; }
 
 	protected:
-		GuideCurvesDeformer(const std::string& name);
+		GuideCurvesDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
-
-		virtual bool updateInputs(pxr::UsdTimeCode time_code) override final {
-			if(!BaseCurvesDeformer::updateInputs(time_code)) {
-				return false;
-			}
-			if(!mpGuideCurvesContainer->update(mDeformerGeoPrimHandle, time_code, isDirty())) {
-				DLOG_ERR << "Error updating guide curves from prim" << mDeformerGeoPrimHandle.getPath().GetText() << " !";
-				return false;
-			}
-		}
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("GuideCurvesDeformer::deformImpl");

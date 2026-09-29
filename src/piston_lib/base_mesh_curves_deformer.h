@@ -23,7 +23,7 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		virtual const std::string& toString() const override; 
 
 	protected:
-		BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type type, const std::string& name);
+		BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type type, const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
 

@@ -30,13 +30,13 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 	public:
 		~WrapCurvesDeformer();
 
-		static SharedPtr create(const std::string& name);
+		static SharedPtr create(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 		virtual const std::string& toString() const override final;
 		void setBindMode(BindMode mode);
 		BindMode getBindMode() const;
 
 	protected:
-		WrapCurvesDeformer(const std::string& name);
+		WrapCurvesDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final  {
 			PROFILE("WrapCurvesDeformer::deformImpl");
 			if(!BaseMeshCurvesDeformer::deformImpl(points, time_code)) return false;

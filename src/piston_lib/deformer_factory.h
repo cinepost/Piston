@@ -12,6 +12,8 @@
 #include "os.h"
 #include "simple_profiler.h"
 
+#include "BS_thread_pool.hpp"
+
 #include <string>
 #include <vector>
 #include <map>
@@ -73,6 +75,8 @@ class CurvesDeformerFactory {
 		BaseDeformer::SharedPtr getDeformer(BaseDeformer::Type type, const std::string& name);
 
 	private:
+		BS::thread_pool<BS::tp::none> mPool;
+
 		DeformersMap mDeformers;
 		PxrPointsLRUCache::UniquePtr mpPxrPointsLRUCache;
 

@@ -14,7 +14,7 @@ static std::string gLRUCacheStatsLastUsageStr = "-";
 
 namespace Piston {
 
-BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): BaseDeformer(t, name) {	
+BaseCurvesDeformer::BaseCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name, BS::thread_pool<BS::tp::none>& pool): BaseDeformer(t, name, pool) {	
 	DLOG_TRC << "BaseCurvesDeformer::BaseCurvesDeformer()";
 }
 
@@ -73,6 +73,19 @@ bool BaseCurvesDeformer::outputDeformedPoints(const PointsList* pPointsList, pxr
 	result = curves.GetPointsAttr().Set(new_points, time_code);
 
 	return result;
+}
+
+bool BaseCurvesDeformer::outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) {
+	assert(pVelocitiesList);
+
+	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
+	pxr::UsdAttribute attr_v = curves.GetVelocitiesAttr();
+
+	if(!attr_v || !attr_v.Set(pVelocitiesList->getPointsVtArray(), time_code)) {
+		return false;	
+	}
+
+	return true;
 }
 
 bool BaseCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {

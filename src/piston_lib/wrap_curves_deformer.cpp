@@ -19,12 +19,12 @@ namespace Piston {
 static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
-WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name) {
+WrapCurvesDeformer::WrapCurvesDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::WRAP, name, pool) {
 	mBindMode = BindMode::DIST;
 }
 
-WrapCurvesDeformer::SharedPtr WrapCurvesDeformer::create(const std::string& name) {
-	return SharedPtr(new WrapCurvesDeformer(name));
+WrapCurvesDeformer::SharedPtr WrapCurvesDeformer::create(const std::string& name, BS::thread_pool<BS::tp::none>& pool) {
+	return SharedPtr(new WrapCurvesDeformer(name, pool));
 }
 
 const std::string& WrapCurvesDeformer::toString() const {

@@ -10,7 +10,7 @@
 
 namespace Piston {
 
-BaseMeshCurvesDeformer::BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name): BaseCurvesDeformer(t, name) {
+BaseMeshCurvesDeformer::BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type t, const std::string& name, BS::thread_pool<BS::tp::none>& pool): BaseCurvesDeformer(t, name, pool) {
 	DLOG_TRC << "BaseMeshCurvesDeformer::BaseMeshCurvesDeformer()";
 }
 

@@ -40,11 +40,11 @@ class PointInstancerDeformer :public BaseDeformer, public inherit_shared_from_th
 		const std::string& getInstancerRestAttrName() const { return mInstancerGeoPrimHandle.getRestAttrName(); }
 
 
-		static SharedPtr create(const std::string& name);
+		static SharedPtr create(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 		virtual const std::string& toString() const override final;
 
 	protected:
-		PointInstancerDeformer(const std::string& name);
+		PointInstancerDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("PointInstancerDeformer::deformImpl");
@@ -62,6 +62,7 @@ class PointInstancerDeformer :public BaseDeformer, public inherit_shared_from_th
 
 		virtual size_t getDeformedPointsCount() const override final; 
 		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) override final; 
+		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) override final;
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) override final;
 		virtual const UsdPrimHandle& getOutputPrimHandle() const override final { return mInstancerGeoPrimHandle; }

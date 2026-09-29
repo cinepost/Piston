@@ -32,11 +32,11 @@ class FastCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 	public:
 		~FastCurvesDeformer();
 
-		static SharedPtr create(const std::string& name);
+		static SharedPtr create(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 		virtual const std::string& toString() const override;
 
 	protected:
-		FastCurvesDeformer(const std::string& name);
+		FastCurvesDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) override final {
 			PROFILE("FastCurvesDeformer::deformImpl");
 			if(!BaseMeshCurvesDeformer::deformImpl(points, time_code)) return false;

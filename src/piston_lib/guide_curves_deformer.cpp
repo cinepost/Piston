@@ -20,7 +20,7 @@
 
 namespace Piston {
 
-GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name): BaseCurvesDeformer(BaseCurvesDeformer::Type::GUIDES, name), mSkinGeoSubdivLevel(0) {
+GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool): BaseCurvesDeformer(BaseCurvesDeformer::Type::GUIDES, name, pool), mSkinGeoSubdivLevel(0) {
 	mBindMode = BindMode::NTB;
 
 	static const std::string kDefaultSkinPrimRestAttrName = "rest";
@@ -28,8 +28,8 @@ GuideCurvesDeformer::GuideCurvesDeformer(const std::string& name): BaseCurvesDef
 	mGuidesSkinGeoPrimHandle.setRestAttrName(kDefaultSkinPrimRestAttrName);
 }
 
-GuideCurvesDeformer::SharedPtr GuideCurvesDeformer::create(const std::string& name) {
-	return SharedPtr(new GuideCurvesDeformer(name));
+GuideCurvesDeformer::SharedPtr GuideCurvesDeformer::create(const std::string& name, BS::thread_pool<BS::tp::none>& pool) {
+	return SharedPtr(new GuideCurvesDeformer(name, pool));
 }
 
 bool GuideCurvesDeformer::validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) {

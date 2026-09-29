@@ -28,6 +28,7 @@ namespace Piston {
 
 
 namespace {
+	const std::string kVelocitiAttrName = "velocities";
 	const std::string kСurvesSkinPrimAttrName = ""; //"skinprim"
 }
 
@@ -87,6 +88,9 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 		bool writeJsonDataToPrim();
 
+		void setVelocityAttrName(const std::string& name);
+		const std::string& getVelocityAttrName() const { return mVelocityAttrName; }
+
 		// DocString: deform
 		/**
 		 * @brief Sets the Pixar USD curves primitive that will undergo deformation.
@@ -94,16 +98,15 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		 * @return something
 		 *
 		 */	
-		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true);
+		bool deform(pxr::UsdTimeCode time_code = pxr::UsdTimeCode::Default(), bool multi_threaded = true, bool ignore_velocities = false  /* ignore velocity vectors calculations */);
 		
-		bool deform_multiple(const std::vector<pxr::UsdTimeCode>& time_code_list, bool multi_threaded = true) {
+		bool deform_multiple(const std::vector<pxr::UsdTimeCode>& time_code_list, bool multi_threaded = true, bool ignore_velocities = true  /* ignore velocity vectors calculations */) {
 			if(time_code_list.empty()) {
-				DLOG_ERR << "Empty time_code list!";
 				return false;
 			}
 
 			for (const auto& time_code : time_code_list) {
-                if(!deform(time_code, multi_threaded)) return false;
+				if(!deform(time_code, multi_threaded, ignore_velocities)) return false;
             }
             return true;
         }
@@ -115,6 +118,9 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 
 		const DeformerStats& getStats() const { return mStats; }
 
+		void setVelocityBlurState(bool state);
+		bool getVelocityBlurState() const { return mCalcMotionVectors; }
+
 		void showDebugGeometry(bool state);
 
 		void setDebugGeometryMultiplier(float m) { mDebugGeometryMult = m; }
@@ -122,14 +128,14 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		uint32_t getUniqueID() const { return mID; }
 
 	protected:
-		BaseDeformer(const Type type, const std::string& name);
+		BaseDeformer(const Type type, const std::string& name, BS::thread_pool<BS::tp::none>& pool);
 
-		virtual bool updateInputs(pxr::UsdTimeCode time_code);
 		virtual bool deformImpl(PointsList& points, pxr::UsdTimeCode time_code) { return true; }
 		virtual bool deformMtImpl(PointsList& points, pxr::UsdTimeCode time_code) { return true; }
 
 		virtual size_t getDeformedPointsCount() const = 0; 
 		virtual bool outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) = 0;
+		virtual bool outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) = 0;
 
 		virtual bool validateDeformerGeoPrim(const pxr::UsdPrim& geoPrim) = 0;
 		virtual void invalidateData(DeformerDataCache& cache) = 0;
@@ -145,7 +151,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		bool  		mDirty = true;
 		bool  		mDeformerDataWritten = false;
 
-		BS::thread_pool<BS::tp::none> mPool;
+		BS::thread_pool<BS::tp::none>& mPool;
 		
 		Type 				mType;
 		std::string 		mName;
@@ -162,7 +168,8 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		
 		UsdPrimHandle 	mDeformerGeoPrimHandle;
 
-		std::string 	mSkinPrimAttrName = kСurvesSkinPrimAttrName;		
+		std::string 	mSkinPrimAttrName = kСurvesSkinPrimAttrName;
+		std::string   	mVelocityAttrName = kVelocitiAttrName;		
 		
 		MeshContainer::UniquePtr   		mpDeformerMeshContainer;
 
@@ -179,6 +186,11 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		}
 
 		const std::string& uniqueName() const { return mUniqueName; }
+		std::string velocityKeyName() const { return uniqueName() + "_vel"; }
+
+		MotionBlurDirection motionBlurDirection() const { return mMotionBlurDirection; }
+		bool calcMotionVectors() const { return mCalcMotionVectors; }
+
 		virtual void drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) = 0;
 
 	private:
@@ -201,6 +213,7 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		// we use these containers to store deformed points data when LRU cache is disabled
 		std::unique_ptr<PointsList> 	mpDeformedPointsList;
 		std::unique_ptr<PointsList> 	mpDeformedPointsListStep;
+		std::unique_ptr<PointsList> 	mpTempVelocitiesList;
 
 		friend class UsdPrimHandle;
 };

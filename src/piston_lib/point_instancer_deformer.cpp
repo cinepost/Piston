@@ -21,12 +21,12 @@ namespace Piston {
 static constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
 static constexpr float kMaxFloat = std::numeric_limits<float>::max();
 
-PointInstancerDeformer::PointInstancerDeformer(const std::string& name): BaseDeformer(BaseDeformer::Type::POINT_INSTANCER, name), mBindMode(BindMode::SIMPLE) {
+PointInstancerDeformer::PointInstancerDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool): BaseDeformer(BaseDeformer::Type::POINT_INSTANCER, name, pool), mBindMode(BindMode::SIMPLE) {
 
 }
 
-PointInstancerDeformer::SharedPtr PointInstancerDeformer::create(const std::string& name) {
-	return SharedPtr(new PointInstancerDeformer(name));
+PointInstancerDeformer::SharedPtr PointInstancerDeformer::create(const std::string& name, BS::thread_pool<BS::tp::none>& pool) {
+	return SharedPtr(new PointInstancerDeformer(name, pool));
 }
 
 const std::string& PointInstancerDeformer::toString() const {
@@ -112,6 +112,19 @@ bool PointInstancerDeformer::outputDeformedPoints(const PointsList* pPointsList,
 	const auto& orientations = pPointsList->getOrientationsVtArray();
 	if(attr_o && orientations.size() == pPointsList->size()) {
 		attr_o.Set(orientations, time_code);
+	}
+
+	return true;
+}
+
+bool PointInstancerDeformer::outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) {
+	assert(pVelocitiesList);
+
+	pxr::UsdGeomPointInstancer instancer(mInstancerGeoPrimHandle.getPrim());
+	pxr::UsdAttribute attr_v = instancer.GetVelocitiesAttr();
+
+	if(!attr_v || !attr_v.Set(pVelocitiesList->getPointsVtArray(), time_code)) {
+		return false;	
 	}
 
 	return true;

@@ -23,12 +23,12 @@ static inline float distanceSquared(const pxr::GfVec3f &p1, const pxr::GfVec3f &
 
 namespace Piston {
 
-FastCurvesDeformer::FastCurvesDeformer(const std::string& name): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name) {
+FastCurvesDeformer::FastCurvesDeformer(const std::string& name, BS::thread_pool<BS::tp::none>& pool): BaseMeshCurvesDeformer(BaseCurvesDeformer::Type::FAST, name, pool) {
 
 }
 
-FastCurvesDeformer::SharedPtr FastCurvesDeformer::create(const std::string& name) {
-	return SharedPtr(new FastCurvesDeformer(name));
+FastCurvesDeformer::SharedPtr FastCurvesDeformer::create(const std::string& name, BS::thread_pool<BS::tp::none>& pool) {
+	return SharedPtr(new FastCurvesDeformer(name, pool));
 }
 
 const std::string& FastCurvesDeformer::toString() const {

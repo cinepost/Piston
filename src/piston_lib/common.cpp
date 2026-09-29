@@ -236,7 +236,7 @@ bool UsdPrimHandle::prepareDataIfNeeded(pxr::UsdTimeCode time_code, bool multi_t
 	if(!mpDeformer) return true;
 
 	LOG_DBG << "Preparing points data for " << getPath() << " using " << mpDeformer->getName();
-	if(!mpDeformer->deform(time_code, multi_threaded)) {
+	if(!mpDeformer->deform(time_code, multi_threaded, false /* ignore velocity vectors calculations */)) {
 		LOG_FTL << "Unable to execute " << mpDeformer->getName() << ".deform(...) for " << getPath() << " !!!";
 		return false;
 	}
@@ -546,14 +546,9 @@ bool UsdPrimHandle::hasPositionsTimeSample(const pxr::UsdTimeCode& time_code, do
     bool hasSamples = false;
     double queryTime = time_code.GetValue();
 
-    if (!pointsAttr.GetBracketingTimeSamples(queryTime, &lower, &upper, &hasSamples)) {
+    if (!pointsAttr.GetBracketingTimeSamples(queryTime, &lower, &upper, &hasSamples) || !hasSamples) {
         // If it has a value but no bracketing samples, it's a static fallback value
         return false;
-    }
-
-    if(!hasSamples) {
-    	// No samples
-    	return false;
     }
 
     // If lower and upper brackets converge on the query time within epsilon, it's a keyframe.
@@ -565,17 +560,26 @@ bool UsdPrimHandle::hasPositionsTimeSample(const pxr::UsdTimeCode& time_code, do
     return true;
 }
 
-bool UsdPrimHandle::hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
+bool UsdPrimHandle::hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to, double epsilon) const {
 	if(mpDeformer) return mpDeformer->canProduceOutputTimeSamples(time_from, time_to);
 
 	pxr::UsdAttributeQuery attrQuery(pxr::UsdGeomPointBased(getPrim()).GetPointsAttr());
 	if (!attrQuery.ValueMightBeTimeVarying()) return false;
 
-	auto _hasTimeSample = [&attrQuery](double time) {
+	auto _hasTimeSample = [&attrQuery, epsilon](double queryTime) {
 		double lower, upper;
 		bool hasSamples;
-		attrQuery.GetBracketingTimeSamples(time, &lower, &upper, &hasSamples);
-		return hasSamples && lower == upper;
+		if(!attrQuery.GetBracketingTimeSamples(queryTime, &lower, &upper, &hasSamples) || !hasSamples) {
+			return false;
+		}
+
+		// If lower and upper brackets converge on the query time within epsilon, it's a keyframe.
+		if (std::abs(queryTime - lower) <= epsilon || std::abs(queryTime - upper) <= epsilon) {
+    		return true;
+    	}
+
+		// If the query time sits strictly between a lower and an upper bracket, it's interpolated.
+    	return true;
 	};
 
 	return _hasTimeSample(time_from.GetValue()) && _hasTimeSample(time_to.GetValue());
