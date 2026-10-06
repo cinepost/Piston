@@ -430,7 +430,7 @@ void BaseDeformer::drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code) {
 	auto* pRefiner = mDeformerGeoPrimHandle.getMeshRefiner(getRestTimeCode());
 	if(!pRefiner || pRefiner->getMaxLevel() == 0) return;
 
-	pRefiner->update(time_code);
+	pRefiner->update(mDeformerGeoPrimHandle, time_code);
 	const pxr::UsdGeomMesh& subdMesh = pRefiner->getOutputMesh();
 
 	if(!mpSubdivDebugGeo) {

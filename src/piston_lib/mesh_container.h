@@ -98,6 +98,9 @@ class TemplatedMeshContainer: public TemplatedMeshContainerBase {
 
 		T 			mUsdMeshRestPositions;
 		mutable T 	mUsdMeshLivePositions;
+
+		mutable pxr::UsdAttributeQuery mPointsQuery;
+
 };
 
 using MeshContainer = TemplatedMeshContainer<pxr::VtArray<TemplatedMeshContainerBase::PointType>>;

@@ -51,6 +51,7 @@ bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, pxr::UsdT
 				LOG_ERR << "TemplatedMeshContainer::init() error. Error getting subdivided mesh " << prim_handle << " point positions !";
 				return false;
 			}
+			mPointsQuery = pxr::UsdAttributeQuery(pRefiner->getOutputMesh().GetPointsAttr());
 		} else {
 			LOG_FTL << "TemplatedMeshContainer::init() error. Error initializing for subdivided mesh " << prim_handle << ". std::vector<> not supported !";
 			return false;
@@ -61,10 +62,11 @@ bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, pxr::UsdT
 		pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = prim_handle.getPrimvarsAPI();
 		pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(prim_handle.getRestAttrName()));
 			
+		pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
+		mPointsQuery = pxr::UsdAttributeQuery(mesh.GetPointsAttr());
+
 		if(!restPositionPrimVar) {
 			LOG_WRN << "No valid primvar \"" << prim_handle.getRestAttrName() << "\" exists in prim " << prim_handle.getPath() << "! Using positions at time code 0.0 !";
-
-			pxr::UsdGeomPointBased mesh(prim_handle.getPrim());
 
 			if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
 				if(!mesh.GetPointsAttr().Get(&mUsdMeshRestPositions, rest_time_code)) {
@@ -105,6 +107,7 @@ bool TemplatedMeshContainer<T>::init(const UsdPrimHandle& prim_handle, pxr::UsdT
 
 	mUsdMeshLivePositions = mUsdMeshRestPositions;
 	mLastUpdateTimeCode = rest_time_code;
+
 	return true;
 }
 
@@ -249,23 +252,46 @@ bool TemplatedMeshContainer<T>::update(const UsdPrimHandle& prim_handle, pxr::Us
 	}
 
 	const PersistentMeshRefiner* pRefiner = prim_handle.getMeshRefiner();
-	if( pRefiner && pRefiner->isInitialized()) {
-		pRefiner->update(time_code);
-		attr = pRefiner->getOutputMesh().GetPointsAttr();
-		LOG_DBG << "TemplatedMeshContainer::update() subdivided mesh " << prim_handle;
-	} else {
-		attr = pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr();
-	}
+
+	auto getPoints = [&, pRefiner](pxr::VtArray<PointType>& array, pxr::UsdTimeCode time_code) {
+		if(pRefiner) {
+			// No need to use attrib query for subdivided mesh we've constructed on the fly
+
+			if(!pRefiner->isInitialized() || !pRefiner->update(prim_handle, time_code)) {
+				return false;
+			} else {
+				return pRefiner->getOutputMesh().GetPointsAttr().Get(&array, time_code);
+			}
+		} else {
+			pxr::UsdAttribute attr = pxr::UsdGeomPointBased(prim_handle.getPrim()).GetPointsAttr();
+
+			pxr::UsdEditTarget currentEditTarget = prim_handle.getStage()->GetEditTarget();
+	        pxr::UsdResolveTarget resolveTarget = prim_handle.getPrim().MakeResolveTargetUpToEditTarget(currentEditTarget);
+	        auto pointsQuery = pxr::UsdAttributeQuery(attr, resolveTarget);
+
+	        if(!pointsQuery || !pointsQuery.Get(&array, time_code)) {
+	            LOG_WRN << "TemplatedMeshContainer: Error getting mesh point positions from " << prim_handle << " using UsdAttributeQuery. Reading using UsdAttribute::Get().";
+	            if(!attr.Get(&array, time_code)) {
+	                LOG_ERR << "TemplatedMeshContainer: Error getting mesh point positions from " << prim_handle << " !";
+	                return false;
+	            }
+	        }
+		}
+
+        return true;
+	};
 
 	if constexpr (std::is_same_v<T, pxr::VtArray<PointType>>) {
-		if(!attr.Get(&mUsdMeshLivePositions, time_code)) {
+		//if(!attr.Get(&mUsdMeshLivePositions, time_code)) {
+		if(!getPoints(mUsdMeshLivePositions, time_code)) {
 			LOG_ERR << "Error getting point positions from " << prim_handle.getPath() << " !";
 			return false;
 		}
 	} else {
 		static_assert(std::is_same_v<T, std::vector<PointType>>);
 		pxr::VtArray<PointType> tmp;
-		if(!attr.Get(&tmp, time_code)) {
+		//if(!attr.Get(&tmp, time_code)) {
+		if(!getPoints(tmp, time_code)) {
 			LOG_ERR << "Error getting point positions from " << prim_handle.getPath() << " !";
 			return false;
 		}

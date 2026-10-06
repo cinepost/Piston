@@ -9,6 +9,9 @@
 #include <atomic>
 
 #include <pxr/usd/usd/editContext.h>
+#include <pxr/usd/usdGeom/boundable.h>
+#include <pxr/base/gf/bbox3d.h>
+
 
 static std::string gLRUCacheStatsLastUsageStr = "-";
 
@@ -32,10 +35,14 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 	}
 
 	auto new_handle = UsdPrimHandle(prim);
+
+	if(!mCurvesGeoPrimHandle.isValid()) DLOG_ERR << mCurvesGeoPrimHandle << "is invalid!!!";
+
 	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle, new_handle, getRestTimeCode()) : false;
 
 	mCurvesGeoPrimHandle = std::move(new_handle);
 	if(!same_topology) {
+		DLOG_DBG << mCurvesGeoPrimHandle << " topology changed";
 		makeDirty();
 	}
 
@@ -61,18 +68,31 @@ size_t BaseCurvesDeformer::getDeformedPointsCount() const {
 
 bool BaseCurvesDeformer::outputDeformedPoints(const PointsList* pPointsList, pxr::UsdTimeCode time_code) {
 	assert(pPointsList);
-	bool result = false;
+	
+	const auto& points = pPointsList->getPointsVtArray();
 
-	pxr::VtArray<pxr::GfVec3f> new_points(pPointsList->getPointsVtArray().size());
+	pxr::GfRange3d range;
+	//pxr::VtArray<pxr::GfVec3f> new_points(points.size());
+	const auto& new_points = pPointsList->getPointsVtArray();
 
-	for(size_t i = 0; i < pPointsList->getPointsVtArray().size(); ++i) {
-		new_points[i] = pPointsList->getPointsVtArray()[i];
+
+	for(size_t i = 0; i < points.size(); ++i) {
+		//new_points[i] = points[i];
+		range.ExtendBy(pxr::GfVec3d(points[i]));
 	}
 
 	pxr::UsdGeomCurves curves(mCurvesGeoPrimHandle.getPrim());
-	result = curves.GetPointsAttr().Set(new_points, time_code);
+	if(!curves.GetPointsAttr().Set(new_points, time_code)) {
+		return false;
+	}
 
-	return result;
+    pxr::VtVec3fArray extent(2);
+    extent[0] = pxr::GfVec3f(range.GetMin());
+    extent[1] = pxr::GfVec3f(range.GetMax());
+
+    curves.CreateExtentAttr().Set(extent, time_code);
+
+	return true;
 }
 
 bool BaseCurvesDeformer::outputVelocites(const PointsList* pVelocitiesList, pxr::UsdTimeCode time_code) {

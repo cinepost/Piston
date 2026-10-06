@@ -181,7 +181,13 @@ class BaseDeformer : public std::enable_shared_from_this<BaseDeformer> {
 		virtual bool writeJsonDataToPrimImpl() const = 0;
 		virtual void drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_code);
 
+		bool canProduceOutputTimeSample(pxr::UsdTimeCode time_code) const {
+			return true;
+			return mDeformerGeoPrimHandle.hasPositionsTimeSample(time_code);
+		}
+
 		bool canProduceOutputTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to) const {
+			return true;
 			return mDeformerGeoPrimHandle.hasPositionsTimeSamples(time_from, time_to);
 		}
 

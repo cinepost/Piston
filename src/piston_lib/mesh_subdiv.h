@@ -36,6 +36,8 @@ struct OpenSubdVertex {
     };
 };
 
+class UsdPrimHandle;
+
 class PersistentMeshRefiner {
 	public:
 		using UniquePtr = std::unique_ptr<PersistentMeshRefiner>;
@@ -48,7 +50,7 @@ class PersistentMeshRefiner {
 	    PersistentMeshRefiner(const PersistentMeshRefiner&) = delete;
 	    PersistentMeshRefiner& operator=(const PersistentMeshRefiner&) = delete;
 
-		bool init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp = true);
+		bool init(const UsdPrimHandle& prim_handle, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp = true);
 		bool isInitialized() const { return mIsInitialized; }
 
 		/**
@@ -69,7 +71,7 @@ class PersistentMeshRefiner {
 	    const pxr::UsdGeomMesh& getSourceMesh() const { return mSourceMesh; }
 	    const pxr::UsdGeomMesh& getOutputMesh() const;
 
-	    void update(pxr::UsdTimeCode time_code) const;
+	    [[nodiscard]] bool update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const;
 
 	    static UniquePtr create();
 
@@ -81,7 +83,7 @@ class PersistentMeshRefiner {
 	    uint8_t mMaxLevel = 0;
 
 	    pxr::UsdStageRefPtr mpStage;
-	    pxr::UsdGeomMesh mSourceMesh;
+	    mutable pxr::UsdGeomMesh mSourceMesh;
 	    pxr::UsdGeomMesh mOutputMesh;
 	    OpenSubdiv::Far::TopologyRefiner* mpRefiner = nullptr;
 

@@ -40,7 +40,7 @@ bool PersistentMeshRefiner::isValidOutputMesh() const {
     return isValidMesh(mOutputMesh); 
 }
 
-bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp) {
+bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp) {
 
     maxLevel = std::min(maxLevel, kMaxSubdivLevel);
     if(maxLevel == 0) {
@@ -48,6 +48,8 @@ bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
     }
 
     if(mIsInitialized && mRestPosName == rest_p_name && (mRestTimeCode == rest_time_code || rest_time_code.IsDefault()) && mMaxLevel == maxLevel) return true;
+
+    auto sourceMesh = pxr::UsdGeomMesh(prim_handle.getPrim());
 
     if(!isValidMesh(sourceMesh)) {
         LOG_ERR << "Error initializing PersistentMeshRefiner";
@@ -57,7 +59,7 @@ bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
     mMaxLevel = maxLevel;
     mRestPosName = rest_p_name;
     mRestTimeCode = rest_time_code;
-    mSourceMesh = sourceMesh;
+    mSourceMesh = pxr::UsdGeomMesh(sourceMesh);
 
     pxr::UsdGeomPrimvarsAPI meshPrimvarsApi = pxr::UsdGeomPrimvarsAPI::Get(mSourceMesh.GetPrim().GetStage(), mSourceMesh.GetPrim().GetPath());
     pxr::UsdGeomPrimvar restPositionPrimVar = meshPrimvarsApi.GetPrimvar(pxr::TfToken(mRestPosName));
@@ -195,16 +197,34 @@ bool PersistentMeshRefiner::init(const pxr::UsdGeomMesh& sourceMesh, uint8_t max
     return true;
 }
 
-void PersistentMeshRefiner::update(pxr::UsdTimeCode time_code) const {
-    if (!mIsInitialized || mLastUpdateTimeCode == time_code) return;
+bool PersistentMeshRefiner::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code) const {
+    assert(mIsInitialized);
+    if(mLastUpdateTimeCode == time_code) return true;
 
     pxr::VtVec3fArray usdPoints;
-    mSourceMesh.GetPointsAttr().Get(&usdPoints, time_code);
+
+    if(!mSourceMesh) {
+        mSourceMesh = pxr::UsdGeomMesh(prim_handle.getPrim());
+    }
+
+    //mSourceMesh.GetPointsAttr().Get(&usdPoints, time_code);
+
+    pxr::UsdEditTarget currentEditTarget = prim_handle.getStage()->GetEditTarget();
+    pxr::UsdResolveTarget resolveTarget = prim_handle.getPrim().MakeResolveTargetUpToEditTarget(currentEditTarget);
+    auto pointsQuery = pxr::UsdAttributeQuery(mSourceMesh.GetPointsAttr(), resolveTarget);
+
+    if(!pointsQuery || !pointsQuery.Get(&usdPoints, time_code)) {
+        LOG_WRN << "Error getting mesh point positions from " << prim_handle << " using UsdAttributeQuery. Reading using UsdAttribute::Get().";
+        if(!prim_handle.getPoints(usdPoints, time_code)) {
+            LOG_ERR << "Error getting mesh point positions from " << prim_handle << " !";
+            return false;
+        }
+    }
 
     int numBaseVertices = mpRefiner->GetLevel(0).GetNumVertices();
     if (usdPoints.size() != numBaseVertices) {
         LOG_ERR << "Topology mismatch: Vertex counts changed at time " << time_code << " !";
-        return;
+        return false;
     }
 
     int totalNumVertices = mpRefiner->GetNumVerticesTotal();
@@ -252,6 +272,8 @@ void PersistentMeshRefiner::update(pxr::UsdTimeCode time_code) const {
     mOutputMesh.GetPointsAttr().Set(mTmpOutPoints);
 
     mLastUpdateTimeCode = time_code;
+
+    return true;
 }
 
 void PersistentMeshRefiner::getSubdividedPrimsFromSource(int sourceFaceId, std::vector<int>& outFaceIds) const  {

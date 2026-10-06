@@ -192,7 +192,7 @@ const PersistentMeshRefiner* UsdPrimHandle::getMeshRefiner(pxr::UsdTimeCode rest
 		mpRefiner = PersistentMeshRefiner::create();
 	}
 
-	if(!mpRefiner->init(pxr::UsdGeomMesh(mPrim), mSubdivLevel, mRestAttrName, rest_time_code)) {
+	if(!mpRefiner->init(*this, mSubdivLevel, mRestAttrName, rest_time_code)) {
 		LOG_ERR << "Error initializing mesh refiner for " << mPrim << " with subdiv level " << mSubdivLevel;
 		mpRefiner = nullptr;
 	}
@@ -534,6 +534,8 @@ bool UsdPrimHandle::positionsMightBeTimeVarying() const {
 }
 
 bool UsdPrimHandle::hasPositionsTimeSample(const pxr::UsdTimeCode& time_code, double epsilon) const {
+	if(mpDeformer) return mpDeformer->canProduceOutputTimeSample(time_code);
+
     pxr::UsdGeomPointBased pointGeom(getPrim());
     pxr::UsdAttribute pointsAttr = pointGeom.GetPointsAttr();
 

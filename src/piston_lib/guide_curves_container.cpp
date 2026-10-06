@@ -83,6 +83,8 @@ bool GuideCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::str
 	}
 
 	mLastUpdateTimeCode = rest_time_code;
+    mPointsQuery = pxr::UsdAttributeQuery(geom_curves.GetPointsAttr());
+
 	return true;
 }
 
@@ -99,11 +101,31 @@ bool GuideCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTime
         return true;
     }
 
-	// Curve live point positions
-	if(!prim_handle.getPoints(mLiveCurvePoints, time_code)) {
-		LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
-		return false;
-	}
+    // Curve live point positions
+    if(prim_handle.isDeformer()) {
+        // If handle is a deformer output read final points using attribute
+        if(!prim_handle.getPoints(mLiveCurvePoints, time_code)) {
+            LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
+            return false;
+        }   
+    } else {
+
+        if(!mPointsQuery.IsValid()) {
+            pxr::UsdEditTarget currentEditTarget = prim_handle.getStage()->GetEditTarget();
+            pxr::UsdResolveTarget resolveTarget = prim_handle.getPrim().MakeResolveTargetUpToEditTarget(currentEditTarget);
+            mPointsQuery = pxr::UsdAttributeQuery(pxr::UsdGeomCurves(prim_handle.getPrim()).GetPointsAttr(), resolveTarget);
+        }
+
+        // If handle is not a deformer output try to read source poins using attribute query with direct attribute read as a fallback
+        if(!mPointsQuery || !mPointsQuery.Get(&mLiveCurvePoints, time_code)) {
+            LOG_WRN << "Error getting curves point positions from " << prim_handle << " using UsdAttributeQuery. Reading using UsdAttribute::Get().";
+            if(!prim_handle.getPoints(mLiveCurvePoints, time_code)) {
+                LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
+                return false;
+            }
+        }
+    }
+
 
 	if(mLiveCurvePoints.size() != mRestCurvePoints.size()) {
 		LOG_ERR << prim_handle.getPath() << " \"rest\" and \"live\" curves point positions count (" << mRestCurvePoints.size() << " vs " << mLiveCurvePoints.size() << " ) mismatch !";

@@ -114,6 +114,11 @@ bool PointInstancerDeformer::outputDeformedPoints(const PointsList* pPointsList,
 		attr_o.Set(orientations, time_code);
 	}
 
+	pxr::VtVec3fArray extent;
+    if (instancer.ComputeExtentAtTime(&extent, time_code, time_code)) {
+        instancer.CreateExtentAttr().Set(extent, time_code);
+    }
+
 	return true;
 }
 

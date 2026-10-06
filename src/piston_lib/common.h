@@ -205,6 +205,7 @@ class UsdPrimHandle {
 		bool setBsonToPrim(const pxr::SdfPath& prim_path, const std::string& identifier, const BSON& v_bson) const;
 		void clearPrimBson(const pxr::SdfPath& prim_path, const std::string& identifier) const;
 
+		bool isDeformer() const { return mpDeformer != nullptr; }
 		bool positionsMightBeTimeVarying() const;
 		bool hasPositionsTimeSample(const pxr::UsdTimeCode& timeCode, double epsilon = 1e-5) const;
 		bool hasPositionsTimeSamples(pxr::UsdTimeCode time_from, pxr::UsdTimeCode time_to, double epsilon = 1e-5) const;

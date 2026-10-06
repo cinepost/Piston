@@ -77,6 +77,7 @@ class GuideCurvesContainer : public std::enable_shared_from_this<GuideCurvesCont
 		bool                                    mExternalLivePointDataSource = false;
 
 		pxr::UsdTimeCode 						mLastUpdateTimeCode;
+		pxr::UsdAttributeQuery              	mPointsQuery;
 };
 
 // KDTree

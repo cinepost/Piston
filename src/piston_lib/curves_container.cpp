@@ -88,7 +88,7 @@ bool PxrCurvesContainer::init(const UsdPrimHandle& prim_handle, const std::strin
 }
 
 bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode time_code, bool force) {
-	assert(prim_handle.isBasisCurvesGeoPrim());
+	assert(prim_handle.isValid() && prim_handle.isBasisCurvesGeoPrim());
 
 	// early return
 	if(!force && mLastUpdateTimeCode == time_code) return true;
@@ -96,9 +96,18 @@ bool PxrCurvesContainer::update(const UsdPrimHandle& prim_handle, pxr::UsdTimeCo
 	// Curve live point positions
 	pxr::VtArray<pxr::GfVec3f> _points;
 
-	if(!mPointsQuery.Get(&_points, time_code)) {
-		LOG_ERR << "Error getting curves point positions from " << prim_handle << " !";
-		return false;
+	if(!mPointsQuery.IsValid()) {
+		pxr::UsdEditTarget currentEditTarget = prim_handle.getStage()->GetEditTarget();
+		pxr::UsdResolveTarget resolveTarget = prim_handle.getPrim().MakeResolveTargetUpToEditTarget(currentEditTarget);
+		mPointsQuery = pxr::UsdAttributeQuery(pxr::UsdGeomCurves(prim_handle.getPrim()).GetPointsAttr(), resolveTarget);
+	}
+
+	if(!mPointsQuery.IsValid() || !mPointsQuery.Get(&_points, time_code)) {
+		LOG_WRN << "Error getting curves point positions from " << prim_handle << " using UsdAttributeQuery. Reading using UsdAttribute::Get().";
+		if(!prim_handle.getPoints(_points, time_code)) {
+			LOG_ERR << "Error getting curves point positions from " << prim_handle << " using query !";
+			return false;
+		}
 	}
 
 	assert(_points.size() == getTotalVertexCount());

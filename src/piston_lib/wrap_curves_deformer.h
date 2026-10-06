@@ -73,6 +73,8 @@ class WrapCurvesDeformer : public BaseMeshCurvesDeformer, public inherit_shared_
 		std::vector<pxr::GfVec3f>               mTmpCurvesLocalAnimVectors;
 
 		BindMode                                mBindMode;
+
+		DebugGeo::UniquePtr                     mpDebugGeo;
 };
 
 } // namespace Piston

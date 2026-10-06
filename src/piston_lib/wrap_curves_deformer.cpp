@@ -269,7 +269,7 @@ bool WrapCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, 
 	}
 
 	// Data validity was checked in BaseMeshCurvesDeformer::buildDeformerDataImpl()
-	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+	const auto* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
 	auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
 
 	DeformerDataCache& dataCache = DeformerDataCache::getInstance();
@@ -393,7 +393,8 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 	assert(pPhantomTrimesh);
 
 	assert(mpAdjacencyData);
-	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacency();
+	const UsdGeomMeshFaceAdjacency* pAdjacencySource = mpAdjacencyData->getAdjacency();
+	const UsdGeomMeshFaceAdjacency* pAdjacency = mpAdjacencyData->getAdjacencyFinal();
 	assert(pAdjacency);
 
 	std::vector<int> skin_prim_indices;
@@ -404,7 +405,7 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 		has_pp_prim_indices = !getSkinPrimAttrName().empty() && 
 								mCurvesGeoPrimHandle.fetchAttributeValues(getSkinPrimAttrName(), skin_prim_indices, rest_time_code) && 
 							   	(skin_prim_indices.size() > 0) &&
-								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacency->getPrimCount()), &err_log_stream);
+								validatePrimIndices(skin_prim_indices, curves_vertex_count, static_cast<int>(pAdjacencySource->getPrimCount()), &err_log_stream);
 	}
 
 	DLOG_INF << "Binding curves using DIST method" << (has_pp_prim_indices ? " with per-point skin primitive indices." : ".");
@@ -811,7 +812,130 @@ WrapCurvesDeformer::~WrapCurvesDeformer() {
 }
 
 void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
+	assert(mpPhantomTrimeshData);
+	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	assert(pPhantomTrimesh);
 
+	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
+	if(!mpDebugGeo) {
+		mpDebugGeo = DebugGeo::create(getName());
+	} else {
+		mpDebugGeo->clear();
+	}
+
+	const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
+
+	for(uint32_t face_id = 0; face_id < pPhantomTrimesh->getFaceCount(); ++face_id) {
+		const auto& face = pPhantomTrimesh->getFaces()[face_id];
+
+		DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]*mDebugGeometryMult);
+		lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lA.setWidth(0.01);
+		DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]*mDebugGeometryMult);
+		lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lB.setWidth(0.01);
+		DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]*mDebugGeometryMult);
+		lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lC.setWidth(0.01);
+
+
+		pxr::GfVec3f face_center = (positions[face.indices[0]] + positions[face.indices[1]] + positions[face.indices[2]]) * 0.3333f;
+		DebugGeo::Line lFN(face_center, face_center + mLiveTriFaceNormals[face_id]);
+		lFN.setColor({0.0, 1.0, 0.0});
+		lFN.setWidth(0.01);
+
+		//mpDebugGeo->addLine(lFN);
+
+		//mpDebugGeo->addLine(lA);
+		//mpDebugGeo->addLine(lB);
+		//mpDebugGeo->addLine(lC);
+	}
+
+	const auto& points = pDeformedPoints->points();
+	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
+
+	if(mBindMode == BindMode::DIST) {
+		for(size_t i = 0; i < pointBinds.size(); ++i) {
+			
+			const auto& bind = pointBinds[i];
+
+			const auto& deformed_pt = points[i];
+			auto deformer_suface_bind_pt = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
+
+			DebugGeo::Line lP(deformed_pt, deformer_suface_bind_pt);
+			lP.setColor({0.0, 0.0, 1.0}, {1.0, 0.0, 0.0});
+			lP.setWidth(0.01);
+
+			//mpDebugGeo->addLine(lP);
+
+
+			DebugGeo::Line lFN(deformer_suface_bind_pt, deformer_suface_bind_pt + mLiveTriFaceNormals[bind.face_id] * bind.dist);
+			lFN.setColor({0.0, 1.0, 0.0});
+			lFN.setWidth(0.01);
+
+			mpDebugGeo->addLine(lFN);
+		}
+	}
+
+	mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
 }
+
+/*
+void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
+	assert(mpPhantomTrimeshData);
+	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
+	assert(pPhantomTrimesh);
+
+	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
+	if(!mpDebugGeo) {
+		mpDebugGeo = DebugGeo::create(getName());
+	} else {
+		mpDebugGeo->clear();
+	}
+
+	const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
+
+	for(const auto face: pPhantomTrimesh->getFaces()) {
+		DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]*mDebugGeometryMult);
+		lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lA.setWidth(0.05);
+		DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]*mDebugGeometryMult);
+		lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lB.setWidth(0.05);
+		DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]*mDebugGeometryMult);
+		lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+		lC.setWidth(0.05);
+
+		mpDebugGeo->addLine(lA);
+		mpDebugGeo->addLine(lB);
+		mpDebugGeo->addLine(lC);
+	}
+
+	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
+	for(size_t i = 0; i < curveBinds.size(); ++i) {
+		
+		const pxr::GfVec3f& N = mPerBindLiveNormals[i];
+		const pxr::GfVec3f& T = mPerBindLiveTBs[i].first;
+		const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
+
+		const auto& bind = curveBinds[i];
+		auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
+
+		DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f*mDebugGeometryMult);
+		lN.setColor({0.0, 1.0, 0.0});
+		DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f*mDebugGeometryMult);
+		lT.setColor({1.0, 0.0, 0.0});
+		DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f*mDebugGeometryMult);
+		lB.setColor({0.0, 0.0, 1.0});
+		
+		mpDebugGeo->addLine(lN);
+		mpDebugGeo->addLine(lT);
+		mpDebugGeo->addLine(lB);
+	}
+	mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
+}
+*/
 
 } // namespace Piston

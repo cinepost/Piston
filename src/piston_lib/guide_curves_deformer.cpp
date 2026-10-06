@@ -2362,7 +2362,7 @@ void GuideCurvesDeformer::drawDebugSubdivDeformerGeometry(pxr::UsdTimeCode time_
 	auto* pRefiner = mGuidesSkinGeoPrimHandle.getMeshRefiner(getRestTimeCode());
 	if(!pRefiner || pRefiner->getMaxLevel() == 0) return;
 
-	pRefiner->update(time_code);
+	pRefiner->update(mGuidesSkinGeoPrimHandle, time_code);
 	const pxr::UsdGeomMesh& subdMesh = pRefiner->getOutputMesh();
 
 	if(!mpSkinSubdivDebugGeo) {

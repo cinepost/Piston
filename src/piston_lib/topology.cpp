@@ -107,10 +107,18 @@ bool isSameTopology(const UsdPrimHandle& handle, const pxr::UsdPrim& prim, pxr::
 bool isSameTopology(const UsdPrimHandle& handle_l, const UsdPrimHandle& handle_r, pxr::UsdTimeCode time_code) {
     assert(handle_l.isValid() && "Invalid prim handle_l");
     assert(handle_r.isValid() && "Invalid prim handle_r");
-    if(!isSameType(handle_l.getPrim(), handle_r.getPrim())) return false;
+    if(!isSameType(handle_l.getPrim(), handle_r.getPrim())) {
+        LOG_DBG << handle_l << " and " << handle_r << " is not same type";
+        return false;
+    }
     if(handle_l.getSubdivLevel() != handle_r.getSubdivLevel()) return false;
 
-    return handle_l.getTopology(time_code) == handle_r.getTopology(time_code);    
+    if(handle_l.getTopology(time_code) != handle_r.getTopology(time_code)) {
+        LOG_DBG << handle_l << " and " << handle_r << " topologies are different";
+        return false;
+    }    
+
+    return true;
 }
 
 } // namespace Piston
