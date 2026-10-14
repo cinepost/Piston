@@ -60,3 +60,4 @@ install/
 .vscode/
 
 *.sublime-workspace
+.aider*

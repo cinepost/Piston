@@ -35,9 +35,6 @@ void BaseCurvesDeformer::setCurvesGeoPrim(const pxr::UsdPrim& prim) {
 	}
 
 	auto new_handle = UsdPrimHandle(prim);
-
-	if(!mCurvesGeoPrimHandle.isValid()) DLOG_ERR << mCurvesGeoPrimHandle << "is invalid!!!";
-
 	const bool same_topology = mCurvesGeoPrimHandle.isValid() ? isSameTopology(mCurvesGeoPrimHandle, new_handle, getRestTimeCode()) : false;
 
 	mCurvesGeoPrimHandle = std::move(new_handle);

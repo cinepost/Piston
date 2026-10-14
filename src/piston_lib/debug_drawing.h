@@ -72,10 +72,22 @@ class DebugGeo {
 			void setWidth(const float w) { width = w; }
 		};
 
-		void addPoint(const Pt& pt) { mPoints.push_back(pt); }
-		void addLine(const Line& l) { mLines.push_back(l); }
-		void addWireBox(const WireframeBox& b) { mWireBoxes.push_back(b); }
-		void addWireTetra(const WireTetra& t) { mWireTetras.push_back(t); }
+		void addPoint(const Pt& pt) { 
+			std::lock_guard<std::mutex> lock(mMutex);
+			mPoints.push_back(pt); 
+		}
+		void addLine(const Line& l) {
+			std::lock_guard<std::mutex> lock(mMutex); 
+			mLines.push_back(l); 
+		}
+		void addWireBox(const WireframeBox& b) { 
+			std::lock_guard<std::mutex> lock(mMutex);
+			mWireBoxes.push_back(b); 
+		}
+		void addWireTetra(const WireTetra& t) {
+			std::lock_guard<std::mutex> lock(mMutex); 
+			mWireTetras.push_back(t); 
+		}
 		void clear();
 
 		static UniquePtr create(const std::string& name);

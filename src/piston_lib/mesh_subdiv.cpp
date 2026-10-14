@@ -1,10 +1,292 @@
 #include "framework.h"
 #include "common.h"
+#include "adjacency.h"
 #include "logging.h"
+
+#include <opensubdiv/bfr/refinerSurfaceFactory.h>
+#include <opensubdiv/bfr/parameterization.h>
 
 #include "mesh_subdiv.h"
 
 namespace Piston {
+
+OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, const UsdGeomMeshFaceAdjacency& adjacency, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions) {
+    OsdFaceCoord result;
+    size_t vertex_count = adjacency.getPrimVertexCount(prim_id);
+
+    auto projectPointToPlane = [](const pxr::GfVec3f& p, const pxr::GfVec3f& planePoint, const pxr::GfVec3f& planeNormal) {
+        pxr::GfVec3f v = p - planePoint;
+        float dist = pxr::GfDot(v, planeNormal);
+        return p - (dist * planeNormal);
+    };
+
+    auto invertBilinearQuad = [&projectPointToPlane](const pxr::GfVec3f& p, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3) {
+        // Compute face normal to perform calculations on a 2D projection plane
+        pxr::GfVec3f normal = pxr::GfCross(p1 - p0, p3 - p0).GetNormalized();
+        pxr::GfVec3f projP = projectPointToPlane(p, p0, normal);
+
+        // Iterative Gauss-Newton solver for finding U and V
+        float u = 0.5f, v = 0.5f; // Initial guess at center
+        for (int iter = 0; iter < 6; ++iter) {
+            pxr::GfVec3f guess = (1.0f - u) * (1.0f - v) * p0 + u * (1.0f - v) * p1 + u * v * p2 + (1.0f - u) * v * p3;
+            pxr::GfVec3f dGdu = -(1.0f - v) * p0 + (1.0f - v) * p1 + v * p2 - v * p3;
+            pxr::GfVec3f dGdv = -(1.0f - u) * p0 - u * p1 + u * p2 + (1.0f - u) * p3;
+            pxr::GfVec3f delta = projP - guess;
+            
+            // Update steps using dot products (pseudo-inverse projection)
+            float lenSqU = dGdu.GetLengthSq();
+            float lenSqV = dGdv.GetLengthSq();
+            
+            if (lenSqU > 1e-6f) u += pxr::GfDot(delta, dGdu) / lenSqU;
+            if (lenSqV > 1e-6f) v += pxr::GfDot(delta, dGdv) / lenSqV;
+            
+            u = std::clamp(u, 0.0f, 1.0f);
+            v = std::clamp(v, 0.0f, 1.0f);
+        }
+        return pxr::GfVec2f(u, v);
+    };
+
+    if (vertex_count == 3) {
+        // Tri
+        result.subFaceId = 0;
+        
+        const pxr::GfVec3f p0 = meshPointPositions[adjacency.getPrimVertex(prim_id, 0)];
+        const pxr::GfVec3f p1 = meshPointPositions[adjacency.getPrimVertex(prim_id, 1)];
+        const pxr::GfVec3f p2 = meshPointPositions[adjacency.getPrimVertex(prim_id, 2)];
+
+        pxr::GfVec3f normal = pxr::GfCross(p1 - p0, p2 - p0).GetNormalized();
+        pxr::GfVec3f projP = projectPointToPlane(pt, p0, normal);
+        
+        float totalArea = pxr::GfDot(pxr::GfCross(p1 - p0, p2 - p0), normal);
+        float areaV = pxr::GfDot(pxr::GfCross(projP - p0, p2 - p0), normal);
+        float areaU = pxr::GfDot(pxr::GfCross(p1 - p0, projP - p0), normal);
+        
+        result.uv[0] = std::clamp(areaU / totalArea, 0.0f, 1.0f);
+        result.uv[1] = std::clamp(areaV / totalArea, 0.0f, 1.0f);
+        return result;
+    }
+
+    if (vertex_count == 4) {
+        // Quad
+        result.subFaceId = 0;
+        result.uv = invertBilinearQuad(pt, 
+            meshPointPositions[adjacency.getPrimVertex(prim_id, 0)], 
+            meshPointPositions[adjacency.getPrimVertex(prim_id, 1)], 
+            meshPointPositions[adjacency.getPrimVertex(prim_id, 2)], 
+            meshPointPositions[adjacency.getPrimVertex(prim_id, 3)]
+        );
+        return result;
+    }
+
+    // Ngon
+
+    pxr::GfVec3f center(0.0f, 0.0f, 0.0f); // Virtual center point exactly like Catmull-Clark/OpenSubdiv does
+    for(size_t i = 0; i < vertex_count; ++i) {
+        center += meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
+    }
+    center /= static_cast<float>(vertex_count);
+
+    // Reconstruct edge midpoints
+    std::vector<pxr::GfVec3f> midpoints(vertex_count);
+    for(size_t i = 0; i < vertex_count; ++i) {
+        midpoints[i] = (meshPointPositions[adjacency.getPrimVertex(prim_id, i)] + meshPointPositions[adjacency.getPrimVertex(prim_id, (i + 1) % vertex_count)]) * 0.5f;
+    }
+
+    auto isPointInTriangle2D = [](const pxr::GfVec3f& p, const pxr::GfVec3f& a, const pxr::GfVec3f& b, const pxr::GfVec3f& c) {
+        pxr::GfVec3f normal = pxr::GfCross(b - a, c - a).GetNormalized();
+        float areaABC = pxr::GfDot(pxr::GfCross(b - a, c - a), normal);
+        float areaPBC = pxr::GfDot(pxr::GfCross(c - b, p - b), normal);
+        float areaPCA = pxr::GfDot(pxr::GfCross(a - c, p - c), normal);
+        
+        if (areaABC == 0.0f) return false;
+        
+        float u = areaPBC / areaABC;
+        float v = areaPCA / areaABC;
+        float w = 1.0f - u - v;
+        
+        return (u >= -1e-4f && v >= -1e-4f && w >= -1e-4f);
+    };
+
+    // Find which sub-quad quadrant the point falls into
+    // We check this by evaluating which sub-quad's diagonal triangle splitting bounds the projected point P
+    int targetQuadrant = 0;
+    for (size_t i = 0; i < vertex_count; ++i) {
+        size_t prev_idx = (i == 0) ? (vertex_count - 1) : (i - 1);
+        
+        // Vertices tracking the i-th sub-quad
+        const pxr::GfVec3f& pi = meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
+        if (isPointInTriangle2D(pt, pi, midpoints[i], center) || 
+            isPointInTriangle2D(pt, pi, center, midpoints[prev_idx])) {
+            targetQuadrant = static_cast<int>(i);
+            break;
+        }
+    }
+
+    // Extract the 4 vertices defining the matched sub-quadrant [1]
+    size_t i = targetQuadrant;
+    size_t prev_idx = (i == 0) ? (vertex_count - 1) : (i - 1);
+    
+    pxr::GfVec3f q0 = meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
+    pxr::GfVec3f q1 = midpoints[i];
+    pxr::GfVec3f q2 = center;
+    pxr::GfVec3f q3 = midpoints[prev_idx];
+
+    // Solve the local bilinear mapping inside the chosen sub-quad
+    result.subFaceId = targetQuadrant;
+    result.uv = invertBilinearQuad(pt, q0, q1, q2, q3);
+    
+    return result;
+}
+
+// Mesh evaluator
+
+PersistentMeshEvaluator::UniquePtr PersistentMeshEvaluator::create() {
+    return PersistentMeshEvaluator::UniquePtr(new PersistentMeshEvaluator());
+}
+
+PersistentMeshEvaluator::~PersistentMeshEvaluator() {
+    if(mpRefiner) {
+        delete mpRefiner;
+    }
+}
+
+bool PersistentMeshEvaluator::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
+    mIsInitialized = false;
+    
+    if(mpRefiner) delete mpRefiner;
+    
+    auto mesh = pxr::UsdGeomMesh(prim_handle.getPrim());
+
+    if(!isValidMesh(mesh)) {
+        LOG_ERR << "Error initializing PersistentMeshEvaluator for " << prim_handle;
+        return false;
+    }
+
+    pxr::UsdAttribute pointsAttr = mesh.GetPointsAttr();
+
+    size_t pointCount = 0;
+    pxr::VtVec3fArray usdPoints;
+    pxr::VtIntArray usdCounts;
+    pxr::VtIntArray usdIndices;
+
+    if (pointsAttr.Get(&usdPoints, rest_time_code)) {
+        pointCount = usdPoints.size();
+    } else {
+        LOG_ERR << "Points attribute is unauthored or empty on " << prim_handle;
+        return false;
+    }
+
+    mesh.GetFaceVertexCountsAttr().Get(&usdCounts);
+    mesh.GetFaceVertexIndicesAttr().Get(&usdIndices);
+
+    mFaceCount = usdCounts.size();
+
+    OpenSubdiv::Far::TopologyDescriptor desc;
+    desc.numVertices = pointCount;
+    desc.numFaces = mFaceCount;
+    desc.numVertsPerFace = usdCounts.data();
+    desc.vertIndicesPerFace = usdIndices.data();
+
+    OpenSubdiv::Sdc::SchemeType osdScheme = OpenSubdiv::Sdc::SCHEME_CATMARK;
+
+    OpenSubdiv::Sdc::Options options;
+    options.SetVtxBoundaryInterpolation(OpenSubdiv::Sdc::Options::VTX_BOUNDARY_EDGE_ONLY);
+
+
+    mpRefiner = OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Create(
+        desc, OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Options(osdScheme, options)
+    );
+
+    if (!mpRefiner) {
+        LOG_ERR << "Failed to construct OpenSubdiv Evaluator. Check " << prim_handle << " topology.";
+        return false;
+    }
+
+    // Pixar recommends a value between 5 and 10 for production meshes
+    OpenSubdiv::Far::TopologyRefiner::AdaptiveOptions adaptiveOptions(5);
+    mpRefiner->RefineAdaptive(adaptiveOptions);
+
+    mIsInitialized = true;
+    return mIsInitialized;
+}
+
+const std::vector<OpenSubdiv::Bfr::Surface<float>>& PersistentMeshEvaluator::getSurfaceCache() const {
+    assert(mpRefiner);
+    assert(mFaceCount > 0u);
+
+    if(mSurfaceCache.empty() || static_cast<uint32_t>(mSurfaceCache.size()) != mFaceCount) {
+        mMaxPatchPoints = 0;
+        mSurfaceCache.resize(mFaceCount);
+
+        OpenSubdiv::Bfr::RefinerSurfaceFactory<> factory(*mpRefiner);
+        for (uint32_t i = 0; i < mFaceCount; ++i) {
+            factory.InitVertexSurface(i, &mSurfaceCache[i]);
+
+            if(!mSurfaceCache[i].IsValid()) continue;
+
+            assert(mSurfaceCache[i].IsValid()); // TODO: handle invalid surfaces
+            mMaxPatchPoints = std::max(mMaxPatchPoints, mSurfaceCache[i].GetNumPatchPoints());
+        }
+    }
+
+    return mSurfaceCache;
+}
+
+void PersistentMeshEvaluator::evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const OsdFaceCoord& pt, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, pxr::GfVec3f& limitPos, pxr::GfVec3f& limitTangentU, pxr::GfVec3f& limitTangentV) {
+    static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor meshPointDesc(3, 3); // The point has 3 float components, the memory stride to the next vertex is 3 floats
+
+    assert(prim_id < surfaceCache.size());
+    surfaceCache[prim_id].Evaluate(&pt.uv[0], meshPointPositions.cdata()->data(), meshPointDesc, &limitPos[0], &limitTangentU[0], &limitTangentV[0]);//, pt.subFaceId /* Defaults to 0 for quads and tris */);
+}
+
+void PersistentMeshEvaluator::evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const std::vector<OsdFaceCoord>& points, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs) {
+    std::vector<float> faceScratchBuffer(mMaxPatchPoints * 3);
+    return evaluateSurface(prim_id, surfaceCache, points, meshPointPositions, limitPositions, limitTangentUs, limitTangentVs, faceScratchBuffer);
+}
+
+void PersistentMeshEvaluator::evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const std::vector<OsdFaceCoord>& points, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs, std::vector<float>& faceScratchBuffer) {
+    static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor meshPointDesc(3, 3); // The point has 3 float components, the memory stride to the next vertex is 3 floats
+    static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor patchPointDesc(3, 3);
+
+    assert(prim_id < surfaceCache.size());
+
+    if(points.empty()) {
+        LOG_ERR << "PersistentMeshRefiner::evaluateSurface(...) points target vector is empty !";
+        return;
+    }
+
+    limitPositions.resize(points.size());
+    limitTangentUs.resize(points.size());
+    limitTangentVs.resize(points.size());
+
+    const auto& surface = surfaceCache[prim_id];
+    
+    surface.PreparePatchPoints(reinterpret_cast<const float*>(meshPointPositions.cdata()->data()), meshPointDesc, faceScratchBuffer.data(), patchPointDesc);
+
+    for(size_t query_id = 0; query_id < points.size(); ++ query_id) {
+        const OsdFaceCoord& pt = points[query_id];
+        surface.Evaluate(&pt.uv[0], faceScratchBuffer.data(), patchPointDesc, &limitPositions[query_id][0], &limitTangentUs[query_id][0], &limitTangentVs[query_id][0]);//, pt.subFaceId /* Defaults to 0 for quads and tris */);
+    }
+}
+
+void PersistentMeshEvaluator::getPrimControlPoints(uint32_t prim_id, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector<pxr::GfVec3f>& faceControlPoints) const {
+    assert(mpRefiner);
+
+    const OpenSubdiv::Far::TopologyLevel& baseLevel = mpRefiner->GetLevel(0);
+
+    auto faceVertIndices = baseLevel.GetFaceVertices(prim_id);
+    int numFaceVertices = faceVertIndices.size();
+
+    faceControlPoints.resize(numFaceVertices);
+    if(faceControlPoints.empty()) return;
+
+    for (int i = 0; i < numFaceVertices; ++i) {
+        int meshVertIndex = faceVertIndices[i];
+        faceControlPoints[i] = meshPointPositions[meshVertIndex];
+    }
+}
+
+// Mesh refiner
 
 PersistentMeshRefiner::UniquePtr PersistentMeshRefiner::create() {
     return PersistentMeshRefiner::UniquePtr(new PersistentMeshRefiner());
@@ -41,6 +323,7 @@ bool PersistentMeshRefiner::isValidOutputMesh() const {
 }
 
 bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLevel, const std::string& rest_p_name, pxr::UsdTimeCode rest_time_code, bool linear_rest_interp) {
+    mIsInitialized = false;
 
     maxLevel = std::min(maxLevel, kMaxSubdivLevel);
     if(maxLevel == 0) {
@@ -112,7 +395,7 @@ bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLe
     );
 
     if (!mpRefiner) {
-        LOG_ERR << "Failed to construct OpenSubdiv Refiner. Check topology validity.";
+        LOG_ERR << "Failed to construct OpenSubdiv Refiner. Check " << prim_handle << " topology.";
         return false;
     }
 
@@ -127,7 +410,7 @@ bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLe
     auto* pRefiner = (pRestRefiner && linear_rest_interp) ? pRestRefiner.get() : mpRefiner;
     
     pRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
-    mpRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
+    if(pRefiner != mpRefiner) mpRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
 
     int totalNumVertices = pRefiner->GetNumVerticesTotal();
     mTmpVertexBuffer.resize(totalNumVertices);
@@ -190,7 +473,6 @@ bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLe
     mOutputMesh.GetSubdivisionSchemeAttr().Set(pxr::UsdGeomTokens->none);
 
     //////
-
     mLastUpdateTimeCode = rest_time_code;
     mIsInitialized = true;
 
@@ -278,7 +560,7 @@ bool PersistentMeshRefiner::update(const UsdPrimHandle& prim_handle, pxr::UsdTim
 
 void PersistentMeshRefiner::getSubdividedPrimsFromSource(int sourceFaceId, std::vector<int>& outFaceIds) const  {
     outFaceIds.clear();
-
+    
     if (!mpRefiner || sourceFaceId < 0 || sourceFaceId >= mpRefiner->GetLevel(0).GetNumFaces()) {
         return;
     }

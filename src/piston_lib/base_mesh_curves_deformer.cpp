@@ -31,6 +31,22 @@ bool BaseMeshCurvesDeformer::writeJsonDataToPrimImpl() const {
 	return true;
 }
 
+bool BaseMeshCurvesDeformer::getSmoothDeformerState() const {
+	return mpDeformerEvaluator != nullptr;
+}
+
+void BaseMeshCurvesDeformer::setSmoothDeformerState(bool state) {
+	const bool curr_state = getSmoothDeformerState();
+	if(state == curr_state) return;
+
+	if(state) {
+		mpDeformerEvaluator = PersistentMeshEvaluator::create();
+	} else { 
+		mpDeformerEvaluator = nullptr;
+	}
+	 makeDirty();
+}
+
 bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_code, bool multi_threaded) {
 	LOG_DBG << "BaseMeshCurvesDeformer::buildDeformerDataImpl";
 	if(!BaseCurvesDeformer::buildDeformerDataImpl(rest_time_code, multi_threaded)) {
@@ -70,6 +86,11 @@ bool BaseMeshCurvesDeformer::buildDeformerDataImpl(pxr::UsdTimeCode rest_time_co
 			DLOG_ERR << "Error building phantom mesh data!";
 			return false;
 		}
+	}
+
+	if(mpDeformerEvaluator && !mpDeformerEvaluator->init(mDeformerGeoPrimHandle, rest_time_code)) {
+		DLOG_ERR << "Error initializing PersistendSurfaceEvaluator for " << mDeformerGeoPrimHandle;
+		return false;
 	}
 	
 	assert(mpAdjacencyData);

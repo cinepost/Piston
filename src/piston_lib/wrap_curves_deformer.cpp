@@ -825,7 +825,7 @@ void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 	}
 
 	const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
-
+/*
 	for(uint32_t face_id = 0; face_id < pPhantomTrimesh->getFaceCount(); ++face_id) {
 		const auto& face = pPhantomTrimesh->getFaces()[face_id];
 
@@ -844,12 +844,6 @@ void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 		DebugGeo::Line lFN(face_center, face_center + mLiveTriFaceNormals[face_id]);
 		lFN.setColor({0.0, 1.0, 0.0});
 		lFN.setWidth(0.01);
-
-		//mpDebugGeo->addLine(lFN);
-
-		//mpDebugGeo->addLine(lA);
-		//mpDebugGeo->addLine(lB);
-		//mpDebugGeo->addLine(lC);
 	}
 
 	const auto& points = pDeformedPoints->points();
@@ -877,65 +871,55 @@ void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 			mpDebugGeo->addLine(lFN);
 		}
 	}
-
-	mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
-}
-
-/*
-void FastCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const PointsList* pDeformedPoints) {
-	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-	assert(pPhantomTrimesh);
-
-	const MeshContainer* pDeformerMeshContainer = mpDeformerMeshContainer.get();
-
-	if(!mpDebugGeo) {
-		mpDebugGeo = DebugGeo::create(getName());
-	} else {
-		mpDebugGeo->clear();
-	}
-
-	const MeshContainer::ContainerType& positions = pDeformerMeshContainer->getLivePositions();
-
-	for(const auto face: pPhantomTrimesh->getFaces()) {
-		DebugGeo::Line lA(positions[face.indices[0]], positions[face.indices[0]] + mLiveVertexNormals[face.indices[0]]*mDebugGeometryMult);
-		lA.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-		lA.setWidth(0.05);
-		DebugGeo::Line lB(positions[face.indices[1]], positions[face.indices[1]] + mLiveVertexNormals[face.indices[1]]*mDebugGeometryMult);
-		lB.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-		lB.setWidth(0.05);
-		DebugGeo::Line lC(positions[face.indices[2]], positions[face.indices[2]] + mLiveVertexNormals[face.indices[2]]*mDebugGeometryMult);
-		lC.setColor({1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
-		lC.setWidth(0.05);
-
-		mpDebugGeo->addLine(lA);
-		mpDebugGeo->addLine(lB);
-		mpDebugGeo->addLine(lC);
-	}
-
-	const auto& curveBinds = mpFastCurvesDeformerData->mCurveBinds;
-	for(size_t i = 0; i < curveBinds.size(); ++i) {
-		
-		const pxr::GfVec3f& N = mPerBindLiveNormals[i];
-		const pxr::GfVec3f& T = mPerBindLiveTBs[i].first;
-		const pxr::GfVec3f& B = mPerBindLiveTBs[i].second;
-
-		const auto& bind = curveBinds[i];
-		auto curve_bind_pos = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v);
-
-		DebugGeo::Line lN(curve_bind_pos, curve_bind_pos + N*0.1f*mDebugGeometryMult);
-		lN.setColor({0.0, 1.0, 0.0});
-		DebugGeo::Line lT(curve_bind_pos, curve_bind_pos + T*0.1f*mDebugGeometryMult);
-		lT.setColor({1.0, 0.0, 0.0});
-		DebugGeo::Line lB(curve_bind_pos, curve_bind_pos + B*0.1f*mDebugGeometryMult);
-		lB.setColor({0.0, 0.0, 1.0});
-		
-		mpDebugGeo->addLine(lN);
-		mpDebugGeo->addLine(lT);
-		mpDebugGeo->addLine(lB);
-	}
-	mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
-}
 */
+
+	assert(mpAdjacencyData);
+	const auto* pAdjacency = mpAdjacencyData->getAdjacency();
+
+	if(mpDeformerEvaluator && mpDeformerEvaluator->isInitialized()) {
+
+		const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache = mpDeformerEvaluator->getSurfaceCache();
+
+		auto func = [&](const std::size_t start, const std::size_t end) {
+			std::vector<OsdFaceCoord> target_points;
+			std::vector<pxr::GfVec3f> limitPositions;
+			std::vector<pxr::GfVec3f> limitTangentUs;
+			std::vector<pxr::GfVec3f> limitTangentVs;
+
+			auto surfaceScratchBuffer = mpDeformerEvaluator->getSurfaceScratchBuffer();
+
+			for(uint32_t prim_id = start; prim_id < end; ++prim_id) {
+				static const int x_divisions = 33;
+				static const int y_divisions = 33;
+
+				target_points.clear();
+				limitPositions.clear();
+				limitTangentUs.clear();
+				limitTangentVs.clear();
+
+				for(int x = 0; x < x_divisions; ++x) {
+					for(int y = 0; y < y_divisions; ++y) {
+						target_points.push_back({static_cast<float>(x) / static_cast<float>(x_divisions), static_cast<float>(y) / static_cast<float>(y_divisions)});
+					}
+				}
+
+				mpDeformerEvaluator->evaluateSurface(prim_id, surfaceCache, target_points, positions, limitPositions, limitTangentUs, limitTangentVs, surfaceScratchBuffer);
+
+				for(int x = 0; x < x_divisions; ++x) {
+					for(int y = 0; y < y_divisions; ++y) {
+						DebugGeo::Pt p(limitPositions[x + y * x_divisions]);
+						p.setColor({static_cast<float>(x) / static_cast<float>(x_divisions), static_cast<float>(y) / static_cast<float>(y_divisions), 0.0f});
+						mpDebugGeo->addPoint(p);
+					}
+				}
+			}
+		};
+
+		BS::multi_future<void> blocks = mPool.submit_blocks(0u, pAdjacency->getPrimCount(), func);
+		blocks.wait();
+	}
+
+	mpDebugGeo->build("/debugNormals", mCurvesGeoPrimHandle.getStage());
+}
 
 } // namespace Piston

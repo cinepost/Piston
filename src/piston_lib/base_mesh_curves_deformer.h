@@ -4,6 +4,7 @@
 #include "base_curves_deformer.h"
 #include "adjacency.h"
 #include "phantom_trimesh.h"
+#include "mesh_subdiv.h"
 
 #include <memory>
 
@@ -21,6 +22,9 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 	public:
 		virtual ~BaseMeshCurvesDeformer() {}
 		virtual const std::string& toString() const override; 
+
+		void setSmoothDeformerState(bool state);
+		bool getSmoothDeformerState() const;
 
 	protected:
 		BaseMeshCurvesDeformer(const BaseCurvesDeformer::Type type, const std::string& name, BS::thread_pool<BS::tp::none>& pool);
@@ -44,6 +48,9 @@ class BaseMeshCurvesDeformer : public BaseCurvesDeformer {
 		virtual bool writeJsonDataToPrimImpl() const override;
 
 		virtual void invalidateData(DeformerDataCache& cache) override;
+
+	protected:
+		PersistentMeshEvaluator::UniquePtr mpDeformerEvaluator;
 };
 
 } // namespace Piston
