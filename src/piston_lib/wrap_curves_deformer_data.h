@@ -20,14 +20,35 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 			DIST 
 		};
 
+		struct PointCoord {
+			uint32_t face_id;
+			float u, v, dist;
+		};
+
 		struct PointBindData {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
 			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
 			uint32_t face_id;
 			float u, v, dist;
+
 			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
+			PointBindData(const OsdFaceCoord& osd_coord) {
+				u = osd_coord.uv[0];
+				v = osd_coord.uv[1];
+				dist = osd_coord.dist;
+				face_id = osd_coord.face_id;
+			}
 
 			inline bool isValid() const { return face_id != kInvalidFaceID; }
+
+			OsdFaceCoord toOsdFaceCoord() const {
+				OsdFaceCoord result;
+				result.face_id = face_id;
+				result.uv = {u, v};
+				result.dist = dist;
+
+				return std::move(result);
+			}
 		};
 
 		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }

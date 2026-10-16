@@ -3,27 +3,25 @@
 #include "adjacency.h"
 #include "logging.h"
 
-#include <opensubdiv/bfr/refinerSurfaceFactory.h>
-#include <opensubdiv/bfr/parameterization.h>
-
 #include "mesh_subdiv.h"
 
 namespace Piston {
 
-OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, const UsdGeomMeshFaceAdjacency& adjacency, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions) {
+OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, const UsdGeomMeshFaceAdjacency& adjacency, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, const OpenSubdiv::Bfr::Parameterization& faceParam) {
     OsdFaceCoord result;
+    result.face_id = prim_id;
     size_t vertex_count = adjacency.getPrimVertexCount(prim_id);
 
-    auto projectPointToPlane = [](const pxr::GfVec3f& p, const pxr::GfVec3f& planePoint, const pxr::GfVec3f& planeNormal) {
+    auto projectPointToPlane = [](const pxr::GfVec3f& p, const pxr::GfVec3f& planePoint, const pxr::GfVec3f& planeNormal, float& dist) {
         pxr::GfVec3f v = p - planePoint;
-        float dist = pxr::GfDot(v, planeNormal);
+        dist = pxr::GfDot(v, planeNormal);
         return p - (dist * planeNormal);
     };
 
-    auto invertBilinearQuad = [&projectPointToPlane](const pxr::GfVec3f& p, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3) {
+    auto invertBilinearQuad = [&projectPointToPlane](const pxr::GfVec3f& p, const pxr::GfVec3f& p0, const pxr::GfVec3f& p1, const pxr::GfVec3f& p2, const pxr::GfVec3f& p3, float& dist) {
         // Compute face normal to perform calculations on a 2D projection plane
         pxr::GfVec3f normal = pxr::GfCross(p1 - p0, p3 - p0).GetNormalized();
-        pxr::GfVec3f projP = projectPointToPlane(p, p0, normal);
+        pxr::GfVec3f projP = projectPointToPlane(p, p0, normal, dist);
 
         // Iterative Gauss-Newton solver for finding U and V
         float u = 0.5f, v = 0.5f; // Initial guess at center
@@ -48,14 +46,12 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
 
     if (vertex_count == 3) {
         // Tri
-        result.subFaceId = 0;
-        
         const pxr::GfVec3f p0 = meshPointPositions[adjacency.getPrimVertex(prim_id, 0)];
         const pxr::GfVec3f p1 = meshPointPositions[adjacency.getPrimVertex(prim_id, 1)];
         const pxr::GfVec3f p2 = meshPointPositions[adjacency.getPrimVertex(prim_id, 2)];
 
         pxr::GfVec3f normal = pxr::GfCross(p1 - p0, p2 - p0).GetNormalized();
-        pxr::GfVec3f projP = projectPointToPlane(pt, p0, normal);
+        pxr::GfVec3f projP = projectPointToPlane(pt, p0, normal, result.dist);
         
         float totalArea = pxr::GfDot(pxr::GfCross(p1 - p0, p2 - p0), normal);
         float areaV = pxr::GfDot(pxr::GfCross(projP - p0, p2 - p0), normal);
@@ -68,18 +64,17 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
 
     if (vertex_count == 4) {
         // Quad
-        result.subFaceId = 0;
         result.uv = invertBilinearQuad(pt, 
             meshPointPositions[adjacency.getPrimVertex(prim_id, 0)], 
             meshPointPositions[adjacency.getPrimVertex(prim_id, 1)], 
             meshPointPositions[adjacency.getPrimVertex(prim_id, 2)], 
-            meshPointPositions[adjacency.getPrimVertex(prim_id, 3)]
+            meshPointPositions[adjacency.getPrimVertex(prim_id, 3)],
+            result.dist
         );
         return result;
     }
 
     // Ngon
-
     pxr::GfVec3f center(0.0f, 0.0f, 0.0f); // Virtual center point exactly like Catmull-Clark/OpenSubdiv does
     for(size_t i = 0; i < vertex_count; ++i) {
         center += meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
@@ -109,7 +104,7 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
 
     // Find which sub-quad quadrant the point falls into
     // We check this by evaluating which sub-quad's diagonal triangle splitting bounds the projected point P
-    int targetQuadrant = 0;
+    int subFaceId = 0;
     for (size_t i = 0; i < vertex_count; ++i) {
         size_t prev_idx = (i == 0) ? (vertex_count - 1) : (i - 1);
         
@@ -117,13 +112,13 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
         const pxr::GfVec3f& pi = meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
         if (isPointInTriangle2D(pt, pi, midpoints[i], center) || 
             isPointInTriangle2D(pt, pi, center, midpoints[prev_idx])) {
-            targetQuadrant = static_cast<int>(i);
+            subFaceId = static_cast<int>(i);
             break;
         }
     }
 
     // Extract the 4 vertices defining the matched sub-quadrant [1]
-    size_t i = targetQuadrant;
+    size_t i = static_cast<size_t>(subFaceId);
     size_t prev_idx = (i == 0) ? (vertex_count - 1) : (i - 1);
     
     pxr::GfVec3f q0 = meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
@@ -132,9 +127,11 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
     pxr::GfVec3f q3 = midpoints[prev_idx];
 
     // Solve the local bilinear mapping inside the chosen sub-quad
-    result.subFaceId = targetQuadrant;
-    result.uv = invertBilinearQuad(pt, q0, q1, q2, q3);
+    pxr::GfVec2f localUV = invertBilinearQuad(pt, q0, q1, q2, q3, result.dist);
     
+    // Shift and tile the sub-face UV into the unified coordinate matrix space
+    faceParam.ConvertSubFaceToCoord(subFaceId, &localUV[0], &result.uv[0]);        
+
     return result;
 }
 
@@ -206,25 +203,31 @@ bool PersistentMeshEvaluator::init(const UsdPrimHandle& prim_handle, pxr::UsdTim
     OpenSubdiv::Far::TopologyRefiner::AdaptiveOptions adaptiveOptions(5);
     mpRefiner->RefineAdaptive(adaptiveOptions);
 
+    mpSurfaceFactory = std::make_unique<OpenSubdiv::Bfr::RefinerSurfaceFactory<>>(*mpRefiner);
+
     mIsInitialized = true;
     return mIsInitialized;
 }
 
 const std::vector<OpenSubdiv::Bfr::Surface<float>>& PersistentMeshEvaluator::getSurfaceCache() const {
     assert(mpRefiner);
+    assert(mpSurfaceFactory);
     assert(mFaceCount > 0u);
 
     if(mSurfaceCache.empty() || static_cast<uint32_t>(mSurfaceCache.size()) != mFaceCount) {
         mMaxPatchPoints = 0;
         mSurfaceCache.resize(mFaceCount);
 
-        OpenSubdiv::Bfr::RefinerSurfaceFactory<> factory(*mpRefiner);
         for (uint32_t i = 0; i < mFaceCount; ++i) {
-            factory.InitVertexSurface(i, &mSurfaceCache[i]);
+            mpSurfaceFactory->InitVertexSurface(i, &mSurfaceCache[i]);
 
-            if(!mSurfaceCache[i].IsValid()) continue;
+            //if(!mSurfaceCache[i].IsValid()) continue;
 
             assert(mSurfaceCache[i].IsValid()); // TODO: handle invalid surfaces
+            
+            if (mSurfaceCache[i].IsValid()) {
+                volatile auto warmUp = mSurfaceCache[i].GetParameterization();
+            }
             mMaxPatchPoints = std::max(mMaxPatchPoints, mSurfaceCache[i].GetNumPatchPoints());
         }
     }
@@ -232,40 +235,47 @@ const std::vector<OpenSubdiv::Bfr::Surface<float>>& PersistentMeshEvaluator::get
     return mSurfaceCache;
 }
 
-void PersistentMeshEvaluator::evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const OsdFaceCoord& pt, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, pxr::GfVec3f& limitPos, pxr::GfVec3f& limitTangentU, pxr::GfVec3f& limitTangentV) {
+void PersistentMeshEvaluator::evaluateSurface(const OsdFaceCoord& coord, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, pxr::GfVec3f& limitPos, pxr::GfVec3f& limitTangentU, pxr::GfVec3f& limitTangentV) {
     static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor meshPointDesc(3, 3); // The point has 3 float components, the memory stride to the next vertex is 3 floats
-
-    assert(prim_id < surfaceCache.size());
-    surfaceCache[prim_id].Evaluate(&pt.uv[0], meshPointPositions.cdata()->data(), meshPointDesc, &limitPos[0], &limitTangentU[0], &limitTangentV[0]);//, pt.subFaceId /* Defaults to 0 for quads and tris */);
+    assert(coord.face_id < surfaceCache.size());
+    surfaceCache[coord.face_id].Evaluate(&coord.uv[0], meshPointPositions.cdata()->data(), meshPointDesc, &limitPos[0], &limitTangentU[0], &limitTangentV[0]);
 }
 
-void PersistentMeshEvaluator::evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const std::vector<OsdFaceCoord>& points, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs) {
+void PersistentMeshEvaluator::evaluateSurface(const std::vector<OsdFaceCoord>& coords, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs) {
     std::vector<float> faceScratchBuffer(mMaxPatchPoints * 3);
-    return evaluateSurface(prim_id, surfaceCache, points, meshPointPositions, limitPositions, limitTangentUs, limitTangentVs, faceScratchBuffer);
+    return evaluateSurface(coords, surfaceCache, meshPointPositions, limitPositions, limitTangentUs, limitTangentVs, faceScratchBuffer);
 }
 
-void PersistentMeshEvaluator::evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const std::vector<OsdFaceCoord>& points, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs, std::vector<float>& faceScratchBuffer) {
+void PersistentMeshEvaluator::evaluateSurface(const std::vector<OsdFaceCoord>& coords, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs, std::vector<float>& faceScratchBuffer) {
     static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor meshPointDesc(3, 3); // The point has 3 float components, the memory stride to the next vertex is 3 floats
     static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor patchPointDesc(3, 3);
 
-    assert(prim_id < surfaceCache.size());
-
-    if(points.empty()) {
-        LOG_ERR << "PersistentMeshRefiner::evaluateSurface(...) points target vector is empty !";
+    if(coords.empty()) {
+        LOG_ERR << "PersistentMeshRefiner::evaluateSurface(...) coords target vector is empty !";
         return;
     }
 
-    limitPositions.resize(points.size());
-    limitTangentUs.resize(points.size());
-    limitTangentVs.resize(points.size());
+    limitPositions.resize(coords.size());
+    limitTangentUs.resize(coords.size());
+    limitTangentVs.resize(coords.size());
 
-    const auto& surface = surfaceCache[prim_id];
+    std::map<uint32_t, std::vector<size_t>> surface_map;
+    for(size_t i = 0; i < coords.size(); ++i) {
+        auto& vec = surface_map[coords[i].face_id];
+        vec.push_back(i);
+    }
+
+
+    for(const auto& [prim_id, queries]: surface_map) {
+        assert(prim_id < surfaceCache.size());
+        const auto& surface = surfaceCache[prim_id];
     
-    surface.PreparePatchPoints(reinterpret_cast<const float*>(meshPointPositions.cdata()->data()), meshPointDesc, faceScratchBuffer.data(), patchPointDesc);
+        surface.PreparePatchPoints(reinterpret_cast<const float*>(meshPointPositions.cdata()->data()), meshPointDesc, faceScratchBuffer.data(), patchPointDesc);
 
-    for(size_t query_id = 0; query_id < points.size(); ++ query_id) {
-        const OsdFaceCoord& pt = points[query_id];
-        surface.Evaluate(&pt.uv[0], faceScratchBuffer.data(), patchPointDesc, &limitPositions[query_id][0], &limitTangentUs[query_id][0], &limitTangentVs[query_id][0]);//, pt.subFaceId /* Defaults to 0 for quads and tris */);
+        for(size_t query_id = 0; query_id < queries.size(); ++query_id) {
+            const OsdFaceCoord& coord = coords[query_id];
+            surface.Evaluate(&coord.uv[0], faceScratchBuffer.data(), patchPointDesc, &limitPositions[query_id][0], &limitTangentUs[query_id][0], &limitTangentVs[query_id][0]);
+        }
     }
 }
 

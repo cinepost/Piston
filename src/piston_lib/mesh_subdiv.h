@@ -8,6 +8,8 @@
 #include <opensubdiv/far/topologyDescriptor.h>
 #include <opensubdiv/far/topologyRefiner.h>
 #include <opensubdiv/far/primvarRefiner.h>
+#include <opensubdiv/bfr/refinerSurfaceFactory.h>
+#include <opensubdiv/bfr/parameterization.h>
 #include <opensubdiv/bfr/surface.h>
 
 #include <limits>
@@ -38,18 +40,20 @@ struct OpenSubdVertex {
 };
 
 struct OsdFaceCoord {
+	static const uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max(); 
+	uint32_t     face_id = kInvalidFaceID;
 	pxr::GfVec2f uv = {0.0f, 0.0f};
-	int 	subFaceId = 0; // 0 for tris and quads
+	float   	 dist = 0;
 
 	OsdFaceCoord() = default;
-	OsdFaceCoord(float _u ,float _v, int _sub_face_id = 0): uv(_u, _v), subFaceId(_sub_face_id) {} 
-	OsdFaceCoord(const pxr::GfVec2f& _uv, int _sub_face_id = 0): uv(_uv), subFaceId(_sub_face_id) {} 
+	OsdFaceCoord(uint32_t _face_id, float _u ,float _v): face_id(_face_id), uv(_u, _v) {} 
+	OsdFaceCoord(uint32_t _face_id, const pxr::GfVec2f& _uv): face_id(_face_id), uv(_uv) {} 
 };
 
 class UsdPrimHandle;
 class UsdGeomMeshFaceAdjacency;
 
-OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, const UsdGeomMeshFaceAdjacency& adjacency, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions);
+OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, const UsdGeomMeshFaceAdjacency& adjacency, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, const OpenSubdiv::Bfr::Parameterization& faceParam);
 
 class PersistentMeshEvaluator {
 	public:
@@ -67,6 +71,12 @@ class PersistentMeshEvaluator {
 	    
 	   	const std::vector<OpenSubdiv::Bfr::Surface<float>>& getSurfaceCache() const;
 
+	   	OpenSubdiv::Bfr::Parameterization getSurfaceParameterization(uint32_t face_id) const {
+	   		assert(face_id < mFaceCount);
+	   		assert(face_id < mSurfaceCache.size());
+	   		return mSurfaceCache[face_id].GetParameterization();
+	   	}
+
 	   	OpenSubdiv::Bfr::Parameterization getSurfaceParameterization(const OpenSubdiv::Bfr::Surface<float>& surface) const {
 	   		return surface.GetParameterization();
 	   	}
@@ -78,14 +88,14 @@ class PersistentMeshEvaluator {
 	   	}
 
 	    // Slow not optimized version
-	    void evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const OsdFaceCoord& pt, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, 
+	    void evaluateSurface(const OsdFaceCoord& pt, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, 
 	    	pxr::GfVec3f& limitPos, pxr::GfVec3f& limitTangentU, pxr::GfVec3f& limitTangentV);
 
 	    // Optimized version for querying all target points on a primitive
-	    void evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const std::vector<OsdFaceCoord>& points, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, 
+	    void evaluateSurface(const std::vector<OsdFaceCoord>& points, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, 
 	    	std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs);
 
-		void evaluateSurface(uint32_t prim_id, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const std::vector<OsdFaceCoord>& points, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, 
+		void evaluateSurface(const std::vector<OsdFaceCoord>& points, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, 
 	    	std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs, std::vector<float>& faceScratchBuffer);
 
 	    static UniquePtr create();
@@ -97,6 +107,7 @@ class PersistentMeshEvaluator {
 	    OpenSubdiv::Far::TopologyRefiner* mpRefiner = nullptr;
 
 		// Long lived surface cache for on-the-fly subdivision evaluations
+		std::unique_ptr<OpenSubdiv::Bfr::RefinerSurfaceFactory<>> mpSurfaceFactory;
 	    mutable std::vector<OpenSubdiv::Bfr::Surface<float>> mSurfaceCache;
 	    mutable int mMaxPatchPoints = 0; // used for patch points scratch buffer
 };
