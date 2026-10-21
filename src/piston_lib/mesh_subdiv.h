@@ -104,12 +104,14 @@ class PersistentMeshEvaluator {
 	    bool mIsInitialized = false;
 	    uint32_t mFaceCount = 0;
 
-	    OpenSubdiv::Far::TopologyRefiner* mpRefiner = nullptr;
+	    std::unique_ptr<OpenSubdiv::Far::TopologyRefiner> mpRefiner;
 
 		// Long lived surface cache for on-the-fly subdivision evaluations
 		std::unique_ptr<OpenSubdiv::Bfr::RefinerSurfaceFactory<>> mpSurfaceFactory;
 	    mutable std::vector<OpenSubdiv::Bfr::Surface<float>> mSurfaceCache;
 	    mutable int mMaxPatchPoints = 0; // used for patch points scratch buffer
+
+	    mutable std::mutex mSurfaceMutex;
 };
 
 class PersistentMeshRefiner {
@@ -135,7 +137,7 @@ class PersistentMeshRefiner {
 
 	    void querySubdividedPoints(int sourceFaceId, std::vector<pxr::GfVec3f>& points, uint32_t& count) const;
 
-	    OpenSubdiv::Far::TopologyRefiner* getRefiner() const { return mpRefiner; }
+	    OpenSubdiv::Far::TopologyRefiner* getRefiner() const { return mpRefiner.get(); }
 	    [[nodiscard]] uint8_t getMaxLevel() const { return mMaxLevel; }
 
 	    [[nodiscard]] bool isValidSourceMesh() const;
@@ -158,7 +160,7 @@ class PersistentMeshRefiner {
 	    pxr::UsdStageRefPtr mpStage;
 	    mutable pxr::UsdGeomMesh mSourceMesh;
 	    pxr::UsdGeomMesh mOutputMesh;
-	    OpenSubdiv::Far::TopologyRefiner* mpRefiner = nullptr;
+	    std::unique_ptr<OpenSubdiv::Far::TopologyRefiner> mpRefiner;
 
 	    std::string mRestPosName;
 	    pxr::UsdTimeCode mRestTimeCode;

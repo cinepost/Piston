@@ -219,6 +219,18 @@ std::vector<uint32_t> UsdGeomMeshFaceAdjacency::getNeighborPrims(uint32_t common
 	return prim_indices;
 }
 
+pxr::GfVec3f UsdGeomMeshFaceAdjacency::getPrimCentroid(uint32_t prim_id, const pxr::VtArray<pxr::GfVec3f>& positions) const {
+	assert(prim_id < mFaceCount);
+	const uint32_t prim_vertex_count = getPrimVertexCount(prim_id);
+
+	pxr::GfVec3f result_p(0.0f, 0.0f, 0.0f);
+	for(uint32_t i = 0; i < prim_vertex_count; ++i) {
+		result_p += positions[getPrimVertex(prim_id, i)];
+	}
+
+	return result_p / static_cast<float>(prim_vertex_count);
+}
+
 uint32_t UsdGeomMeshFaceAdjacency::findBestPrimFast(const pxr::GfVec3f target, uint32_t common_point_idx) const {
 	const uint32_t neighbors_count = getNeighborsCount(common_point_idx);
 	if(neighbors_count == 0) return kInvalidID;

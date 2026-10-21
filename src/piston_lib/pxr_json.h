@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include <pxr/base/gf/vec2f.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/gf/matrix3f.h>
@@ -17,6 +18,9 @@
 using json = nlohmann::json;
 
 namespace Piston {
+
+void to_json(json& j, const pxr::GfVec2f& p);
+void from_json(const json& j, pxr::GfVec2f& p);
 
 void to_json(json& j, const pxr::GfVec3f& p);
 void from_json(const json& j, pxr::GfVec3f& p);

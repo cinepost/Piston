@@ -44,8 +44,9 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
         return pxr::GfVec2f(u, v);
     };
 
-    if (vertex_count == 3) {
-        // Tri
+    if (vertex_count == 3 && !faceParam.HasSubFaces()) {
+        // Barycentric coordinates apply only to triangular parameterizations.
+        // Catmull-Clark triangles use the quadrangulated sub-face path below.
         const pxr::GfVec3f p0 = meshPointPositions[adjacency.getPrimVertex(prim_id, 0)];
         const pxr::GfVec3f p1 = meshPointPositions[adjacency.getPrimVertex(prim_id, 1)];
         const pxr::GfVec3f p2 = meshPointPositions[adjacency.getPrimVertex(prim_id, 2)];
@@ -74,7 +75,7 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
         return result;
     }
 
-    // Ngon
+    // Faces with quadrangulated sub-faces, including Catmull-Clark triangles.
     pxr::GfVec3f center(0.0f, 0.0f, 0.0f); // Virtual center point exactly like Catmull-Clark/OpenSubdiv does
     for(size_t i = 0; i < vertex_count; ++i) {
         center += meshPointPositions[adjacency.getPrimVertex(prim_id, i)];
@@ -130,7 +131,7 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
     pxr::GfVec2f localUV = invertBilinearQuad(pt, q0, q1, q2, q3, result.dist);
     
     // Shift and tile the sub-face UV into the unified coordinate matrix space
-    faceParam.ConvertSubFaceToCoord(subFaceId, &localUV[0], &result.uv[0]);        
+    faceParam.ConvertNormalizedSubFaceToCoord(subFaceId, &localUV[0], &result.uv[0]);        
 
     return result;
 }
@@ -142,16 +143,14 @@ PersistentMeshEvaluator::UniquePtr PersistentMeshEvaluator::create() {
 }
 
 PersistentMeshEvaluator::~PersistentMeshEvaluator() {
-    if(mpRefiner) {
-        delete mpRefiner;
-    }
+
 }
 
 bool PersistentMeshEvaluator::init(const UsdPrimHandle& prim_handle, pxr::UsdTimeCode rest_time_code) {
     mIsInitialized = false;
     
-    if(mpRefiner) delete mpRefiner;
-    
+    mSurfaceCache.clear();
+
     auto mesh = pxr::UsdGeomMesh(prim_handle.getPrim());
 
     if(!isValidMesh(mesh)) {
@@ -189,10 +188,9 @@ bool PersistentMeshEvaluator::init(const UsdPrimHandle& prim_handle, pxr::UsdTim
     OpenSubdiv::Sdc::Options options;
     options.SetVtxBoundaryInterpolation(OpenSubdiv::Sdc::Options::VTX_BOUNDARY_EDGE_ONLY);
 
-
-    mpRefiner = OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Create(
-        desc, OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Options(osdScheme, options)
-    );
+    mpRefiner = std::unique_ptr<OpenSubdiv::Far::TopologyRefiner>(
+        OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Create(desc, OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Options(osdScheme, options)
+    ));
 
     if (!mpRefiner) {
         LOG_ERR << "Failed to construct OpenSubdiv Evaluator. Check " << prim_handle << " topology.";
@@ -210,6 +208,9 @@ bool PersistentMeshEvaluator::init(const UsdPrimHandle& prim_handle, pxr::UsdTim
 }
 
 const std::vector<OpenSubdiv::Bfr::Surface<float>>& PersistentMeshEvaluator::getSurfaceCache() const {
+    const std::lock_guard<std::mutex> lock(mSurfaceMutex);
+
+    assert(mIsInitialized);
     assert(mpRefiner);
     assert(mpSurfaceFactory);
     assert(mFaceCount > 0u);
@@ -238,6 +239,8 @@ const std::vector<OpenSubdiv::Bfr::Surface<float>>& PersistentMeshEvaluator::get
 void PersistentMeshEvaluator::evaluateSurface(const OsdFaceCoord& coord, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, pxr::GfVec3f& limitPos, pxr::GfVec3f& limitTangentU, pxr::GfVec3f& limitTangentV) {
     static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor meshPointDesc(3, 3); // The point has 3 float components, the memory stride to the next vertex is 3 floats
     assert(coord.face_id < surfaceCache.size());
+    
+    const std::lock_guard<std::mutex> lock(mSurfaceMutex);
     surfaceCache[coord.face_id].Evaluate(&coord.uv[0], meshPointPositions.cdata()->data(), meshPointDesc, &limitPos[0], &limitTangentU[0], &limitTangentV[0]);
 }
 
@@ -249,6 +252,8 @@ void PersistentMeshEvaluator::evaluateSurface(const std::vector<OsdFaceCoord>& c
 void PersistentMeshEvaluator::evaluateSurface(const std::vector<OsdFaceCoord>& coords, const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache, const pxr::VtArray<pxr::GfVec3f>& meshPointPositions, std::vector< pxr::GfVec3f>& limitPositions, std::vector< pxr::GfVec3f>& limitTangentUs, std::vector<pxr::GfVec3f>& limitTangentVs, std::vector<float>& faceScratchBuffer) {
     static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor meshPointDesc(3, 3); // The point has 3 float components, the memory stride to the next vertex is 3 floats
     static const OpenSubdiv::Bfr::Surface<float>::PointDescriptor patchPointDesc(3, 3);
+
+    const std::lock_guard<std::mutex> lock(mSurfaceMutex);
 
     if(coords.empty()) {
         LOG_ERR << "PersistentMeshRefiner::evaluateSurface(...) coords target vector is empty !";
@@ -265,16 +270,16 @@ void PersistentMeshEvaluator::evaluateSurface(const std::vector<OsdFaceCoord>& c
         vec.push_back(i);
     }
 
-
     for(const auto& [prim_id, queries]: surface_map) {
         assert(prim_id < surfaceCache.size());
         const auto& surface = surfaceCache[prim_id];
     
+        assert(surface.IsValid());
         surface.PreparePatchPoints(reinterpret_cast<const float*>(meshPointPositions.cdata()->data()), meshPointDesc, faceScratchBuffer.data(), patchPointDesc);
 
-        for(size_t query_id = 0; query_id < queries.size(); ++query_id) {
-            const OsdFaceCoord& coord = coords[query_id];
-            surface.Evaluate(&coord.uv[0], faceScratchBuffer.data(), patchPointDesc, &limitPositions[query_id][0], &limitTangentUs[query_id][0], &limitTangentVs[query_id][0]);
+        for (const size_t index : queries) {
+            const OsdFaceCoord& coord = coords[index];
+            surface.Evaluate(&coord.uv[0], faceScratchBuffer.data(), patchPointDesc, &limitPositions[index][0], &limitTangentUs[index][0], &limitTangentVs[index][0]);
         }
     }
 }
@@ -303,9 +308,7 @@ PersistentMeshRefiner::UniquePtr PersistentMeshRefiner::create() {
 }
 
 PersistentMeshRefiner::~PersistentMeshRefiner() {
-    if(mpRefiner) {
-        delete mpRefiner;
-    }
+
 }
 
 void PersistentMeshRefiner::clear() {
@@ -396,13 +399,9 @@ bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLe
         osdScheme = OpenSubdiv::Sdc::SCHEME_BILINEAR;
     }
 
-    if(mpRefiner) {
-        delete mpRefiner;
-    }
-
-    mpRefiner = OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Create(
-        desc, OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Options(osdScheme)
-    );
+    mpRefiner = std::unique_ptr<OpenSubdiv::Far::TopologyRefiner>(
+        OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Create(desc, OpenSubdiv::Far::TopologyRefinerFactory<OpenSubdiv::Far::TopologyDescriptor>::Options(osdScheme)
+    ));
 
     if (!mpRefiner) {
         LOG_ERR << "Failed to construct OpenSubdiv Refiner. Check " << prim_handle << " topology.";
@@ -417,10 +416,10 @@ bool PersistentMeshRefiner::init(const UsdPrimHandle& prim_handle, uint8_t maxLe
         );
     }
 
-    auto* pRefiner = (pRestRefiner && linear_rest_interp) ? pRestRefiner.get() : mpRefiner;
+    auto* pRefiner = (pRestRefiner && linear_rest_interp) ? pRestRefiner.get() : mpRefiner.get();
     
     pRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
-    if(pRefiner != mpRefiner) mpRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
+    if(pRefiner != mpRefiner.get()) mpRefiner->RefineUniform(OpenSubdiv::Far::TopologyRefiner::UniformOptions(mMaxLevel));
 
     int totalNumVertices = pRefiner->GetNumVerticesTotal();
     mTmpVertexBuffer.resize(totalNumVertices);

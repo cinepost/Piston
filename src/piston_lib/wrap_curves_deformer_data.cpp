@@ -15,6 +15,7 @@ void WrapCurvesDeformerData::clearData() {
 	const std::lock_guard<std::mutex> lock(mMutex);
 
 	mPointBinds.clear();
+	mOsdPointBinds.clear();
 	mIsValid = false;
 }
 
@@ -22,11 +23,13 @@ size_t WrapCurvesDeformerData::calcHash() const {
 	size_t hash = 0;
 
 	for(const auto& bind: mPointBinds) {
-		std::size_t raw_bits;
 		double _tmp = bind.u + bind.v + bind.dist;
+    	hash += static_cast<size_t>(bind.face_id) + static_cast<size_t>(_tmp);
+	}
 
-    	std::memcpy(&raw_bits, &_tmp, sizeof(double));
-		hash += static_cast<size_t>(bind.face_id) + raw_bits;
+	for(const auto& bind: mOsdPointBinds) {
+		double _tmp = bind.uv[0] + bind.uv[1] + bind.localPos[0] + bind.localPos[1] + bind.localPos[2];
+    	hash += static_cast<size_t>(bind.face_id) + static_cast<size_t>(_tmp);
 	}
 
 	hash += mPointBinds.size();
@@ -35,6 +38,7 @@ size_t WrapCurvesDeformerData::calcHash() const {
 }
 
 static constexpr const char* kJPointBinds = "pointbinds";
+static constexpr const char* kJOsdPointBinds = "osdpointbinds";
 static constexpr const char* kJMode = "mode";
 static constexpr const char* kJDataHash = "data_hash";
 
@@ -43,6 +47,7 @@ bool WrapCurvesDeformerData::dumpToJSON(json& j) const {
 	const std::lock_guard<std::mutex> lock(mMutex);
 	
 	j[kJPointBinds] = mPointBinds;
+	j[kJOsdPointBinds] = mOsdPointBinds;
 	j[kJMode] = to_string(mBindMode);
 	j[kJDataHash] = calcHash();
 
@@ -62,6 +67,8 @@ bool WrapCurvesDeformerData::readFromJSON(const json& j) {
 	}
 
 	mPointBinds = j[kJPointBinds].template get<std::vector<PointBindData>>();
+	mOsdPointBinds = j[kJOsdPointBinds].template get<std::vector<OsdPointBindData>>();
+	
 	if(j[kJDataHash].template get<size_t>() != calcHash()) {
 		LOG_ERR << typeName() << " json data hash mismatch !";
 		return false;
@@ -97,11 +104,21 @@ void to_json(json& j, const WrapCurvesDeformerData::PointBindData& bind) {
 	j = {bind.face_id, bind.u, bind.v, bind.dist};
 }
 
+void to_json(json& j, const WrapCurvesDeformerData::OsdPointBindData& bind) {
+	j = {bind.face_id, bind.uv[0], bind.uv[1], bind.localPos[0], bind.localPos[1], bind.localPos[2]};
+}
+
 void from_json(const json& j, WrapCurvesDeformerData::PointBindData& bind) {
 	bind.face_id = j.at(0).template get<uint32_t>();
 	bind.u = j.at(1).template get<float>();
 	bind.v = j.at(2).template get<float>();
 	bind.dist = j.at(3).template get<float>();
+}
+
+void from_json(const json& j, WrapCurvesDeformerData::OsdPointBindData& bind) {
+	bind.face_id = j.at(0).template get<uint32_t>();
+	bind.uv = {j.at(1).template get<float>(), j.at(2).template get<float>()};
+	bind.localPos = {j.at(3).template get<float>(), j.at(4).template get<float>(), j.at(5).template get<float>()};
 }
 
 } // namespace Piston

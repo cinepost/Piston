@@ -74,11 +74,18 @@ class UsdGeomMeshFaceAdjacency {
 			return mSrcFaceVertexIndices[mSrcFaceVertexOffsets[prim_idx] + local_vertex_index];
 		}
 
+		template<typename T>
+		T getPrimVertex(uint32_t prim_idx, uint32_t local_vertex_index) const {
+			return static_cast<T>(getPrimVertex(prim_idx, local_vertex_index));
+		}
+
 		uint32_t getVertexFaceId(uint32_t vtx) const;
 
 		uint32_t getVertexCount() const { return mVertexCount; }
 		uint32_t getPrimCount() const { return mFaceCount; }
 		uint32_t getMaxFaceVertexCount() const { return mMaxFaceVertexCount; }
+
+		pxr::GfVec3f getPrimCentroid(uint32_t prim_id, const pxr::VtArray<pxr::GfVec3f>& positions) const;
 
 		const std::vector<uint32_t>& getPrimData() const { return mPrimData; }
 

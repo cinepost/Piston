@@ -2,6 +2,15 @@
 
 namespace Piston {
 
+void to_json(json& j, const pxr::GfVec2f& p) {
+	j =  json{(float)p[0], (float)p[1]};
+}
+
+void from_json(const json& j, pxr::GfVec2f& p) {
+	p[0] = j.at(0).template get<float>();
+	p[1] = j.at(1).template get<float>();
+}
+
 void to_json(json& j, const pxr::GfVec3f& p) {
 	j =  json{(float)p[0], (float)p[1], (float)p[2]};
 }

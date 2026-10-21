@@ -39,19 +39,6 @@ void WrapCurvesDeformer::invalidateData(DeformerDataCache& cache) {
 }
 
 bool WrapCurvesDeformer::__deform__(PointsList& points, bool multi_threaded, pxr::UsdTimeCode time_code) {
-	assert(mpPhantomTrimeshData);
-	const auto* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
-
-	if(!pPhantomTrimesh || !pPhantomTrimesh->isValid()) {
-		return false;
-	}
-
-	assert(points.size() == mpWrapCurvesDeformerData->getPointBinds().size());
-	assert(mpAdjacencyData);
-	assert(mpDeformerMeshContainer);
-
-	buildVertexNormals(mpAdjacencyData->getAdjacencyFinal(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
-
 	bool result = false;
 	switch(mpWrapCurvesDeformerData->getBindMode()) {
 		case BindMode::SPACE:
@@ -78,7 +65,11 @@ bool WrapCurvesDeformer::deformImpl_SpaceMode(bool multi_threaded, PointsList& p
 
 	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
 
+	assert(mpDeformerMeshContainer);
 	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
+
+	assert(mpAdjacencyData);
+	buildVertexNormals(mpAdjacencyData->getAdjacencyFinal(), pPhantomTrimesh, mLiveVertexNormals, mpDeformerMeshContainer->getLivePositions(), (multi_threaded ? &mPool : nullptr));
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
 		auto* pOutPoints = points.points();
@@ -183,13 +174,11 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 	const auto* pDeformerMeshContainer = mpDeformerMeshContainer.get();
 	assert(pDeformerMeshContainer);
 
-	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
-
 	if(!smooth_deformer) {
 		mLiveTriFaceNormals.resize(pPhantomTrimesh->getFaceCount());
 	}
 
-	const bool adjust_for_curve_local_anim = buildCurvesLocalAnimVectors(multi_threaded);
+	const bool adjust_for_curve_local_anim = smooth_deformer ? false : buildCurvesLocalAnimVectors(multi_threaded);
 
 	auto face_normal_and_matrix_func = [&](const std::size_t start, const std::size_t end) {
 		const auto& face_flags = pPhantomTrimesh->getFaceFlags(); 
@@ -223,6 +212,7 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 	};
 
 	auto func = [&](const std::size_t start, const std::size_t end) {
+		const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
 		auto* pOutPoints = points.points();
 		
 		for(size_t i = start; i < end; ++i) {
@@ -242,30 +232,55 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 	};
 
 	auto func_smoothed = [&](const std::size_t start, const std::size_t end) {
-
-		const pxr::VtArray<pxr::GfVec3f>& mesh_live_positions = mpDeformerMeshContainer->getLivePositions();
+		const MeshContainer::ContainerType& mesh_live_positions = pDeformerMeshContainer->getLivePositions();
 
 		const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache = mpDeformerEvaluator->getSurfaceCache();
 		auto surfaceScratchBuffer = mpDeformerEvaluator->getSurfaceScratchBuffer();
 
 		auto* pOutPoints = points.points();
+
+		const auto& osdPointBinds = mpWrapCurvesDeformerData->getOsdPointBinds();
 		
+		std::vector<OsdFaceCoord> coords;
+		std::vector<pxr::GfVec3f> limitPositions;
+		std::vector<pxr::GfVec3f> limitTangentUs;
+		std::vector<pxr::GfVec3f> limitTangentVs;
+
 		for(size_t i = start; i < end; ++i) {
-			const auto& bind = pointBinds[i];
+			const auto& bind = osdPointBinds[i];
+			coords.push_back({bind.face_id, bind.uv});
+		}
 
-			OsdFaceCoord osd_coord = bind.toOsdFaceCoord();
+		mpDeformerEvaluator->evaluateSurface(coords, surfaceCache, mesh_live_positions, limitPositions, limitTangentUs, limitTangentVs, surfaceScratchBuffer);
 
-			//pOutPoints[i] = pDeformerMeshContainer->getInterpolatedLivePosition(pPhantomTrimesh->getFace(bind.face_id), bind.u, bind.v) + (mLiveTriFaceNormals[bind.face_id] * bind.dist);
+		assert(coords.size() == limitPositions.size());
+		assert(coords.size() == limitTangentUs.size());
+		assert(coords.size() == limitTangentVs.size());
 
+		for(size_t i = start; i < end; ++i) {
+			const auto& bind = osdPointBinds[i];
+			const uint32_t ii = i - start;
 
-			pxr::GfVec3f limitPosition, limitTangentU, limitTangentV;
-			mpDeformerEvaluator->evaluateSurface(osd_coord, surfaceCache, mesh_live_positions, limitPosition, limitTangentU, limitTangentV);
+			const pxr::GfVec3f& T = limitTangentUs[ii];
+			const pxr::GfVec3f& B = limitTangentVs[ii];
+			const pxr::GfVec3f N = pxr::GfCross(T, B).GetNormalized();
+
+			const pxr::GfMatrix3f m = {
+				N[0], T[0], B[0], 
+				N[1], T[1], B[1],
+				N[2], T[2], B[2]
+			};
+
+			pOutPoints[i] = limitPositions[ii] + m * bind.localPos; 
 		}
 	};
 
+	const auto& pointBinds = mpWrapCurvesDeformerData->getPointBinds();
+	const auto& osdPointBinds = mpWrapCurvesDeformerData->getOsdPointBinds();
+
 	if(multi_threaded) {
 		if(smooth_deformer) {
-			BS::multi_future<void> blocks = mPool.submit_blocks(0u, pointBinds.size(), func_smoothed);
+			BS::multi_future<void> blocks = mPool.submit_blocks(0u, osdPointBinds.size(), func_smoothed);
 			blocks.wait();
 		} else {
 			BS::multi_future<void> blocks_nm = mPool.submit_blocks(0u, pPhantomTrimesh->getFaceCount(), face_normal_and_matrix_func);
@@ -275,7 +290,7 @@ bool WrapCurvesDeformer::deformImpl_DistMode(bool multi_threaded, PointsList& po
 		}
 	} else {
 		if(smooth_deformer) {
-			func_smoothed(0u, pointBinds.size());
+			func_smoothed(0u, osdPointBinds.size());
 		} else {
 			face_normal_and_matrix_func(0u, pPhantomTrimesh->getFaceCount());
 			func(0u, pointBinds.size());
@@ -423,7 +438,13 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 	const size_t curves_vertex_count = pCurvesContainer->getTotalVertexCount(); 
 
 	auto& pointBinds = mpWrapCurvesDeformerData->mPointBinds;
-	pointBinds.resize(pCurvesContainer->getTotalVertexCount());
+	auto& osdPointBinds = mpWrapCurvesDeformerData->mOsdPointBinds;
+	
+	if(smooth_deformer) {
+		osdPointBinds.resize(pCurvesContainer->getTotalVertexCount());
+	} else {
+		pointBinds.resize(pCurvesContainer->getTotalVertexCount());
+	}
 
 	assert(mpPhantomTrimeshData);
 	PhantomTrimesh* pPhantomTrimesh = mpPhantomTrimeshData->getTrimesh();
@@ -469,16 +490,14 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 
     	for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
     		const PxrCurvesContainer::CurveDataPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_idx);
-        	if(curve_data_ptr.first < 2) continue;
+        	if(curve_data_ptr.first == 0) continue;
 
         	const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
-
         	const pxr::GfVec3f& curve_root_pt = pCurvesContainer->getCurveRootPoint(curve_idx);
         	const uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_idx);
         	
         	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
-        		auto& bind = pointBinds[curve_vertex_offset + i];
-        		bind.face_id = PointBindData::kInvalidFaceID;
+        		const uint32_t bind_id = curve_vertex_offset + i;
         		const pxr::GfVec3f curr_pt = curve_root_pt + *(curve_data_ptr.second + i);
 
         		static constexpr uint32_t sInvalidPrimID = std::numeric_limits<uint32_t>::max();
@@ -513,6 +532,8 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 
 						if(smooth_deformer) {
 							// Deformer mesh smooth bind using PersistentMeshEvaluator
+							assert(bind_id < osdPointBinds.size());
+							auto& osdBind = osdPointBinds[bind_id];
 
 							const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache = mpDeformerEvaluator->getSurfaceCache();
 							assert(prim_id < surfaceCache.size());
@@ -520,10 +541,15 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 							
 							OpenSubdiv::Bfr::Parameterization faceParam = mpDeformerEvaluator->getSurfaceParameterization(prim_id);
 							OsdFaceCoord osd_coord = calculateOsdCoordinates(prim_id, curr_pt, *pAdjacency, mesh_rest_positions, faceParam); 
-							bind = std::move(PointBindData(osd_coord));
+							
+							osdBind.face_id = osd_coord.face_id;
+							osdBind.uv = osd_coord.uv;
 
 						} else {
 							// bind using per point prim_id attr
+							auto& bind = pointBinds[bind_id];
+        					bind.face_id = PointBindData::kInvalidFaceID;
+
 							const uint32_t prim_vertex_count = pAdjacency->getPrimVertexCount(prim_id);
 							assert(prim_vertex_count > 2);
 							if(prim_vertex_count == 3) {
@@ -560,6 +586,8 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 	        			// auto search
 						if(smooth_deformer) {
 							// Deformer mesh smooth bind using PersistentMeshEvaluator
+							assert(bind_id < osdPointBinds.size());
+							auto& osdBind = osdPointBinds[bind_id];
 
 							assert(pMeshPointsKDtree);
 							const neighbour_search::KDTree<float, 3>::ReturnType nearest_pt = pMeshPointsKDtree->findNearestNeighbour(curr_pt);
@@ -575,7 +603,9 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 							OpenSubdiv::Bfr::Parameterization faceParam = mpDeformerEvaluator->getSurfaceParameterization(best_prim);
 
 							OsdFaceCoord osd_coord = calculateOsdCoordinates(best_prim, curr_pt, *pAdjacency, mesh_rest_positions, faceParam); 
-							bind = std::move(PointBindData(osd_coord));
+							
+							osdBind.face_id = osd_coord.face_id;
+							osdBind.uv = osd_coord.uv;
 
 						} else {
 							assert(pKDtree);
@@ -609,6 +639,9 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
 								bind.face_id = face_id;
 							};
 
+							auto& bind = pointBinds[bind_id];
+        					bind.face_id = PointBindData::kInvalidFaceID;
+
 							bindCurvePointToPrim(i, face_id, bind);
 						}
 					}
@@ -617,11 +650,86 @@ bool WrapCurvesDeformer::buildDeformerData_DistMode(bool multi_threaded, const s
     	}
     };
 
+    auto func_smoothed_ntb = [&](const std::size_t start, const std::size_t end) {
+		if(multi_threaded) {
+			LOG_TRC << "Calculating curves bind local positions from " << start << " to " << end << " by thread id #" << *BS::this_thread::get_index();
+		}
+
+		const std::vector<OpenSubdiv::Bfr::Surface<float>>& surfaceCache = mpDeformerEvaluator->getSurfaceCache();
+		auto& osdPointBinds = mpWrapCurvesDeformerData->mOsdPointBinds;
+
+		std::vector<uint32_t> bind_indices;
+		std::vector<OsdFaceCoord> coords;
+		std::vector<pxr::GfVec3f> curvePositions;
+
+		std::vector<pxr::GfVec3f> limitPositions;
+		std::vector<pxr::GfVec3f> limitTangentUs;
+		std::vector<pxr::GfVec3f> limitTangentVs;
+
+		bind_indices.clear();
+		coords.clear();
+		curvePositions.clear();
+
+		for(size_t curve_idx = start; curve_idx < end; ++curve_idx) {
+			const PxrCurvesContainer::CurveDataPtr curve_data_ptr = pCurvesContainer->getCurveDataPtr(curve_idx);
+        	assert(curve_data_ptr.first > 1);
+
+        	const uint32_t curve_vertices_count = static_cast<uint32_t>(curve_data_ptr.first);
+        	const pxr::GfVec3f& curve_root_pt = pCurvesContainer->getCurveRootPoint(curve_idx);
+        	const uint32_t curve_vertex_offset = pCurvesContainer->getCurveVertexOffset(curve_idx);
+
+        	for(uint32_t i = 0; i < curve_vertices_count; ++i) {
+        		const uint32_t bind_id = curve_vertex_offset + i;
+        		assert(bind_id < osdPointBinds.size());
+        		const auto& bind = osdPointBinds[bind_id];
+
+        		bind_indices.push_back(bind_id);
+        		curvePositions.push_back(curve_root_pt + *(curve_data_ptr.second + i));
+
+				assert(bind.isValid());
+				coords.push_back({bind.face_id, bind.uv});
+        	}
+		}
+
+
+		auto surfaceScratchBuffer = mpDeformerEvaluator->getSurfaceScratchBuffer();
+		mpDeformerEvaluator->evaluateSurface(coords, surfaceCache, mesh_rest_positions, limitPositions, limitTangentUs, limitTangentVs, surfaceScratchBuffer);
+		
+		assert(bind_indices.size() == limitPositions.size());
+		assert(curvePositions.size() == limitPositions.size());
+
+		for(size_t ii = 0; ii < bind_indices.size(); ++ii) {
+			const pxr::GfVec3f& T = limitTangentUs[ii];
+			const pxr::GfVec3f& B = limitTangentVs[ii];
+			const pxr::GfVec3f N = pxr::GfCross(T, B).GetNormalized();
+
+			const pxr::GfMatrix3f m = pxr::GfMatrix3f(
+				N[0], T[0], B[0],
+				N[1], T[1], B[1],
+				N[2], T[2], B[2]
+			).GetInverse();
+
+			const uint32_t bind_id = bind_indices[ii];
+			assert(bind_id < osdPointBinds.size());
+			pxr::GfVec3f offset = curvePositions[ii] - limitPositions[ii];
+			osdPointBinds[bind_id].localPos = m * offset;
+		}
+	};
+
     if(multi_threaded) {
 		BS::multi_future<void> blocks = mPool.submit_blocks(0, curves_count, func);
 		blocks.wait();
+
+		if(smooth_deformer) {
+			BS::multi_future<void> blocks_ntb = mPool.submit_blocks(0, curves_count, func_smoothed_ntb);
+			blocks_ntb.wait();
+		}
 	} else {
 		func(0, curves_count);
+
+		if(smooth_deformer) {
+			func_smoothed_ntb(0, curves_count);
+		}
 	}
 
     DLOG_TRC << "WrapCurvesDeformer::buildDeformerData_DistMode() done.";
@@ -963,8 +1071,8 @@ void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 			auto surfaceScratchBuffer = mpDeformerEvaluator->getSurfaceScratchBuffer();
 
 			for(uint32_t prim_id = start; prim_id < end; ++prim_id) {
-				static const int x_divisions = 10;
-				static const int y_divisions = 10;
+				static const int x_divisions = 3;
+				static const int y_divisions = 3;
 
 				target_points.clear();
 				limitPositions.clear();
@@ -983,11 +1091,48 @@ void WrapCurvesDeformer::drawDebugGeometry(pxr::UsdTimeCode time_code, const Poi
 
 				for(int x = 0; x < x_divisions; ++x) {
 					for(int y = 0; y < y_divisions; ++y) {
-						DebugGeo::Pt p(limitPositions[x + y * x_divisions]);
+						size_t idx = x + y * x_divisions;
+						const auto& limit_pt = limitPositions[idx];
+
+						DebugGeo::Pt p(limit_pt);
 						p.setColor({static_cast<float>(x) / static_cast<float>(x_divisions), static_cast<float>(y) / static_cast<float>(y_divisions), 0.0f});
 						mpDebugGeo->addPoint(p);
+
+						// UV
+						DebugGeo::Line lU(limit_pt, limit_pt + limitTangentUs[idx]);
+						lU.setColor({1.0f, 0.0f, 0.0f});
+						lU.setWidth(0.01f);
+						mpDebugGeo->addLine(lU);
+
+						DebugGeo::Line lV(limit_pt, limit_pt + limitTangentVs[idx]);
+						lV.setColor({0.0f, 1.0f, 0.0f});
+						lV.setWidth(0.01f);
+						mpDebugGeo->addLine(lV);
 					}
 				}
+			}
+
+
+			// bind links
+
+			assert(mpCurvesContainer);
+			const auto& osdPointBinds = mpWrapCurvesDeformerData->getOsdPointBinds();
+
+			const auto& curves_rest_positions = mpCurvesContainer->getRestCurvePoints();
+
+			assert(osdPointBinds.size() == curves_rest_positions.size());
+
+			for(uint32_t i = 0; i < osdPointBinds.size(); ++i) {
+				const auto& bind = osdPointBinds[i];
+				const auto& curve_pt = curves_rest_positions[i];
+
+				assert(bind.isValid());
+				pxr::GfVec3f prim_centroid = pAdjacency->getPrimCentroid(bind.face_id, positions);
+
+				DebugGeo::Line l(curve_pt, prim_centroid);
+				l.setColor({0.0f, 0.0f, 1.0f});
+				l.setWidth(0.01f);
+				mpDebugGeo->addLine(l);
 			}
 		};
 

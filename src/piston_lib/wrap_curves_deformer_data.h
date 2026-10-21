@@ -20,38 +20,31 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 			DIST 
 		};
 
-		struct PointCoord {
-			uint32_t face_id;
-			float u, v, dist;
+		struct OsdPointBindData {
+			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
+			uint32_t face_id = kInvalidFaceID;
+			pxr::GfVec2f uv = {0.0f, 0.0f};
+			pxr::GfVec3f localPos;
+
+			bool isValid() const { return face_id != kInvalidFaceID; }
+
+			OsdPointBindData() = default;
 		};
 
 		struct PointBindData {
 			static constexpr uint32_t kInvalidFaceID = std::numeric_limits<uint32_t>::max();
 			static constexpr float kFltMax = std::numeric_limits<float>::max(); 
-			uint32_t face_id;
-			float u, v, dist;
+			uint32_t face_id = kInvalidFaceID;
+			float u = 0.0f, v = 0.0f;
+			float dist = kFltMax;
 
-			PointBindData(): face_id(kInvalidFaceID), dist(kFltMax) {};
-			PointBindData(const OsdFaceCoord& osd_coord) {
-				u = osd_coord.uv[0];
-				v = osd_coord.uv[1];
-				dist = osd_coord.dist;
-				face_id = osd_coord.face_id;
-			}
-
-			inline bool isValid() const { return face_id != kInvalidFaceID; }
-
-			OsdFaceCoord toOsdFaceCoord() const {
-				OsdFaceCoord result;
-				result.face_id = face_id;
-				result.uv = {u, v};
-				result.dist = dist;
-
-				return std::move(result);
-			}
+			PointBindData() = default;
+			bool isValid() const { return face_id != kInvalidFaceID; }
 		};
 
-		const std::vector<PointBindData>& 	getPointBinds() const { return mPointBinds; }
+		const std::vector<PointBindData>& 		getPointBinds() const { return mPointBinds; }
+		const std::vector<OsdPointBindData>& 	getOsdPointBinds() const { return mOsdPointBinds; }
+
 		BindMode        					getBindMode() const { return mBindMode; }
 		void  								setBindMode(const BindMode& mode);
 
@@ -73,7 +66,10 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 		void 	setValid(bool state) { const std::lock_guard<std::mutex> lock(mMutex); mIsValid = state; }
 
 		BindMode                                mBindMode = BindMode::DIST;
+		
 		std::vector<PointBindData>              mPointBinds;
+		std::vector<OsdPointBindData>           mOsdPointBinds;
+
 		bool 									mIsValid;
 
 		friend class WrapCurvesDeformer;
@@ -81,6 +77,9 @@ class WrapCurvesDeformerData : public SerializableDeformerDataBase {
 
 void to_json(json& j, const WrapCurvesDeformerData::PointBindData& bind);
 void from_json(const json& j, WrapCurvesDeformerData::PointBindData& bind);
+
+void to_json(json& j, const WrapCurvesDeformerData::OsdPointBindData& bind);
+void from_json(const json& j, WrapCurvesDeformerData::OsdPointBindData& bind);
 
 inline std::string to_string(const WrapCurvesDeformerData::BindMode& mode) {
 	std::string str;
