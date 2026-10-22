@@ -58,8 +58,8 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
         float areaV = pxr::GfDot(pxr::GfCross(projP - p0, p2 - p0), normal);
         float areaU = pxr::GfDot(pxr::GfCross(p1 - p0, projP - p0), normal);
         
-        result.uv[0] = std::clamp(areaU / totalArea, 0.0f, 1.0f);
-        result.uv[1] = std::clamp(areaV / totalArea, 0.0f, 1.0f);
+        result.uv[0] = std::clamp(areaU / totalArea, 0.01f, 0.99f);
+        result.uv[1] = std::clamp(areaV / totalArea, 0.01f, 0.99f);
         return result;
     }
 
@@ -72,6 +72,10 @@ OsdFaceCoord calculateOsdCoordinates(uint32_t prim_id, const pxr::GfVec3f& pt, c
             meshPointPositions[adjacency.getPrimVertex(prim_id, 3)],
             result.dist
         );
+
+        result.uv[0] = std::clamp(result.uv[0], 0.01f, 0.99f);
+        result.uv[1] = std::clamp(result.uv[1], 0.01f, 0.99f);
+
         return result;
     }
 
