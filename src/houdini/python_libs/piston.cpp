@@ -100,12 +100,12 @@ BOOST_PYTHON_MODULE(_piston) {
 	using namespace boost::python;
 	using namespace Piston;
 
-	UsdTimeCode_from_python(); // UsdTimeCode converter
-	to_python_converter<pxr::UsdTimeCode, UsdTimeCode_to_python>();
+	//UsdTimeCode_from_python(); // UsdTimeCode converter
+	//to_python_converter<pxr::UsdTimeCode, UsdTimeCode_to_python>();
 
-	class_<std::vector<pxr::UsdTimeCode>>("UsdTimeCodeVector")
-    	.def(vector_indexing_suite<std::vector<pxr::UsdTimeCode>>())
-    ;
+	//class_<std::vector<pxr::UsdTimeCode>>("UsdTimeCodeVector")
+    //	.def(vector_indexing_suite<std::vector<pxr::UsdTimeCode>>())
+    //;
 
 	class_<SimpleProfiler, boost::noncopyable>("Profiler",  no_init)
 		.def("printReport", &SimpleProfiler::printReport)

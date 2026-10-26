@@ -2,6 +2,7 @@ import importlib
 import atexit
 from typing import Union, List
 
+from pxr import Usd
 import _piston
 
 ###################################
